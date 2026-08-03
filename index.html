@@ -263,14 +263,17 @@
   .cat-card .lbl .ct { font-size: 10.5px; opacity: .85; margin-top: 2px; }
 
   /* ---- Viewer ---- */
-  #screen-viewer { background: #000; }
-  .viewer-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to bottom, rgba(0,0,0,.5), transparent); }
-  .viewer-top .glass-btn { background: rgba(255,255,255,.18); }
+  /* Matches the cream/sage retheme used everywhere else now (was hardcoded black) —
+     photo shown smaller/framed with breathing room instead of bleeding to every edge,
+     same "photo as a card on cream" feel as the dashboard's own lightbox. */
+  #screen-viewer { background: var(--bg); }
+  .viewer-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to bottom, rgba(0,0,0,.45), transparent); }
+  .viewer-top .glass-btn { background: rgba(255,255,255,.22); }
   .viewer-actions { display: flex; gap: 10px; }
-  .viewer-img-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
-  .viewer-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; }
+  .viewer-img-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; box-sizing: border-box; padding: 78px 22px 64px; }
+  .viewer-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; border-radius: 14px; box-shadow: 0 18px 46px -20px rgba(20,16,20,.35); }
   .viewer-count { color: #fff; font-size: 12.5px; font-weight: 700; background: rgba(255,255,255,.18); padding: 5px 12px; border-radius: 999px; }
-  .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,.32); color: #fff; border: none; width: 38px; height: 38px; border-radius: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 4; }
+  .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(20,16,20,.5); color: #fff; border: none; width: 38px; height: 38px; border-radius: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 4; }
   .viewer-nav-prev { left: 10px; }
   .viewer-nav-next { right: 10px; }
   .viewer-nav[disabled] { opacity: 0; pointer-events: none; }
