@@ -14,6 +14,9 @@
      used for the "Download All Photos" > email-me-a-link flow. Needs a free EmailJS
      account; see EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY below. -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- Real QR decoding (pure JS, reads camera frames off a canvas) — powers the QR button
+     next to "Enter Event ID" on the gate screen; see openQrScanner()/scanQrFrame(). -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
   :root {
     /* Earthy sage-green / warm cream palette, swapped in from the coral default —
@@ -324,6 +327,19 @@
   .camera-fallback p { color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.6; margin: 0; }
   .camera-fallback .btn-solid { width: auto; display: inline-flex; }
   .camera-bottom { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; z-index: 5; }
+
+  /* ---- QR scanner (Event Gate) — independent of the selfie camera screen above:
+       no login/face-recognition gating, back camera by default, runs before an event
+       is even resolved. ---- */
+  .qr-scan-overlay { position: fixed; inset: 0; z-index: 1100; background: #000; display: none; flex-direction: column; }
+  .qr-scan-top { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to bottom, rgba(0,0,0,.65), transparent); }
+  .qr-scan-title { color: #fff; font-weight: 700; font-size: 14px; }
+  .qr-scan-video-wrap { flex: 1; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .qr-scan-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  .qr-scan-frame { position: absolute; width: 62%; max-width: 240px; aspect-ratio: 1/1; border: 3px solid rgba(255,255,255,.85); border-radius: 20px; box-shadow: 0 0 0 2000px rgba(0,0,0,.4); pointer-events: none; }
+  .qr-scan-hint { position: absolute; bottom: 90px; left: 0; right: 0; text-align: center; color: rgba(255,255,255,.85); font-size: 12.5px; padding: 0 30px; }
+  .qr-scan-fallback { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 30px; text-align: center; color: #fff; background: #111; z-index: 4; }
+  .qr-scan-fallback p { color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.6; margin: 0; }
   .shutter-btn { width: 68px; height: 68px; border-radius: 34px; background: #fff; border: 4px solid rgba(255,255,255,.4); cursor: pointer; }
 </style>
 </head>
@@ -384,32 +400,85 @@
     </div>
 
     <!-- Purely decorative "welcome" section — an original illustration (not traced/copied
-         art), no real data involved, with a few gentle CSS/SVG animations (floating
-         social badges, a pulsing camera lens, a flowing dashed connector) so it feels
-         alive rather than a static graphic pasted under the real form above it. -->
-    <div style="width:100%;max-width:320px;margin-top:26px;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:26px;padding:26px 18px 10px;box-shadow:0 16px 40px -20px rgba(20,16,20,.28);text-align:center;">
+         art), no real data involved. Redrawn as a simple 4-step story strip (Scan → Share
+         → View → Enjoy) instead of a freeform scene, each step a small self-contained
+         icon group so nothing depends on precise overlap/positioning between unrelated
+         elements — the previous version could end up looking like a single stray badge
+         if anything in that composition clipped oddly. -->
+    <div style="width:100%;max-width:320px;margin-top:26px;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:26px;padding:24px 16px 20px;box-shadow:0 16px 40px -20px rgba(20,16,20,.28);text-align:center;">
       <h2 style="margin:0 0 4px;font-size:19px;color:var(--ink);line-height:1.35;">Welcome to the future<br>of Photo Sharing</h2>
-      <p style="margin:0 0 6px;font-size:12px;color:var(--muted);" id="gate-welcome-studio-name-wrap">by <span id="gate-welcome-studio-name">SnapFilmer</span></p>
-      <svg viewBox="0 0 260 190" width="100%" style="max-width:230px;overflow:visible;">
-        <g style="animation:sf-tilt 4.5s ease-in-out infinite;transform-origin:54px 97px;">
-          <rect x="18" y="70" width="72" height="54" rx="6" fill="none" stroke="var(--ink)" stroke-width="2"/>
-          <circle cx="54" cy="97" r="16" fill="none" stroke="var(--ink)" stroke-width="2"/>
-          <circle cx="54" cy="97" r="16" fill="none" stroke="var(--accent)" stroke-width="2" opacity=".55" style="animation:sf-pulse-ring 2.4s ease-out infinite;transform-origin:54px 97px;"/>
-          <rect x="40" y="62" width="16" height="10" rx="2" fill="var(--ink)"/>
+      <p style="margin:0 0 14px;font-size:12px;color:var(--muted);" id="gate-welcome-studio-name-wrap">by <span id="gate-welcome-studio-name">SnapFilmer</span></p>
+      <svg viewBox="0 0 320 92" width="100%" height="92" style="max-width:300px;display:block;margin:0 auto;">
+        <path d="M62 40H258" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 6" opacity=".6" style="animation:sf-dash-flow 1s linear infinite;"/>
+        <path d="M76 34l8 6-8 6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+        <path d="M156 34l8 6-8 6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+        <path d="M236 34l8 6-8 6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+
+        <g style="animation:sf-float 3s ease-in-out infinite;">
+          <circle cx="40" cy="40" r="22" fill="var(--accent-soft)"/>
+          <g transform="translate(40,40)">
+            <path d="M-8 -8v-3a2 2 0 012-2h3M8 -8v-3a2 2 0 00-2-2H3M-8 8v3a2 2 0 002 2h3M8 8v3a2 2 0 01-2 2H3" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+            <rect x="-3.5" y="-3.5" width="7" height="7" rx="1.2" fill="var(--accent)"/>
+          </g>
+          <text x="40" y="80" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Scan</text>
         </g>
-        <g style="animation:sf-float 3.2s ease-in-out infinite;">
-          <rect x="120" y="30" width="70" height="52" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/>
-          <path d="M120 68l18-16 14 12 20-20 18 24z" fill="var(--accent-soft)"/>
-          <circle cx="138" cy="44" r="6" fill="var(--accent-soft)"/>
+
+        <g style="animation:sf-float 3.2s ease-in-out infinite;animation-delay:.25s;">
+          <circle cx="120" cy="40" r="22" fill="var(--accent-soft)"/>
+          <g transform="translate(120,40)">
+            <circle cx="6.5" cy="-7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+            <circle cx="-6.5" cy="0" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+            <circle cx="6.5" cy="7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+            <path d="M-3.9 1.6L4 5.6M4 -5.6L-3.9 -1.6" stroke="var(--accent)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          </g>
+          <text x="120" y="80" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Share</text>
         </g>
-        <path d="M96 96C130 60 160 130 196 96" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 6" style="animation:sf-dash-flow 1s linear infinite;"/>
-        <path d="M188 90l10 8-3 12z" fill="var(--accent)"/>
-        <g transform="translate(196,108)" style="animation:sf-float 3s ease-in-out infinite;animation-delay:.2s;"><circle r="17" fill="#E1306C"/><g fill="#fff" transform="translate(-9,-9) scale(0.75)"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/></g></g>
-        <g transform="translate(150,150)" style="animation:sf-float 3.4s ease-in-out infinite;animation-delay:.6s;"><circle r="15" fill="#25D366"/><g fill="#fff" transform="translate(-8,-8) scale(0.68)"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2z" fill="#fff"/></g></g>
-        <g transform="translate(60,150)" style="animation:sf-float 2.8s ease-in-out infinite;animation-delay:.9s;"><circle r="15" fill="#1877F2"/><text x="0" y="6" text-anchor="middle" font-size="16" fill="#fff" font-family="sans-serif" font-weight="700">f</text></g>
-        <g transform="translate(24,40)" style="animation:sf-float 3.6s ease-in-out infinite;animation-delay:.3s;"><circle r="14" fill="#FF0000"/><path d="M-4,-5 L6,0 L-4,5 Z" fill="#fff"/></g>
+
+        <g style="animation:sf-float 3.4s ease-in-out infinite;animation-delay:.5s;">
+          <circle cx="200" cy="40" r="22" fill="var(--accent-soft)"/>
+          <g transform="translate(200,40)">
+            <rect x="-9" y="-7" width="18" height="14" rx="2" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+            <circle cx="-3.8" cy="-2.8" r="1.6" fill="var(--accent)"/>
+            <path d="M-9 5l5-5 3 3 4-4 4 4" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <text x="200" y="80" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">View</text>
+        </g>
+
+        <g style="animation:sf-float 2.8s ease-in-out infinite;animation-delay:.75s;">
+          <circle cx="280" cy="40" r="22" fill="var(--accent-soft)"/>
+          <g transform="translate(280,40)">
+            <circle r="9.5" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+            <circle cx="-3.3" cy="-2.6" r="1.3" fill="var(--accent)"/>
+            <circle cx="3.3" cy="-2.6" r="1.3" fill="var(--accent)"/>
+            <path d="M-4.6 2.6a5.2 5.2 0 009.2 0" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+          </g>
+          <text x="280" y="80" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Enjoy</text>
+        </g>
       </svg>
     </div>
+  </div>
+
+  <!-- ========== QR SCANNER — deliberately separate from the selfie camera screen
+       (screen-camera below): that one is login/face-recognition gated and mirrors the
+       front camera for selfies, neither of which makes sense here. This overlay works
+       standalone, before any event is even resolved, using the back camera. See
+       openQrScanner()/scanQrFrame() in the script below. ========== -->
+  <div id="qr-scan-overlay" class="qr-scan-overlay">
+    <div class="qr-scan-top">
+      <div class="qr-scan-title">Scan Event QR Code</div>
+      <button class="ghost-btn" style="background:rgba(255,255,255,.15);color:#fff;" onclick="closeQrScanner()"><i data-icon="CLOSE_X"></i></button>
+    </div>
+    <div class="qr-scan-video-wrap">
+      <video id="qr-scan-video" autoplay playsinline muted></video>
+      <div class="qr-scan-frame"></div>
+      <div class="qr-scan-hint" id="qr-scan-hint">Point your camera at the QR code your photographer shared.</div>
+    </div>
+    <div class="qr-scan-fallback" id="qr-scan-fallback">
+      <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;"><i data-icon="QR"></i></div>
+      <p id="qr-scan-fallback-msg">Couldn't access the camera. You can still type the Event ID in above.</p>
+      <button class="btn-solid" style="width:auto;" onclick="closeQrScanner()">Close</button>
+    </div>
+    <canvas id="qr-scan-canvas" style="display:none;"></canvas>
   </div>
 
   <!-- ========== LOGIN / SIGNUP (optional — opened voluntarily from More tab; browsing/selfie
@@ -566,7 +635,7 @@
         <div class="lbl"><i data-icon="PLUS_SQ"></i> Follow a new event</div>
         <div class="follow-row">
           <input class="follow-input" id="follow-event-input" placeholder="Enter the Event ID">
-          <button class="sq-btn" onclick="scanEventQr()"><i data-icon="QR"></i></button>
+          <button class="sq-btn" onclick="scanFollowEventQr()"><i data-icon="QR"></i></button>
         </div>
         <p id="follow-msg" style="display:none;font-size:11.5px;margin:-2px 0 10px;"></p>
         <button class="btn-solid" onclick="followEvent()"><i data-icon="TAP"></i> Follow</button>
@@ -849,6 +918,7 @@
     POSTS: icon('<path d="M4 5h16M4 10h16M4 15h10"/>'),
     MORE: icon('<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'),
     BACK: icon('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
+    CLOSE_X: icon('<path d="M18 6L6 18M6 6l12 12"/>'),
     TRASH: icon('<path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/>'),
     CHECK_SQ: icon('<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/>'),
     PLUS: icon('<path d="M12 5v14M5 12h14"/>'),
@@ -1383,8 +1453,130 @@
     });
   }
 
+  // ================= QR Scanner (Event Gate) =================
+  // Deliberately its own small camera pipeline rather than reusing openCamera() below —
+  // that one is gated behind login/face-recognition settings and mirrors the FRONT
+  // camera for selfies, neither of which is right for reading a QR code off a poster.
+  let qrScanStream = null;
+  let qrScanRafId = null;
+  // What to do with a successfully-decoded Event ID depends on where the scanner was
+  // opened from — the Event Gate wants to jump straight into that event, but the
+  // Events tab's "Follow a new event" card should behave exactly like typing the ID in
+  // and tapping Follow (validate, add to the list, stay right where you are).
+  let qrScanCallback = null;
+
+  // Opened from the Event Gate screen (before any event is loaded yet).
   function scanEventQr() {
-    alert('QR scanning needs camera access wired up for barcode reading — for now, ask your photographer for the Event ID and type it in above.');
+    openQrScanner(function (id) {
+      const input = document.getElementById('event-gate-input');
+      if (input) input.value = id;
+      submitEventGate();
+    });
+  }
+
+  // Opened from the Events tab's "Follow a new event" card.
+  function scanFollowEventQr() {
+    openQrScanner(function (id) {
+      const input = document.getElementById('follow-event-input');
+      if (input) input.value = id;
+      followEvent();
+    });
+  }
+
+  function openQrScanner(onResult) {
+    qrScanCallback = onResult || null;
+    const overlay = document.getElementById('qr-scan-overlay');
+    const fallback = document.getElementById('qr-scan-fallback');
+    const video = document.getElementById('qr-scan-video');
+    if (!overlay || !video) return;
+    overlay.style.display = 'flex';
+    fallback.style.display = 'none';
+    video.style.display = 'block';
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof jsQR === 'undefined') {
+      showQrScanFallback('Couldn\'t access the camera on this device. You can still type the Event ID in above.');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .then(function (stream) {
+        qrScanStream = stream;
+        video.srcObject = stream;
+        video.onloadedmetadata = function () {
+          video.play();
+          qrScanRafId = requestAnimationFrame(scanQrFrame);
+        };
+      })
+      .catch(function () {
+        showQrScanFallback('Camera access was denied. You can still type the Event ID in above.');
+      });
+  }
+
+  function showQrScanFallback(msg) {
+    const fallback = document.getElementById('qr-scan-fallback');
+    const msgEl = document.getElementById('qr-scan-fallback-msg');
+    const video = document.getElementById('qr-scan-video');
+    if (msgEl && msg) msgEl.textContent = msg;
+    if (video) video.style.display = 'none';
+    if (fallback) fallback.style.display = 'flex';
+  }
+
+  // Runs on every animation frame while the scanner is open: grabs the current video
+  // frame onto a hidden canvas and hands the raw pixels to jsQR. No fixed interval —
+  // riding requestAnimationFrame keeps it as fast as the camera can actually deliver
+  // frames and stops automatically the moment closeQrScanner()/onQrDetected() cancels it.
+  function scanQrFrame() {
+    const video = document.getElementById('qr-scan-video');
+    const canvas = document.getElementById('qr-scan-canvas');
+    if (!video || !canvas || !qrScanStream) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const result = jsQR(imageData.data, imageData.width, imageData.height);
+        if (result && result.data) {
+          onQrDetected(result.data);
+          return;
+        }
+      } catch (err) { /* frame mid-decode, or not readable yet — just keep scanning */ }
+    }
+    qrScanRafId = requestAnimationFrame(scanQrFrame);
+  }
+
+  // Real Kamero QR posters encode this guest app's own share link (…/?event=<id>) —
+  // also tolerates a bare event-ID string, in case a photographer ever prints/shares
+  // just the raw ID as a QR instead of a full link.
+  function extractEventIdFromQr(text) {
+    if (!text) return '';
+    try {
+      const url = new URL(text);
+      const fromParam = url.searchParams.get('event');
+      if (fromParam) return fromParam.trim().toLowerCase();
+    } catch (err) { /* not a URL — fall through to treating it as a raw ID */ }
+    return text.trim().toLowerCase();
+  }
+
+  function onQrDetected(text) {
+    const id = extractEventIdFromQr(text);
+    const callback = qrScanCallback;
+    closeQrScanner();
+    if (!id) {
+      alert('That QR code didn\'t contain a valid Event ID — ask your photographer for a fresh one, or type it in manually.');
+      return;
+    }
+    if (callback) callback(id);
+  }
+
+  function closeQrScanner() {
+    const overlay = document.getElementById('qr-scan-overlay');
+    if (overlay) overlay.style.display = 'none';
+    qrScanCallback = null;
+    if (qrScanRafId) { cancelAnimationFrame(qrScanRafId); qrScanRafId = null; }
+    if (qrScanStream) {
+      qrScanStream.getTracks().forEach(function (t) { t.stop(); });
+      qrScanStream = null;
+    }
   }
 
   // Small helper shared by the studio-share and photo-share buttons: uses the native
@@ -1478,8 +1670,12 @@
     if (!confirm('Unfollow ' + EVENT.name + '? You can follow again anytime using the Event ID.')) return;
     EVENTS_LIST = EVENTS_LIST.filter(function (e) { return e.tag !== EVENT.id; });
     saveFollowedEvents(EVENTS_LIST);
-    renderEvents();
-    alert('Unfollowed ' + EVENT.name + '.');
+    // Can't keep browsing an event you just unfollowed — same reasoning as
+    // switchToEvent() below: reload straight back to the Event Gate (bare URL, no
+    // ?event= param, and the remembered "last event" cleared) instead of leaving the
+    // guest sitting inside a gallery that's no longer theirs to be in.
+    try { localStorage.removeItem('sf_last_event_id'); } catch (err) {}
+    window.location.href = window.location.origin + window.location.pathname;
   }
 
   // Switching events reloads the page with the new ?event= — far safer than trying to
