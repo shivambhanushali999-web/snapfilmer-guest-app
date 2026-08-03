@@ -27,7 +27,12 @@
     --dark: #0F0E12;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; height: 100%; background: #05060a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  /* overscroll-behavior stops iOS Safari's native "pull to refresh" / rubber-band bounce
+     from firing when a guest drags past the top of a scrollable list inside the fake
+     phone frame — without this, that drag propagates up to the real page and Safari
+     reloads the whole app from scratch, which looked like "upar niche karte waqt reload
+     ho jaata hai". */
+  html, body { margin: 0; padding: 0; height: 100%; background: #05060a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overscroll-behavior-y: none; }
   body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
 
   [data-icon] { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
@@ -38,7 +43,7 @@
     width: 390px; max-width: 100vw; height: 844px; max-height: 100vh;
     background: var(--bg); border-radius: 40px; border: 8px solid #000;
     overflow: hidden; position: relative; box-shadow: 0 30px 80px rgba(0,0,0,.5);
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; overscroll-behavior-y: none;
   }
   /* On an actual phone, the ".phone" element above is the fake device-mockup frame
      (black bezel + rounded corners + shadow) meant only for previewing this app on a
@@ -57,7 +62,7 @@
 
   .tab-screen { display: none; flex-direction: column; height: 100%; position: relative; }
   .tab-screen.active { display: flex; }
-  .scroll { overflow-y: auto; flex: 1; padding-bottom: 100px; }
+  .scroll { overflow-y: auto; flex: 1; padding-bottom: 100px; overscroll-behavior-y: contain; }
 
   /* ---- Plain top bar (used on Events/Posts/More) ---- */
   .plainbar { padding: 20px 20px 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; background: var(--bg); }
@@ -405,9 +410,13 @@
       </div>
 
       <div class="chip-row">
+        <!-- My Photos (find yourself via selfie) is the single most important thing a
+             guest does here — moved first so it's always visible without needing to
+             scroll the chip row, instead of being the last chip (previously partly
+             cut off at the screen edge, easy to miss entirely). -->
+        <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
         <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
         <div class="chip" onclick="openGallery()"><span class="dot"><i data-icon="IMAGE"></i></span>Gallery</div>
-        <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
         <div class="chip" onclick="openHighlights('Highlights', HIGHLIGHT_PHOTOS)"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
       </div>
 
