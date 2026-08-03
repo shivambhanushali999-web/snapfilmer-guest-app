@@ -16,15 +16,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   :root {
-    --bg: #FAFAF8;
+    /* Earthy sage-green / warm cream palette, swapped in from the coral default —
+       accent-soft/accent-ink are still auto-derived from --accent at runtime for
+       whichever studio's own brand color is set (see applyBrandColor()), these are
+       just the matching static values so there's no flash of the old coral before
+       that JS runs. */
+    --bg: #F5F1E7;
     --surface: #FFFFFF;
-    --ink: #17161B;
-    --muted: #918D93;
-    --accent: #FF5A36;
-    --accent-soft: #FFE9E2;
-    --accent-ink: #C0431F;
-    --border: #EFECE8;
-    --dark: #0F0E12;
+    --ink: #2B2F22;
+    --muted: #7C7A6C;
+    --accent: #4B5D3A;
+    --accent-soft: #E6E8E3;
+    --accent-ink: #3B492D;
+    --border: #E8E2D2;
+    --dark: #14150F;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* overscroll-behavior stops iOS Safari's native "pull to refresh" / rubber-band bounce
@@ -38,6 +43,11 @@
   [data-icon] { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
   [data-icon] svg { display: block; }
   @keyframes sf-spin { to { transform: rotate(360deg); } }
+  /* ---- Event Gate hero illustration motion ---- */
+  @keyframes sf-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+  @keyframes sf-pulse-ring { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.35); opacity: 0; } }
+  @keyframes sf-dash-flow { to { stroke-dashoffset: -22; } }
+  @keyframes sf-tilt { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
 
   .phone {
     width: 390px; max-width: 100vw; height: 844px; max-height: 100vh;
@@ -123,8 +133,8 @@
   .studio-cta { display: flex; gap: 8px; }
   .btn-outline { background: none; border: 1.5px solid var(--ink); color: var(--ink); border-radius: 20px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .studio-bio { font-size: 13px; color: #514D53; line-height: 1.6; margin-top: 14px; }
-  .studio-bio #studio-bio-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .studio-bio.expanded #studio-bio-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .studio-bio #studio-bio-text, .studio-bio #gate-studio-bio-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .studio-bio.expanded #studio-bio-text, .studio-bio.expanded #gate-studio-bio-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
   .studio-bio .more-link { color: var(--accent); font-weight: 700; cursor: pointer; }
   .social-strip { display: flex; gap: 8px; margin-top: 14px; }
   .social-ghost { width: 36px; height: 36px; border-radius: 18px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
@@ -133,13 +143,13 @@
   .stories-label { padding: 4px 16px 10px; font-size: 13px; font-weight: 800; color: var(--ink); text-transform: uppercase; letter-spacing: .6px; }
   .stories-row { display: flex; gap: 16px; padding: 0 16px 22px; overflow-x: auto; }
   .story { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; cursor: pointer; }
-  .story-ring { width: 66px; height: 66px; border-radius: 33px; padding: 3px; background: linear-gradient(135deg, var(--accent), #FFB199); }
+  .story-ring { width: 66px; height: 66px; border-radius: 33px; padding: 3px; background: linear-gradient(135deg, var(--accent), #8FA37E); }
   .story-ring img { width: 100%; height: 100%; border-radius: 30px; object-fit: cover; display: block; border: 2px solid var(--bg); }
   .story span { font-size: 11px; font-weight: 700; color: var(--ink); }
 
   /* ---- Home album banner cards (folders, Kamero-style) ---- */
   .home-albums-wrap { padding: 0 16px 6px; }
-  .home-album-card { position: relative; width: 100%; height: 140px; border-radius: 18px; overflow: hidden; margin-bottom: 14px; cursor: pointer; background: linear-gradient(135deg, var(--accent), #FFB199); }
+  .home-album-card { position: relative; width: 100%; height: 140px; border-radius: 18px; overflow: hidden; margin-bottom: 14px; cursor: pointer; background: linear-gradient(135deg, var(--accent), #8FA37E); }
   .home-album-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
   .home-album-card .overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.62) 100%); }
   .home-album-card .name { position: absolute; left: 16px; bottom: 14px; right: 90px; color: #fff; font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; line-height: 1.25; text-shadow: 0 1px 4px rgba(0,0,0,.35); }
@@ -225,7 +235,7 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .photo-cell { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 3/4; background: var(--border); cursor: pointer; }
   .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .wm-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(255,90,54,.9); color: #fff; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 6px; letter-spacing: .3px; }
+  .wm-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(75,93,58,.9); color: #fff; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 6px; letter-spacing: .3px; }
 
   /* ---- Studio watermark overlay (real, driven by dashboard settings — NOT baked
      into the file here, just shown on screen; downloads get the real thing baked
@@ -324,16 +334,81 @@
        before anything else can render it has to know WHICH event (from ?event=<id> in
        the link/QR, or the last one this guest opened). Sits on top of everything until
        that resolves; hidden the moment bootApp() actually runs. ========== -->
-  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;box-sizing:border-box;">
+  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;padding:36px 22px 40px;text-align:center;box-sizing:border-box;overflow-y:auto;">
+    <!-- Same studio-profile card as the Home tab (name, avatar, bio, socials) — populated
+         by the same applyStudioProfile(), which now also runs before any event ID is
+         known, so a guest sees who this gallery belongs to even here. Styled as its own
+         elevated card (not the plain flat block used inline on Home) so it reads as one
+         distinct, premium section instead of blending into everything below it. -->
+    <div class="studio-block" id="event-gate-studio" style="width:100%;max-width:320px;box-sizing:border-box;text-align:left;margin:0 0 18px;border-radius:26px;box-shadow:0 16px 40px -20px rgba(20,16,20,.28);">
+      <div class="studio-top">
+        <div class="studio-avatar" id="gate-studio-avatar" style="width:56px;height:56px;border-radius:18px;font-size:17px;">SF</div>
+        <div class="studio-meta">
+          <h3 onclick="openPortfolioFromGate()" id="gate-studio-name">SnapFilmer</h3>
+          <p>Wedding &amp; Portrait Studio</p>
+        </div>
+        <div class="studio-cta" id="gate-studio-contact-row">
+          <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+          <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+          <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+        </div>
+      </div>
+      <p class="studio-bio" id="gate-studio-bio-p"><span id="gate-studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="gate-bio-toggle-link" onclick="toggleBio('gate-')">Read more</span></p>
+      <div class="social-strip" id="gate-social-strip">
+        <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+        <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+        <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+        <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn-outline" onclick="openPortfolioFromGate()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
+        <button class="ghost-btn" onclick="shareStudioProfile()" title="Share"><i data-icon="SHARE"></i></button>
+      </div>
+    </div>
+
     <div id="event-gate-loading">
       <div style="width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);margin:0 auto 14px;animation:sf-spin 0.8s linear infinite;"></div>
       <div style="font-size:13px;color:var(--muted);">Loading your gallery&hellip;</div>
     </div>
-    <div id="event-gate-form" style="display:none;width:100%;max-width:300px;">
+
+    <!-- Own elevated card, matching the studio card above, so this reads as a clearly
+         separate step rather than form fields floating loose on the page background. -->
+    <div id="event-gate-form" style="display:none;width:100%;max-width:320px;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:26px;padding:22px 20px;box-shadow:0 16px 40px -20px rgba(20,16,20,.28);text-align:left;">
       <h2 style="margin:0 0 8px;font-size:19px;color:var(--ink);">Enter Event ID</h2>
       <p id="event-gate-msg" style="font-size:12.5px;color:var(--muted);margin:0 0 18px;line-height:1.5;">Ask your photographer for the Event ID or scan the QR code they shared.</p>
-      <input id="event-gate-input" placeholder="e.g. vaibhav-komal" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitEventGate()" style="width:100%;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px;box-sizing:border-box;margin-bottom:12px;color:var(--ink);background:var(--surface);">
-      <button onclick="submitEventGate()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;">Open Gallery</button>
+      <div style="position:relative;margin-bottom:12px;">
+        <input id="event-gate-input" placeholder="Enter the Event ID" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitEventGate()" style="width:100%;border:1px solid var(--border);border-radius:12px;padding:12px 44px 12px 14px;font-size:14px;box-sizing:border-box;color:var(--ink);background:var(--bg);">
+        <button onclick="scanEventQr()" title="Scan QR" style="position:absolute;right:5px;top:5px;bottom:5px;width:34px;border:none;border-radius:9px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="QR"></i></button>
+      </div>
+      <button onclick="submitEventGate()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;"><i data-icon="TAP"></i>Follow Event</button>
+    </div>
+
+    <!-- Purely decorative "welcome" section — an original illustration (not traced/copied
+         art), no real data involved, with a few gentle CSS/SVG animations (floating
+         social badges, a pulsing camera lens, a flowing dashed connector) so it feels
+         alive rather than a static graphic pasted under the real form above it. -->
+    <div style="width:100%;max-width:320px;margin-top:26px;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:26px;padding:26px 18px 10px;box-shadow:0 16px 40px -20px rgba(20,16,20,.28);text-align:center;">
+      <h2 style="margin:0 0 4px;font-size:19px;color:var(--ink);line-height:1.35;">Welcome to the future<br>of Photo Sharing</h2>
+      <p style="margin:0 0 6px;font-size:12px;color:var(--muted);" id="gate-welcome-studio-name-wrap">by <span id="gate-welcome-studio-name">SnapFilmer</span></p>
+      <svg viewBox="0 0 260 190" width="100%" style="max-width:230px;overflow:visible;">
+        <g style="animation:sf-tilt 4.5s ease-in-out infinite;transform-origin:54px 97px;">
+          <rect x="18" y="70" width="72" height="54" rx="6" fill="none" stroke="var(--ink)" stroke-width="2"/>
+          <circle cx="54" cy="97" r="16" fill="none" stroke="var(--ink)" stroke-width="2"/>
+          <circle cx="54" cy="97" r="16" fill="none" stroke="var(--accent)" stroke-width="2" opacity=".55" style="animation:sf-pulse-ring 2.4s ease-out infinite;transform-origin:54px 97px;"/>
+          <rect x="40" y="62" width="16" height="10" rx="2" fill="var(--ink)"/>
+        </g>
+        <g style="animation:sf-float 3.2s ease-in-out infinite;">
+          <rect x="120" y="30" width="70" height="52" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-width="2"/>
+          <path d="M120 68l18-16 14 12 20-20 18 24z" fill="var(--accent-soft)"/>
+          <circle cx="138" cy="44" r="6" fill="var(--accent-soft)"/>
+        </g>
+        <path d="M96 96C130 60 160 130 196 96" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 6" style="animation:sf-dash-flow 1s linear infinite;"/>
+        <path d="M188 90l10 8-3 12z" fill="var(--accent)"/>
+        <g transform="translate(196,108)" style="animation:sf-float 3s ease-in-out infinite;animation-delay:.2s;"><circle r="17" fill="#E1306C"/><g fill="#fff" transform="translate(-9,-9) scale(0.75)"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/></g></g>
+        <g transform="translate(150,150)" style="animation:sf-float 3.4s ease-in-out infinite;animation-delay:.6s;"><circle r="15" fill="#25D366"/><g fill="#fff" transform="translate(-8,-8) scale(0.68)"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2z" fill="#fff"/></g></g>
+        <g transform="translate(60,150)" style="animation:sf-float 2.8s ease-in-out infinite;animation-delay:.9s;"><circle r="15" fill="#1877F2"/><text x="0" y="6" text-anchor="middle" font-size="16" fill="#fff" font-family="sans-serif" font-weight="700">f</text></g>
+        <g transform="translate(24,40)" style="animation:sf-float 3.6s ease-in-out infinite;animation-delay:.3s;"><circle r="14" fill="#FF0000"/><path d="M-4,-5 L6,0 L-4,5 Z" fill="#fff"/></g>
+      </svg>
     </div>
   </div>
 
@@ -429,7 +504,7 @@
         <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
         <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
         <div class="chip" onclick="openGallery()"><span class="dot"><i data-icon="IMAGE"></i></span>Gallery</div>
-        <div class="chip" onclick="openHighlights('Highlights', HIGHLIGHT_PHOTOS)"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
+        <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
       </div>
 
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
@@ -441,9 +516,10 @@
             <h3 onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
             <p>Wedding &amp; Portrait Studio</p>
           </div>
-          <div class="studio-cta">
-            <button class="btn-outline" onclick="openPortfolio()">Portfolio</button>
-            <button class="ghost-btn" onclick="shareStudioProfile()"><i data-icon="SHARE"></i></button>
+          <div class="studio-cta" id="studio-contact-row">
+            <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+            <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+            <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
           </div>
         </div>
         <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
@@ -452,6 +528,10 @@
           <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
           <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
           <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn-outline" onclick="openPortfolio()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
+          <button class="ghost-btn" onclick="shareStudioProfile()" title="Share"><i data-icon="SHARE"></i></button>
         </div>
       </div>
 
@@ -777,6 +857,8 @@
     LOCK: icon('<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/>'),
     IMAGE: icon('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'),
     MAIL: icon('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>'),
+    PHONE: icon('<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7a2 2 0 011.72 2.03z"/>'),
+    GLOBE: icon('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'),
     EYE: icon('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
     USER: icon('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>'),
     GOOGLE: '<svg width="19" height="19" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.4H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1C3.4 21.3 7.4 24 12 24z"/><path fill="#FBBC05" d="M5.4 14.4c-.2-.7-.4-1.4-.4-2.4s.1-1.6.4-2.4V6.5H1.4C.5 8.2 0 10.1 0 12s.5 3.8 1.4 5.5l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.4 0 3.4 2.7 1.4 6.5l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>',
@@ -881,13 +963,6 @@
   function makePhotos(prefix, count) {
     return Array.from({ length: count }).map((_, i) => 'https://picsum.photos/seed/' + prefix + i + '/500/650');
   }
-  const HIGHLIGHT_PHOTOS = makePhotos('ohl', 12);
-  const STORIES = [
-    { name: 'Highlights', cover: 'https://picsum.photos/seed/ohl0/200/200', photos: HIGHLIGHT_PHOTOS },
-    { name: 'Wedding', cover: 'https://picsum.photos/seed/opw0/200/200', photos: makePhotos('opw', 26) },
-    { name: 'Prewedding', cover: 'https://picsum.photos/seed/oppw0/200/200', photos: makePhotos('oppw', 24) },
-    { name: 'Sangeet', cover: 'https://picsum.photos/seed/osg0/200/200', photos: makePhotos('osg', 18) },
-  ];
   const PORTFOLIO_CATS = [
     { name: 'WEDDING', count: 26, cover: 'https://picsum.photos/seed/opw/700/500', photos: makePhotos('opw', 26) },
     { name: 'PREWEDDING', count: 24, cover: 'https://picsum.photos/seed/oppw/700/500', photos: makePhotos('oppw', 24) },
@@ -950,6 +1025,10 @@
   let likedPhotos = {};
   let viewerPhotos = [];
   let viewerIndex = 0;
+  // True whenever the Event Gate overlay is the thing a guest is actually looking at
+  // (no event resolved yet) — lets Portfolio/Share opened FROM that gate screen know to
+  // bring the gate back on "back" instead of leaving the guest staring at a blank app.
+  let gateActive = false;
 
   function showTab(tab) {
     document.querySelectorAll('.tab-screen').forEach(function (s) { s.classList.remove('active'); });
@@ -985,10 +1064,25 @@
     } else {
       document.getElementById('bottom-nav').style.display = 'flex';
       try { localStorage.removeItem('sf_last_subscreen'); } catch (err) {}
+      // Came from the Event Gate (no event resolved yet) rather than the normal app —
+      // bring that overlay back instead of leaving the guest looking at an empty Home tab.
+      if (gateActive) {
+        const gate = document.getElementById('event-gate');
+        if (gate) gate.style.display = 'flex';
+      }
     }
   }
 
   function openPortfolio() { renderPortfolio(); pushScreen('portfolio'); }
+
+  // Same Portfolio screen, opened from the Event Gate's studio card before any event ID
+  // has been entered — the gate overlay sits above everything (z-index:999) so it has to
+  // be hidden first or Portfolio would just render invisibly underneath it.
+  function openPortfolioFromGate() {
+    const gate = document.getElementById('event-gate');
+    if (gate) gate.style.display = 'none';
+    openPortfolio();
+  }
 
   function openHighlights(title, photos) {
     document.getElementById('highlights-title').textContent = title;
@@ -1031,7 +1125,7 @@
   }
   function updateLikeIcon() {
     const btn = document.getElementById('viewer-like');
-    btn.style.color = likedPhotos[viewerPhotos[viewerIndex]] ? '#FF5A36' : '#fff';
+    btn.style.color = likedPhotos[viewerPhotos[viewerIndex]] ? '#4B5D3A' : '#fff';
   }
 
   function forceDownloadDataUrl(dataUrl, filename) {
@@ -1336,9 +1430,12 @@
     });
   }
 
-  function toggleBio() {
-    const p = document.getElementById('studio-bio-p');
-    const link = document.getElementById('bio-toggle-link');
+  function toggleBio(prefix) {
+    // Same bio block is rendered twice now (Home tab + Event Gate studio card, before an
+    // event ID is even known) — prefix picks which copy's "Read more" was tapped.
+    const p = document.getElementById((prefix || '') + 'studio-bio-p');
+    const link = document.getElementById((prefix || '') + 'bio-toggle-link');
+    if (!p || !link) return;
     const expanded = p.classList.toggle('expanded');
     link.textContent = expanded ? 'Read less' : 'Read more';
   }
@@ -1413,14 +1510,60 @@
     });
   }
 
+  // Real photos the studio has starred in the dashboard's photo lightbox — replaces
+  // what used to be 12 hardcoded picsum.photos placeholders shown to every guest on
+  // every event regardless of anything the studio actually did.
+  function getHighlightedPhotos() {
+    return eventPhotos.filter(function (p) { return p.isHighlight; });
+  }
+
+  // Opens the shared "Highlights" grid screen with whatever real highlighted photos
+  // exist right now — used by both the Home chip and the stories row below, so there's
+  // one source of truth instead of two copies that could disagree.
+  function openRealHighlights() {
+    const highlighted = getHighlightedPhotos();
+    if (!highlighted.length) {
+      alert(eventSettings.highlightEnabled
+        ? 'Your photographer hasn\'t starred any Highlight photos yet — check back later.'
+        : 'Highlights aren\'t turned on for this event yet.');
+      return;
+    }
+    openHighlights('Highlights', highlighted.map(function (p) { return p.dataUrl; }));
+  }
+
   function renderStories() {
     const wrap = document.getElementById('stories-row');
+    if (!wrap) return;
     wrap.innerHTML = '';
-    STORIES.forEach(function (s) {
+
+    // "Highlights" circle only appears once the studio has both turned the feature on
+    // for this event AND actually starred at least one real photo for it — otherwise
+    // there'd be nothing genuine behind it to show.
+    if (eventSettings.highlightEnabled) {
+      const highlighted = getHighlightedPhotos();
+      if (highlighted.length) {
+        const item = document.createElement('div');
+        item.className = 'story';
+        item.innerHTML = '<div class="story-ring"><img src="' + highlighted[0].dataUrl + '"></div><span>Highlights</span>';
+        item.addEventListener('click', openRealHighlights);
+        wrap.appendChild(item);
+      }
+    }
+
+    // One circle per real album the studio has actually created for this event —
+    // replaces the old hardcoded "Wedding / Prewedding / Sangeet" demo entries, which
+    // showed the exact same three fake albums no matter what the studio's real
+    // folders were (or weren't) called.
+    eventAlbums.forEach(function (a) {
+      const photosInAlbum = eventPhotos.filter(function (p) { return p.album === a.name; });
+      if (!photosInAlbum.length && !a.cover) return; // nothing real to show for this album yet
+      const cover = a.cover || photosInAlbum[0].dataUrl;
       const item = document.createElement('div');
       item.className = 'story';
-      item.innerHTML = '<div class="story-ring"><img src="' + s.cover + '"></div><span>' + s.name + '</span>';
-      item.addEventListener('click', function () { openHighlights(s.name, s.photos); });
+      item.innerHTML = '<div class="story-ring"><img src="' + cover + '"></div><span>' + escWm(a.name) + '</span>';
+      item.addEventListener('click', function () {
+        openHighlights(a.name, photosInAlbum.map(function (p) { return p.dataUrl; }));
+      });
       wrap.appendChild(item);
     });
   }
@@ -1678,7 +1821,7 @@
   // facePrivacy: whether the general Gallery is locked until a selfie is taken.
   // anonymousMyPhotos: whether guests can use the selfie feature without a real account —
   // if false (the real Kamero default), a guest must sign in before taking a selfie.
-  let eventSettings = { facePrivacy: false, faceRecognition: true, anonymousMyPhotos: false, pin: '', enquiry: false };
+  let eventSettings = { facePrivacy: false, faceRecognition: true, anonymousMyPhotos: false, pin: '', enquiry: false, highlightEnabled: false };
   let pendingCameraOpen = false;
   let eventSettingsUnsub = null;
   // If a guest already unlocked the full private gallery with the event PIN, remember
@@ -1715,6 +1858,11 @@
         if (document.getElementById('screen-login').classList.contains('active')) {
           completeLogin();
         }
+        // studio/profile is one global doc, not tied to any event — start pulling it the
+        // moment we have an authenticated session so the studio's name/bio/socials show
+        // up even on the bare Event Gate screen, before any event ID is known or valid.
+        // (Safe to call again later from loadEventAndBoot() — it no-ops once subscribed.)
+        startStudioProfileSync();
         // Resolve + boot exactly once. Later auth changes (e.g. the guest signs into a
         // real account mid-session, from the anonymous session set up below) must NOT
         // re-run event loading or re-subscribe every Firestore listener a second time.
@@ -1741,6 +1889,7 @@
   // spinner) — used when there's no ?event=/last-visited event to try, or when one was
   // tried and didn't work.
   function showEventGateForm(msg) {
+    gateActive = true;
     const loading = document.getElementById('event-gate-loading');
     const form = document.getElementById('event-gate-form');
     const msgEl = document.getElementById('event-gate-msg');
@@ -1784,6 +1933,7 @@
       };
       try { localStorage.setItem('sf_last_event_id', EVENT.id); } catch (err) {}
       addOrUpdateFollowedEvent(EVENT);
+      gateActive = false;
       startStudioProfileSync();
       startPostsSync();
       startEventSettingsSync();
@@ -1839,31 +1989,62 @@
       renderMyPhotosResults();
     }
 
-    const nameEl = document.getElementById('studio-name');
-    const bioEl = document.getElementById('studio-bio-text');
-    const avatarEl = document.getElementById('studio-avatar');
+    // The exact same profile now renders in two places — the Home tab's studio card and
+    // the Event Gate's studio card (shown even before any event ID is known) — so every
+    // lookup below updates both copies instead of just the Home tab's original IDs.
+    const nameEls = [document.getElementById('studio-name'), document.getElementById('gate-studio-name'), document.getElementById('gate-welcome-studio-name')];
+    const bioEls = [document.getElementById('studio-bio-text'), document.getElementById('gate-studio-bio-text')];
+    const avatarEls = [document.getElementById('studio-avatar'), document.getElementById('gate-studio-avatar')];
     const portfolioTitleEl = document.getElementById('portfolio-title');
-    if (nameEl && profile.name) nameEl.textContent = profile.name;
-    if (portfolioTitleEl && profile.name) portfolioTitleEl.textContent = profile.name;
-    if (bioEl && profile.about) bioEl.textContent = profile.about;
+    if (profile.name) {
+      nameEls.forEach(function (el) { if (el) el.textContent = profile.name; });
+      if (portfolioTitleEl) portfolioTitleEl.textContent = profile.name;
+    }
+    if (profile.about) bioEls.forEach(function (el) { if (el) el.textContent = profile.about; });
     if (profile.email) studioContactEmail = profile.email;
-    if (avatarEl && profile.name) {
-      avatarEl.textContent = profile.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+    if (profile.name) {
+      const initials = profile.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+      avatarEls.forEach(function (el) { if (el) el.textContent = initials; });
     }
 
-    const strip = document.getElementById('social-strip');
-    if (strip) {
-      const social = profile.social || {};
-      const platforms = [
-        { key: 'instagram', icon: 'INSTA_O' },
-        { key: 'vimeo', icon: 'VIMEO_O' },
-        { key: 'whatsapp', icon: 'WHATSAPP_O' },
-        { key: 'youtube', icon: 'YOUTUBE_O' },
-      ];
-      const withLinks = platforms.filter(function (p) { return social[p.key]; });
-      // If nothing has been configured yet, keep the default decorative icons rather
-      // than showing an empty strip.
-      if (withLinks.length) {
+    // Call / Email / Website icon row — real tel:/mailto:/https: links straight from the
+    // dashboard's Business Settings, not decorative placeholders. Hidden individually
+    // when the studio hasn't filled that field in yet, rather than showing a dead link.
+    [
+      { call: 'studio-call-btn', mail: 'studio-mail-btn', web: 'studio-web-btn' },
+      { call: 'gate-studio-call-btn', mail: 'gate-studio-mail-btn', web: 'gate-studio-web-btn' },
+    ].forEach(function (ids) {
+      const callBtn = document.getElementById(ids.call);
+      const mailBtn = document.getElementById(ids.mail);
+      const webBtn = document.getElementById(ids.web);
+      if (callBtn) {
+        if (profile.phone) { callBtn.href = 'tel:' + profile.phone.replace(/\s+/g, ''); callBtn.style.display = 'flex'; }
+        else { callBtn.style.display = 'none'; }
+      }
+      if (mailBtn) {
+        if (profile.email) { mailBtn.href = 'mailto:' + profile.email; mailBtn.style.display = 'flex'; }
+        else { mailBtn.style.display = 'none'; }
+      }
+      if (webBtn) {
+        if (profile.website) { webBtn.href = /^https?:\/\//i.test(profile.website) ? profile.website : ('https://' + profile.website); webBtn.style.display = 'flex'; }
+        else { webBtn.style.display = 'none'; }
+      }
+    });
+
+    const strips = [document.getElementById('social-strip'), document.getElementById('gate-social-strip')];
+    const social = profile.social || {};
+    const platforms = [
+      { key: 'instagram', icon: 'INSTA_O' },
+      { key: 'vimeo', icon: 'VIMEO_O' },
+      { key: 'whatsapp', icon: 'WHATSAPP_O' },
+      { key: 'youtube', icon: 'YOUTUBE_O' },
+    ];
+    const withLinks = platforms.filter(function (p) { return social[p.key]; });
+    // If nothing has been configured yet, keep the default decorative icons rather
+    // than showing an empty strip.
+    if (withLinks.length) {
+      strips.forEach(function (strip) {
+        if (!strip) return;
         strip.innerHTML = '';
         withLinks.forEach(function (p) {
           const div = document.createElement('div');
@@ -1873,7 +2054,7 @@
           div.addEventListener('click', function () { window.open(social[p.key], '_blank'); });
           strip.appendChild(div);
         });
-      }
+      });
     }
   }
 
@@ -1895,6 +2076,7 @@
       eventSettings.anonymousMyPhotos = !!d.anonymousMyPhotos;
       eventSettings.pin = d.pin || '';
       eventSettings.enquiry = !!d.enquiry;
+      eventSettings.highlightEnabled = !!d.highlightEnabled;
       eventWatermark = normalizeEventWatermark(d.watermark);
       eventAlbums = Array.isArray(d.albums) ? d.albums : [];
       // If an album the guest had filtered by got deleted from the dashboard, fall back
@@ -1912,6 +2094,7 @@
       renderMyPhotosResults();
       renderHomeEnquiry();
       renderHomeAlbums();
+      renderStories();
     }, function () {
       // If this fails (offline etc.), just fall back to the open/public default.
     });
@@ -1962,8 +2145,23 @@
 
   function startTestPhotosSync() {
     if (!db || testPhotosUnsub) return;
-    testPhotosUnsub = db.collection('testPhotos').orderBy('createdAt', 'asc').onSnapshot(function (snapshot) {
-      testPhotos = snapshot.docs.map(function (doc) {
+    // This used to query the ENTIRE testPhotos collection with no filter at all — every
+    // guest, on every event, on every phone, saw the exact same shared pile of
+    // everyone's calibration selfies. Scoping to this event + this guest's own
+    // anonymous-auth uid is what actually makes "My Photos" private per person. Two
+    // plain equality filters don't need a Firestore composite index (adding
+    // .orderBy('createdAt') on top would), so photos are sorted by upload time in JS
+    // below instead, right after fetching.
+    const uid = (auth && auth.currentUser) ? auth.currentUser.uid : null;
+    let query = db.collection('testPhotos').where('eventId', '==', EVENT.id);
+    if (uid) query = query.where('uid', '==', uid);
+    testPhotosUnsub = query.onSnapshot(function (snapshot) {
+      const docs = snapshot.docs.slice().sort(function (a, b) {
+        const at = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
+        const bt = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
+        return at - bt;
+      });
+      testPhotos = docs.map(function (doc) {
         const existing = testPhotos.find(function (p) { return p.id === doc.id; });
         return { id: doc.id, dataUrl: doc.data().dataUrl, matched: existing ? existing.matched : null };
       });
@@ -2011,7 +2209,7 @@
           const existing = eventPhotos.find(function (p) { return p.id === doc.id; });
           let matched = existing ? existing.matched : null;
           if (matched === null && cachedIds.indexOf(doc.id) !== -1) matched = true;
-          return { id: doc.id, dataUrl: doc.data().dataUrl, album: doc.data().album || '', matched: matched };
+          return { id: doc.id, dataUrl: doc.data().dataUrl, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight };
         });
 
         const currentIds = eventPhotos.map(function (p) { return p.id; });
@@ -2038,6 +2236,7 @@
 
         renderGallery();
         renderMyPhotosResults();
+        renderStories();
         if (selfieRawDataUrl) matchAllTestPhotos();
       });
   }
@@ -2127,6 +2326,8 @@
           if (db) {
             db.collection('testPhotos').add({
               dataUrl: resized,
+              eventId: EVENT.id,
+              uid: (auth && auth.currentUser) ? auth.currentUser.uid : null,
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             }).catch(function () {
               addLocalTestPhoto(resized);
