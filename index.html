@@ -1,0 +1,2807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SnapFilmer</title>
+<!-- Real in-browser AI face detection/recognition, used by the My Photos test panel -->
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<!-- Firebase (Firestore + Auth) — persists photos and handles real login -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<!-- EmailJS: lets this static, backend-less app send a real email (no server needed) —
+     used for the "Download All Photos" > email-me-a-link flow. Needs a free EmailJS
+     account; see EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY below. -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --surface: #FFFFFF;
+    --ink: #17161B;
+    --muted: #918D93;
+    --accent: #FF5A36;
+    --accent-soft: #FFE9E2;
+    --accent-ink: #C0431F;
+    --border: #EFECE8;
+    --dark: #0F0E12;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #05060a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  [data-icon] { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+  [data-icon] svg { display: block; }
+  @keyframes sf-spin { to { transform: rotate(360deg); } }
+
+  .phone {
+    width: 390px; max-width: 100vw; height: 844px; max-height: 100vh;
+    background: var(--bg); border-radius: 40px; border: 8px solid #000;
+    overflow: hidden; position: relative; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    display: flex; flex-direction: column;
+  }
+  /* On an actual phone, the ".phone" element above is the fake device-mockup frame
+     (black bezel + rounded corners + shadow) meant only for previewing this app on a
+     desktop browser. Left as-is, a real phone would show that fake frame nested inside
+     its own real screen — wasted space and an odd look. Below ~600px width we assume
+     it's being opened directly on a phone and make it fill the real viewport edge to
+     edge instead, using the dynamic-viewport unit so mobile browser address bars don't
+     clip/scroll the bottom nav. */
+  @media (max-width: 600px) {
+    body { padding: 0; }
+    .phone {
+      width: 100vw; height: 100vh; height: 100dvh; max-width: 100vw; max-height: 100dvh;
+      border-radius: 0; border: none; box-shadow: none;
+    }
+  }
+
+  .tab-screen { display: none; flex-direction: column; height: 100%; position: relative; }
+  .tab-screen.active { display: flex; }
+  .scroll { overflow-y: auto; flex: 1; padding-bottom: 100px; }
+
+  /* ---- Plain top bar (used on Events/Posts/More) ---- */
+  .plainbar { padding: 20px 20px 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; background: var(--bg); }
+  .plainbar h1 { font-size: 26px; font-weight: 800; color: var(--ink); margin: 0; letter-spacing: -.5px; }
+  .ghost-btn {
+    width: 40px; height: 40px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; flex-shrink: 0;
+  }
+  .ghost-btn.accent { color: var(--accent); }
+
+  /* ---- Sub-screen header ---- */
+  .sub-screen { display: none; position: absolute; inset: 0; background: var(--bg); flex-direction: column; z-index: 20; }
+  .sub-screen.active { display: flex; }
+  .sub-bar { padding: 20px 16px 14px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .sub-bar h1 { font-size: 18px; font-weight: 800; color: var(--ink); margin: 0; flex: 1; letter-spacing: -.3px; }
+  .sub-bar-actions { display: flex; gap: 8px; }
+
+  /* ---- Floating pill bottom nav ---- */
+  .bottom-nav {
+    position: absolute; left: 18px; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); height: 66px; z-index: 30;
+    background: rgba(255,255,255,.88); backdrop-filter: blur(14px); border: 1px solid var(--border);
+    border-radius: 33px; display: flex; align-items: center; box-shadow: 0 14px 30px rgba(20,15,10,.12);
+  }
+  .nav-item { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: none; cursor: pointer; color: var(--muted); }
+  .nav-dot { width: 34px; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; }
+  .nav-item.active .nav-dot { background: var(--accent); color: #fff; }
+  .nav-item span { font-size: 10px; font-weight: 600; }
+  .nav-item.active span { color: var(--accent); }
+
+  /* ---- Home hero ---- */
+  .hero { position: relative; margin: 0 0 16px; }
+  .hero img { width: 100%; height: 320px; object-fit: cover; display: block; }
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.75), rgba(10,8,6,0) 55%); }
+  .hero-top { position: absolute; top: 20px; left: 16px; right: 16px; display: flex; justify-content: flex-end; z-index: 2; }
+  .glass-btn { width: 40px; height: 40px; border-radius: 20px; background: rgba(255,255,255,.22); backdrop-filter: blur(8px); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .notif-badge { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius: 5px; background: #FF4747; border: 1.5px solid var(--bg); }
+  .hero-info { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 2; }
+  .hero-info .date-pill { display: inline-block; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 8px; letter-spacing: .3px; }
+  .hero-info h2 { color: #fff; font-size: 26px; font-weight: 800; margin: 0; letter-spacing: -.5px; }
+
+  /* ---- Quick action chips ---- */
+  .chip-row { display: flex; gap: 10px; padding: 0 16px 18px; overflow-x: auto; }
+  .chip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 11px 18px; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
+  .chip .dot { width: 26px; height: 26px; border-radius: 13px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; }
+
+  /* ---- Album/folder chips (Gallery) ---- */
+  .album-chip-row { display: flex; gap: 8px; padding: 0 0 14px; overflow-x: auto; }
+  .album-chip { flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .album-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ---- Studio card ---- */
+  .studio-block { margin: 0 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 18px; }
+  .studio-top { display: flex; align-items: center; gap: 12px; }
+  .studio-avatar { width: 50px; height: 50px; border-radius: 16px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex-shrink: 0; }
+  .studio-meta { flex: 1; min-width: 0; }
+  .studio-meta h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.3px; cursor: pointer; }
+  .studio-meta p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .studio-cta { display: flex; gap: 8px; }
+  .btn-outline { background: none; border: 1.5px solid var(--ink); color: var(--ink); border-radius: 20px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .studio-bio { font-size: 13px; color: #514D53; line-height: 1.6; margin-top: 14px; }
+  .studio-bio #studio-bio-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .studio-bio.expanded #studio-bio-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .studio-bio .more-link { color: var(--accent); font-weight: 700; cursor: pointer; }
+  .social-strip { display: flex; gap: 8px; margin-top: 14px; }
+  .social-ghost { width: 36px; height: 36px; border-radius: 18px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
+
+  /* ---- Stories row (highlights) ---- */
+  .stories-label { padding: 4px 16px 10px; font-size: 13px; font-weight: 800; color: var(--ink); text-transform: uppercase; letter-spacing: .6px; }
+  .stories-row { display: flex; gap: 16px; padding: 0 16px 22px; overflow-x: auto; }
+  .story { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; cursor: pointer; }
+  .story-ring { width: 66px; height: 66px; border-radius: 33px; padding: 3px; background: linear-gradient(135deg, var(--accent), #FFB199); }
+  .story-ring img { width: 100%; height: 100%; border-radius: 30px; object-fit: cover; display: block; border: 2px solid var(--bg); }
+  .story span { font-size: 11px; font-weight: 700; color: var(--ink); }
+
+  /* ---- Home album banner cards (folders, Kamero-style) ---- */
+  .home-albums-wrap { padding: 0 16px 6px; }
+  .home-album-card { position: relative; width: 100%; height: 140px; border-radius: 18px; overflow: hidden; margin-bottom: 14px; cursor: pointer; background: linear-gradient(135deg, var(--accent), #FFB199); }
+  .home-album-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .home-album-card .overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.62) 100%); }
+  .home-album-card .name { position: absolute; left: 16px; bottom: 14px; right: 90px; color: #fff; font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; line-height: 1.25; text-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .home-album-card .count-badge { position: absolute; right: 12px; bottom: 12px; background: rgba(0,0,0,.45); color: #fff; font-size: 11.5px; font-weight: 700; padding: 5px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px; backdrop-filter: blur(2px); }
+  .home-album-card .count-badge svg { width: 13px; height: 13px; }
+  .home-album-card .folder-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: .35; }
+  .home-album-card .folder-fallback svg { width: 46px; height: 46px; color: #fff; }
+
+  /* ---- Section link row ---- */
+  .section-link { display: flex; align-items: center; justify-content: space-between; padding: 0 16px 10px; }
+  .section-link h4 { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); }
+  .section-link a { font-size: 12.5px; font-weight: 700; color: var(--accent); cursor: pointer; }
+
+  /* ---- Events tab ---- */
+  .events-body { padding: 0 16px; }
+  .follow-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 18px; }
+  .follow-card .lbl { font-size: 12.5px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  .follow-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .follow-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 0 14px; height: 44px; color: var(--ink); font-size: 13.5px; }
+  .sq-btn { width: 44px; height: 44px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; flex-shrink: 0; }
+  .btn-solid { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 12px; height: 46px; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+  .search-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 16px; margin-bottom: 14px; color: var(--muted); }
+  .search-pill input { border: none; background: none; outline: none; flex: 1; font-size: 13.5px; color: var(--ink); }
+  .event-tile { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 10px; margin-bottom: 10px; cursor: pointer; }
+  .event-tile img { width: 54px; height: 54px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+  .event-tile .name { font-weight: 700; color: var(--ink); font-size: 14px; }
+  .event-tile .tag { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ---- Posts ---- */
+  .posts-body { padding: 0 16px; }
+  .post-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 14px; position: relative; }
+  .post-card::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; background: var(--accent); border-radius: 3px; }
+  .post-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding-left: 12px; }
+  .post-title { font-weight: 800; color: var(--ink); font-size: 14.5px; margin: 0; line-height: 1.35; }
+  .post-date { font-size: 10.5px; color: var(--muted); white-space: nowrap; text-align: right; }
+  .post-body { padding-left: 12px; font-size: 13px; color: #514D53; line-height: 1.65; margin: 10px 0 0; white-space: pre-line; }
+  .post-checkout { padding-left: 12px; margin-top: 10px; color: var(--accent); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+
+  /* ---- More ---- */
+  .more-body { padding: 0 16px; }
+  .profile-block { display: flex; align-items: center; gap: 14px; background: var(--ink); border-radius: 22px; padding: 18px; margin-bottom: 18px; }
+  .profile-block .av { width: 52px; height: 52px; border-radius: 26px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; flex-shrink: 0; }
+  .profile-block .nm { color: #fff; font-weight: 800; font-size: 15px; }
+  .profile-block .em { color: rgba(255,255,255,.6); font-size: 12px; margin-top: 3px; }
+  .profile-block .vp { margin-top: 8px; background: rgba(255,255,255,.14); color: #fff; border: none; border-radius: 14px; padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .list-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin-bottom: 16px; }
+  .list-row { padding: 15px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .list-row:last-child { border-bottom: none; }
+  .list-row .lt { font-weight: 700; color: var(--ink); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .list-row .ld { font-size: 11.5px; color: var(--muted); margin-top: 4px; padding-right: 30px; }
+  .list-row .arrow { color: var(--muted); flex-shrink: 0; }
+  .switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: .2s; }
+  .slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(18px); }
+  .tagline { text-align: center; padding: 24px 20px; }
+  .tagline .t1 { font-size: 16px; font-weight: 800; color: var(--ink); line-height: 1.4; }
+  .tagline .t1 b { color: var(--accent); }
+  .tagline .t2 { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+  /* ---- Videos grid ---- */
+  .videos-body { padding: 16px; overflow-y: auto; }
+  .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .video-tile img { width: 100%; height: 130px; object-fit: cover; border-radius: 16px; display: block; }
+  .video-tile { position: relative; cursor: pointer; }
+  .video-tile .pill-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 38px; height: 38px; border-radius: 19px; background: rgba(255,255,255,.9); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .video-tile .cap { font-size: 11.5px; font-weight: 700; color: var(--ink); margin-top: 8px; }
+
+  /* ---- My Photos ---- */
+  .myphotos-body { padding: 16px; overflow-y: auto; }
+  .avatar-row { display: flex; gap: 14px; margin-bottom: 20px; }
+  .avatar-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .add-circle { width: 58px; height: 58px; border-radius: 29px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; background: var(--surface); }
+  .selfie-circle { width: 58px; height: 58px; border-radius: 29px; object-fit: cover; border: 2px solid var(--accent); cursor: pointer; display: none; }
+  .avatar-slot span { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .seg-tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 4px; margin-bottom: 16px; overflow-x: auto; }
+  .seg-tab { flex-shrink: 0; padding: 9px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .seg-tab.active { background: var(--ink); color: #fff; }
+
+  /* ---- Photo grid ---- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .photo-cell { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 3/4; background: var(--border); cursor: pointer; }
+  .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .wm-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(255,90,54,.9); color: #fff; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 6px; letter-spacing: .3px; }
+
+  .highlights-body { padding: 16px; overflow-y: auto; }
+  .portfolio-body { padding: 16px; overflow-y: auto; }
+  .portfolio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cat-card { position: relative; border-radius: 18px; overflow: hidden; cursor: pointer; }
+  .cat-card img { width: 100%; height: 160px; object-fit: cover; display: block; }
+  .cat-card .lbl { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px; background: linear-gradient(to top, rgba(0,0,0,.7), transparent); color: #fff; }
+  .cat-card .lbl .nm { font-weight: 800; font-size: 12.5px; letter-spacing: .3px; }
+  .cat-card .lbl .ct { font-size: 10.5px; opacity: .85; margin-top: 2px; }
+
+  /* ---- Viewer ---- */
+  #screen-viewer { background: #000; }
+  .viewer-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to bottom, rgba(0,0,0,.5), transparent); }
+  .viewer-top .glass-btn { background: rgba(255,255,255,.18); }
+  .viewer-actions { display: flex; gap: 10px; }
+  .viewer-img-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
+  .viewer-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; }
+  .viewer-count { color: #fff; font-size: 12.5px; font-weight: 700; background: rgba(255,255,255,.18); padding: 5px 12px; border-radius: 999px; }
+  .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,.32); color: #fff; border: none; width: 38px; height: 38px; border-radius: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 4; }
+  .viewer-nav-prev { left: 10px; }
+  .viewer-nav-next { right: 10px; }
+  .viewer-nav[disabled] { opacity: 0; pointer-events: none; }
+  .viewer-wm { position: absolute; left: 18px; bottom: 20px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; padding: 5px 10px; border-radius: 8px; letter-spacing: .3px; }
+
+  /* ---- Notifications ---- */
+  .notif-body { padding: 16px; overflow-y: auto; }
+  .notif-row { display: flex; gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--border); }
+  .notif-row .adot { width: 8px; height: 8px; border-radius: 4px; background: var(--accent); margin-top: 6px; flex-shrink: 0; }
+  .notif-row .txt { font-size: 13.5px; color: var(--ink); font-weight: 600; line-height: 1.45; }
+  .notif-row .tm { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  /* ---- Login / Signup ---- */
+  .login-screen { position: absolute; inset: 0; z-index: 50; background: var(--bg); display: none; flex-direction: column; overflow-y: auto; }
+  .login-screen.active { display: flex; }
+  .login-bar { padding: 20px 16px 4px; flex-shrink: 0; }
+  .login-inner { display: none; flex-direction: column; align-items: center; width: 100%; padding: 10px 28px 40px; flex: 1; }
+  .login-inner.active { display: flex; }
+  .login-badge { width: 64px; height: 64px; border-radius: 20px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 18px; }
+  .login-inner h2 { margin: 0; font-size: 23px; font-weight: 800; color: var(--ink); letter-spacing: -.4px; }
+  .login-sub { color: var(--muted); font-size: 13px; margin: 6px 0 26px; text-align: center; }
+  .field-row { width: 100%; position: relative; margin-bottom: 12px; }
+  .field-row .fi { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .field-input {
+    width: 100%; height: 50px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface);
+    padding: 0 42px; font-size: 14px; color: var(--ink); outline: none;
+  }
+  .field-input:focus { border-color: var(--accent); }
+  .field-eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; display: flex; }
+  .name-row { display: flex; gap: 10px; width: 100%; }
+  .name-row .field-row { flex: 1; }
+  .cc-input { display: flex; align-items: center; width: 100%; height: 50px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); padding: 0 14px; gap: 8px; }
+  .cc-input .cc { color: var(--ink); font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .cc-input .divider { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+  .cc-input input { border: none; background: none; outline: none; flex: 1; font-size: 14px; color: var(--ink); min-width: 0; }
+  .forgot-row { width: 100%; text-align: right; margin-bottom: 18px; }
+  .forgot-row span { color: var(--accent); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  .oauth-btn {
+    width: 100%; height: 50px; border-radius: 14px; background: var(--surface); border: 1.5px solid var(--ink);
+    display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; font-size: 14px;
+    color: var(--ink); cursor: pointer;
+  }
+  .login-divider { display: flex; align-items: center; gap: 10px; width: 100%; margin: 16px 0; color: var(--muted); font-size: 12px; }
+  .login-divider::before, .login-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .switch-link { margin-top: 18px; font-size: 12.5px; color: var(--muted); }
+  .switch-link span { color: var(--accent); font-weight: 700; cursor: pointer; }
+
+  /* ---- Camera ---- */
+  .camera-screen { background: #000; }
+  .camera-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent); }
+  .camera-title { color: #fff; font-weight: 700; font-size: 14px; }
+  .camera-stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .camera-stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .camera-fallback { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 30px; text-align: center; color: #fff; background: #111; }
+  .camera-fallback p { color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.6; margin: 0; }
+  .camera-fallback .btn-solid { width: auto; display: inline-flex; }
+  .camera-bottom { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; z-index: 5; }
+  .shutter-btn { width: 68px; height: 68px; border-radius: 34px; background: #fff; border: 4px solid rgba(255,255,255,.4); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ========== EVENT GATE — this one file now serves every event the studio runs, so
+       before anything else can render it has to know WHICH event (from ?event=<id> in
+       the link/QR, or the last one this guest opened). Sits on top of everything until
+       that resolves; hidden the moment bootApp() actually runs. ========== -->
+  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;box-sizing:border-box;">
+    <div id="event-gate-loading">
+      <div style="width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);margin:0 auto 14px;animation:sf-spin 0.8s linear infinite;"></div>
+      <div style="font-size:13px;color:var(--muted);">Loading your gallery&hellip;</div>
+    </div>
+    <div id="event-gate-form" style="display:none;width:100%;max-width:300px;">
+      <h2 style="margin:0 0 8px;font-size:19px;color:var(--ink);">Enter Event ID</h2>
+      <p id="event-gate-msg" style="font-size:12.5px;color:var(--muted);margin:0 0 18px;line-height:1.5;">Ask your photographer for the Event ID or scan the QR code they shared.</p>
+      <input id="event-gate-input" placeholder="e.g. vaibhav-komal" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitEventGate()" style="width:100%;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px;box-sizing:border-box;margin-bottom:12px;color:var(--ink);background:var(--surface);">
+      <button onclick="submitEventGate()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;">Open Gallery</button>
+    </div>
+  </div>
+
+  <!-- ========== LOGIN / SIGNUP (optional — opened voluntarily from More tab; browsing/selfie
+       matching never requires this, matching real Kamero's no-forced-signup guest access) ========== -->
+  <div id="screen-login" class="login-screen">
+    <div class="login-bar" id="login-topbar">
+      <button class="ghost-btn" onclick="closeLoginScreen()"><i data-icon="BACK"></i></button>
+    </div>
+
+    <div class="login-inner active" id="login-step-signin">
+      <div class="login-badge"><i data-icon="LOCK"></i></div>
+      <h2>Welcome Back</h2>
+      <p class="login-sub">Sign in to continue to your account</p>
+
+      <div class="field-row">
+        <span class="fi"><i data-icon="MAIL"></i></span>
+        <input class="field-input" id="signin-email" type="email" placeholder="Enter your email address">
+      </div>
+      <div class="field-row">
+        <span class="fi"><i data-icon="LOCK"></i></span>
+        <input class="field-input" id="signin-password" type="password" placeholder="Enter your password">
+        <button class="field-eye" onclick="togglePassword('signin-password', this)"><i data-icon="EYE"></i></button>
+      </div>
+      <div class="forgot-row"><span onclick="forgotPassword()">Forgot Password?</span></div>
+      <p id="signin-error" style="display:none;color:#D0342C;font-size:12px;margin:-6px 0 10px;"></p>
+
+      <button class="oauth-btn" onclick="googleSignIn()"><i data-icon="GOOGLE"></i>Sign in with Google</button>
+      <div class="login-divider"><span>OR</span></div>
+      <button class="btn-solid" id="signin-submit" onclick="doSignIn()">Sign In</button>
+
+      <p class="switch-link">Don't have an account? <span onclick="showSignup()">Sign Up</span></p>
+    </div>
+
+    <div class="login-inner" id="login-step-signup">
+      <div class="login-badge" style="font-size:28px;">&#128075;</div>
+      <h2>Create Account</h2>
+      <p class="login-sub">Join us and start your journey</p>
+
+      <div class="name-row">
+        <div class="field-row">
+          <span class="fi"><i data-icon="USER"></i></span>
+          <input class="field-input" id="signup-firstname" style="padding-left:38px;" placeholder="First Name">
+        </div>
+        <div class="field-row">
+          <span class="fi"><i data-icon="USER"></i></span>
+          <input class="field-input" id="signup-lastname" style="padding-left:38px;" placeholder="Last Name">
+        </div>
+      </div>
+      <div class="field-row">
+        <span class="fi"><i data-icon="MAIL"></i></span>
+        <input class="field-input" id="signup-email" type="email" placeholder="Email Address">
+      </div>
+      <div class="field-row">
+        <span class="fi"><i data-icon="LOCK"></i></span>
+        <input class="field-input" id="signup-password" type="password" placeholder="Create a password">
+        <button class="field-eye" onclick="togglePassword('signup-password', this)"><i data-icon="EYE"></i></button>
+      </div>
+      <div class="field-row">
+        <div class="cc-input">
+          <span class="cc">+91</span>
+          <span class="divider"></span>
+          <input type="tel" inputmode="numeric" maxlength="10" id="signup-phone" placeholder="Phone Number">
+        </div>
+      </div>
+      <p id="signup-error" style="display:none;color:#D0342C;font-size:12px;margin:-6px 0 10px;"></p>
+
+      <button class="oauth-btn" style="margin-top:6px;" onclick="googleSignIn()"><i data-icon="GOOGLE"></i>Continue with Google</button>
+      <div class="login-divider"><span>OR</span></div>
+      <button class="btn-solid" id="signup-submit" onclick="doSignUp()">Continue</button>
+
+      <p class="switch-link">Already have an account? <span onclick="showLogin()">Login</span></p>
+    </div>
+  </div>
+
+  <!-- ========== HOME ========== -->
+  <div id="screen-home" class="tab-screen active">
+    <div class="scroll">
+      <div class="hero">
+        <img id="home-cover" src="" alt="cover">
+        <div class="hero-top"><button class="glass-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button></div>
+        <div class="hero-info">
+          <span class="date-pill" id="home-date">14 Aug 2026</span>
+          <h2 id="home-event-name">Vaibhav &amp; Komal</h2>
+        </div>
+      </div>
+
+      <div class="chip-row">
+        <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
+        <div class="chip" onclick="openGallery()"><span class="dot"><i data-icon="IMAGE"></i></span>Gallery</div>
+        <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
+        <div class="chip" onclick="openHighlights('Highlights', HIGHLIGHT_PHOTOS)"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
+      </div>
+
+      <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
+
+      <div class="studio-block">
+        <div class="studio-top">
+          <div class="studio-avatar" id="studio-avatar">SF</div>
+          <div class="studio-meta">
+            <h3 onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
+            <p>Wedding &amp; Portrait Studio</p>
+          </div>
+          <div class="studio-cta">
+            <button class="btn-outline" onclick="openPortfolio()">Portfolio</button>
+            <button class="ghost-btn" onclick="shareStudioProfile()"><i data-icon="SHARE"></i></button>
+          </div>
+        </div>
+        <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
+        <div class="social-strip" id="social-strip">
+          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+        </div>
+      </div>
+
+      <div class="stories-label">Highlights</div>
+      <div class="stories-row" id="stories-row"></div>
+
+      <div id="home-enquiry-wrap" style="display:none;padding:0 16px;">
+        <div class="stories-label" style="padding:20px 0 10px;">Interested in booking us?</div>
+        <div style="border:1px solid var(--border);border-radius:16px;padding:16px;">
+          <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Loved what you see? Send us an enquiry and we'll get back to you.</p>
+          <div style="margin-bottom:10px;"><input id="enq-name" placeholder="Your Name" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;box-sizing:border-box;"></div>
+          <div style="margin-bottom:10px;"><input id="enq-email" placeholder="Email" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;box-sizing:border-box;"></div>
+          <div style="margin-bottom:10px;"><input id="enq-phone" placeholder="Phone (optional)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;box-sizing:border-box;"></div>
+          <div style="margin-bottom:12px;"><textarea id="enq-message" placeholder="Tell us about your event..." rows="3" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea></div>
+          <button class="btn-solid-sm" onclick="submitEnquiry()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
+          <p id="enq-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
+        </div>
+      </div>
+
+      <div style="height:10px;"></div>
+    </div>
+  </div>
+
+  <!-- ========== EVENTS ========== -->
+  <div id="screen-events" class="tab-screen">
+    <div class="plainbar">
+      <h1>Events</h1>
+      <button class="ghost-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button>
+    </div>
+    <div class="scroll events-body">
+      <div class="follow-card">
+        <div class="lbl"><i data-icon="PLUS_SQ"></i> Follow a new event</div>
+        <div class="follow-row">
+          <input class="follow-input" id="follow-event-input" placeholder="Enter the Event ID">
+          <button class="sq-btn" onclick="scanEventQr()"><i data-icon="QR"></i></button>
+        </div>
+        <p id="follow-msg" style="display:none;font-size:11.5px;margin:-2px 0 10px;"></p>
+        <button class="btn-solid" onclick="followEvent()"><i data-icon="TAP"></i> Follow</button>
+      </div>
+      <div class="search-pill"><i data-icon="SEARCH"></i><input placeholder="Search your events"></div>
+      <div id="events-list"></div>
+    </div>
+  </div>
+
+  <!-- ========== POSTS ========== -->
+  <div id="screen-posts" class="tab-screen">
+    <div class="plainbar">
+      <h1>Posts</h1>
+      <button class="ghost-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button>
+    </div>
+    <div class="scroll posts-body" id="posts-list"></div>
+  </div>
+
+  <!-- ========== MORE ========== -->
+  <div id="screen-more" class="tab-screen">
+    <div class="plainbar">
+      <h1>More</h1>
+      <button class="ghost-btn accent" onclick="showAppInfo()"><i data-icon="INFO"></i></button>
+    </div>
+    <div class="scroll more-body">
+      <div class="profile-block">
+        <div class="av" id="profile-avatar">SF</div>
+        <div style="flex:1;">
+          <div class="nm" id="profile-name">Shivam Bhanushali</div>
+          <div class="em" id="profile-email">snapfilmergallery6@gmail.com</div>
+          <button class="vp" onclick="handleViewProfile()">View Profile &#8594;</button>
+        </div>
+      </div>
+
+      <div class="list-card">
+        <div class="list-row">
+          <div>
+            <div class="lt">Admin Permission</div>
+            <div class="ld">Request access to upload photos for this event.</div>
+          </div>
+          <button class="btn-outline" style="padding:6px 14px;font-size:11.5px;" onclick="requestAdminPermission()">Send</button>
+        </div>
+        <div class="list-row">
+          <div>
+            <div class="lt">Mute Event</div>
+            <div class="ld">Pause notifications for this event only.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="mute-toggle"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="list-card">
+        <div class="list-row" onclick="toggleDownloadAllEmailForm()" style="cursor:pointer;">
+          <div><div class="lt">Download All Photos</div><div class="ld">Get an email with a link to download all your matched photos.</div></div>
+          <span class="arrow"><i data-icon="DOWNLOAD"></i></span>
+        </div>
+        <div id="download-all-email-form" style="display:none;padding:0 16px 16px;">
+          <input id="dl-email-input" type="email" placeholder="Your email address" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;box-sizing:border-box;margin-bottom:10px;">
+          <button class="btn-solid-sm" onclick="sendDownloadAllEmail()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Me the Link</button>
+          <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">Or <span style="color:var(--accent);text-decoration:underline;cursor:pointer;" onclick="downloadAllPhotos()">download now instead</span>.</p>
+          <p id="dl-email-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
+        </div>
+        <div class="list-row" onclick="unfollowEvent()" style="cursor:pointer;">
+          <div><div class="lt">Unfollow Event</div><div class="ld">Remove this event from your app.</div></div>
+          <span class="arrow"><i data-icon="CHEVRON"></i></span>
+        </div>
+        <div class="list-row" id="more-auth-row" style="cursor:pointer;">
+          <div><div class="lt">Sign In / Create Account</div><div class="ld">Save your selfie and photos across devices.</div></div>
+          <span class="arrow"><i data-icon="CHEVRON"></i></span>
+        </div>
+      </div>
+
+      <div class="list-card">
+        <div class="list-row">
+          <div><div class="lt">Create a New Event</div><div class="ld">Head to the studio dashboard to set one up.</div></div>
+          <button class="btn-outline" style="padding:6px 14px;font-size:11.5px;" onclick="showAppInfo('create-event')">Create</button>
+        </div>
+      </div>
+
+      <div class="tagline">
+        <p class="t1"><b>Memories</b> become treasures,<br>when shared with <b>love.</b></p>
+        <p class="t2">Crafted with care in India by SnapFilmer</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== BOTTOM NAV ========== -->
+  <div class="bottom-nav" id="bottom-nav">
+    <button class="nav-item active" data-tab="home" onclick="showTab('home')"><span class="nav-dot"><i data-icon="HOME"></i></span><span>Home</span></button>
+    <button class="nav-item" data-tab="events" onclick="showTab('events')"><span class="nav-dot"><i data-icon="EVENTS"></i></span><span>Events</span></button>
+    <button class="nav-item" data-tab="posts" onclick="showTab('posts')"><span class="nav-dot"><i data-icon="POSTS"></i></span><span>Posts</span></button>
+    <button class="nav-item" data-tab="more" onclick="showTab('more')"><span class="nav-dot"><i data-icon="MORE"></i></span><span>More</span></button>
+  </div>
+
+  <!-- ========== SUB SCREENS ========== -->
+
+  <div id="screen-videos" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1>Videos</h1>
+    </div>
+    <div class="videos-body"><div class="video-grid" id="videos-list"></div></div>
+  </div>
+
+  <div id="screen-myphotos" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <div style="flex:1;">
+        <h1 style="text-align:left;">My Photos</h1>
+        <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted);" id="myphotos-count">15 photos found</p>
+      </div>
+      <div class="sub-bar-actions">
+        <button class="ghost-btn" onclick="deleteSelectedTestPhotos()"><i data-icon="TRASH"></i></button>
+        <button class="ghost-btn" id="myphotos-selectmode-btn" onclick="toggleMyPhotosSelectMode()"><i data-icon="CHECK_SQ"></i></button>
+      </div>
+    </div>
+    <div class="myphotos-body">
+      <div class="avatar-row">
+        <div class="avatar-slot">
+          <label class="add-circle" style="cursor:pointer;">
+            <i data-icon="PLUS"></i>
+            <input type="file" accept="image/*" multiple style="display:none" onchange="addTestPhotos(event)">
+          </label>
+          <span>Add</span>
+        </div>
+        <div class="avatar-slot">
+          <img class="selfie-circle" id="selfie-thumb" src="" style="cursor:pointer;" onclick="openCamera()" title="Tap to retake">
+          <div class="add-circle" id="selfie-add" style="cursor:pointer;" onclick="openCamera()">
+            <i data-icon="SPARKLE"></i>
+          </div>
+          <span>Selfie</span>
+        </div>
+      </div>
+      <p id="ai-status" style="font-size:11.5px;color:var(--muted);margin:0 0 16px;line-height:1.5;">Tap + to add a few photos of yourself, then tap Selfie — this uses real AI face matching, run entirely in your browser.</p>
+
+      <div id="test-gallery-section" style="display:none;">
+        <div class="stories-label" style="padding:0 0 10px;">Your Test Photos</div>
+        <div class="grid2" id="test-gallery-grid"></div>
+        <div style="height:20px;"></div>
+      </div>
+
+      <div class="stories-label" style="padding:0 0 10px;">Your Photos</div>
+      <div id="mp-selfie-prompt" style="display:none;text-align:center;padding:30px 16px;border:1px dashed var(--border);border-radius:16px;">
+        <i data-icon="SPARKLE" style="color:var(--accent);"></i>
+        <p style="font-size:13px;color:var(--ink);font-weight:700;margin:10px 0 4px;">Find yourself in the gallery</p>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Take a selfie above — we'll show only the photos you appear in.</p>
+        <button class="btn-solid-sm" onclick="openCamera()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;">Take Selfie</button>
+      </div>
+      <div class="album-chip-row" id="myphotos-album-chips" style="display:none;"></div>
+      <p id="mp-yourphotos-empty" style="font-size:12px;color:var(--muted);display:none;margin:0 0 14px;">No matching photos found yet.</p>
+      <div class="grid2" id="mp-yourphotos-grid"></div>
+    </div>
+  </div>
+
+  <!-- ========== GALLERY (all event photos) ========== -->
+  <div id="screen-gallery" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1>Gallery</h1>
+    </div>
+    <div class="myphotos-body">
+      <p id="gallery-empty" style="font-size:12px;color:var(--muted);display:none;margin:0 0 14px;">No photos uploaded yet by your photographer. Ask them to upload from the Studio Dashboard.</p>
+      <div id="gallery-locked" style="display:none;text-align:center;padding:30px 16px;border:1px dashed var(--border);border-radius:16px;">
+        <i data-icon="LOCK" style="color:var(--accent);"></i>
+        <p style="font-size:13px;color:var(--ink);font-weight:700;margin:10px 0 4px;">This gallery is private</p>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Take a selfie to see only your own photos.</p>
+        <button class="btn-solid-sm" onclick="openCamera()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;">Take Selfie</button>
+        <div id="gallery-pin-section" style="display:none;margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);">
+          <p style="font-size:11.5px;color:var(--muted);margin:0 0 8px;">Or, if your photographer gave you a PIN, enter it to see every photo</p>
+          <div style="display:flex;gap:8px;justify-content:center;max-width:240px;margin:0 auto;">
+            <input id="gallery-pin-input" placeholder="PIN" inputmode="numeric" onkeydown="if(event.key==='Enter')unlockGalleryWithPin()" style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;text-align:center;">
+            <button class="btn-solid-sm" onclick="unlockGalleryWithPin()" style="background:var(--ink);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:700;cursor:pointer;">Unlock</button>
+          </div>
+          <p id="gallery-pin-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
+        </div>
+      </div>
+      <div class="album-chip-row" id="gallery-album-chips" style="display:none;"></div>
+      <div class="grid2" id="gallery-grid"></div>
+    </div>
+  </div>
+
+  <div id="screen-portfolio" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1 id="portfolio-title">SnapFilmer</h1>
+    </div>
+    <div class="portfolio-body">
+      <div class="chip-row" style="padding:0 0 16px;">
+        <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Watch Videos</div>
+      </div>
+      <div class="portfolio-grid" id="portfolio-categories"></div>
+    </div>
+  </div>
+
+  <div id="screen-highlights" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1 id="highlights-title">Highlights</h1>
+      <div class="sub-bar-actions"><button class="ghost-btn" onclick="downloadHighlightsGrid()"><i data-icon="CHECK_SQ"></i></button></div>
+    </div>
+    <div class="highlights-body"><div class="grid2" id="highlights-grid"></div></div>
+  </div>
+
+  <div id="screen-notifications" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1>Notifications</h1>
+    </div>
+    <div class="notif-body" id="notif-list"></div>
+  </div>
+
+  <div id="screen-viewer" class="sub-screen">
+    <div class="viewer-top">
+      <button class="glass-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <div class="viewer-count" id="viewer-count">1 / 1</div>
+      <div class="viewer-actions">
+        <button class="glass-btn" id="viewer-like" onclick="toggleLike()"><i data-icon="HEART"></i></button>
+        <button class="glass-btn" onclick="shareCurrentPhoto()"><i data-icon="SHARE"></i></button>
+        <button class="glass-btn" onclick="downloadCurrentPhoto()"><i data-icon="DOWNLOAD"></i></button>
+      </div>
+    </div>
+    <div class="viewer-img-wrap" id="viewer-img-wrap">
+      <button class="viewer-nav viewer-nav-prev" id="viewer-prev-btn" onclick="navigateViewer(-1)"><i data-icon="CHEVRON_LEFT"></i></button>
+      <img id="viewer-img" src="">
+      <button class="viewer-nav viewer-nav-next" id="viewer-next-btn" onclick="navigateViewer(1)"><i data-icon="CHEVRON"></i></button>
+    </div>
+    <div class="viewer-wm">SnapFilmer</div>
+  </div>
+
+  <div id="screen-camera" class="sub-screen camera-screen">
+    <div class="camera-top">
+      <button class="glass-btn" onclick="closeCamera()"><i data-icon="BACK"></i></button>
+      <span class="camera-title">Take a Selfie</span>
+      <span style="width:40px;"></span>
+    </div>
+    <div class="camera-stage">
+      <video id="camera-video" autoplay playsinline muted></video>
+      <canvas id="camera-canvas" style="display:none;"></canvas>
+      <div class="camera-fallback" id="camera-fallback">
+        <i data-icon="CAMERA" style="width:40px;height:40px;color:#fff;"></i>
+        <p>Live camera preview needs this page to be served over a local server (http://) rather than opened directly as a file. You can upload a selfie photo instead.</p>
+        <label class="btn-solid">
+          Upload a Selfie Instead
+          <input type="file" accept="image/*" capture="user" style="display:none" onchange="handleSelfieFile(event)">
+        </label>
+      </div>
+    </div>
+    <div class="camera-bottom" id="camera-controls">
+      <button class="shutter-btn" onclick="capturePhoto()"></button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ================= ICONS =================
+  function icon(paths) {
+    return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+  }
+  const ICONS = {
+    BELL: icon('<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
+    PLAY_SM: icon('<path d="M8 5v14l11-7z"/>'),
+    SPARKLE: icon('<path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
+    STAR: icon('<path d="M12 2l3.1 6.3 7 1-5 5 1.2 6.9L12 18l-6.3 3.2L7 14.3l-5-5 7-1z"/>'),
+    SHARE: icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/>'),
+    INSTA_O: icon('<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".8"/>'),
+    VIMEO_O: icon('<path d="M22 7c-.2 2-1.7 4.9-4.4 8.6-2.8 3.7-5.2 5.6-7.2 5.6-1.2 0-2.2-1.1-3-3.4L5.3 11c-.5-2-1.1-3-1.7-3-.1 0-.6.3-1.3.8L1.4 7.8C3 6.4 4.6 5 5.7 4.9c1.5-.1 2.4.9 2.8 3 .5 3.2.9 5.2 1.2 6 .6 1.5 1.3 2.2 2 2.2.5 0 1.3-.8 2.3-2.5s1.5-3 1.6-3.9c.1-1.5-.5-2.2-1.7-2.2-.6 0-1.2.1-1.9.4C13.2 4.6 15.1 2.6 18.3 2.5 20.6 2.4 22.2 4.1 22 7z"/>'),
+    WHATSAPP_O: icon('<path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2z"/><path d="M8.5 8c.3-.5.6-.5.9-.4.3.1 1 1.6 1 1.9s-.1.4-.3.6c-.2.2-.4.4-.2.7.2.4 1 1.5 2 2.2 1.2.8 1.8 1 2.1 1 .3 0 .5-.1.7-.4.2-.3.6-.7.9-.7.3 0 1.6.6 1.9.7.3.1.5.2.5.4.1.5-.5 1.6-1.6 2-1.1.3-2 .3-4.5-.9C9.5 13.9 7.5 11.5 7.3 11.1c-.2-.4-1.1-1.7-.6-2.7z"/>'),
+    YOUTUBE_O: icon('<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.5 9.3l4.5 2.7-4.5 2.7z"/>'),
+    PLUS_SQ: icon('<rect x="3" y="3" width="18" height="18" rx="6"/><path d="M12 8v8M8 12h8"/>'),
+    QR: icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17.5 17.5h.01M20 20h.01"/>'),
+    TAP: icon('<path d="M9 12V4.5a1.5 1.5 0 013 0V11m0 .5V3.5a1.5 1.5 0 013 0V11m0 .5v-4a1.5 1.5 0 013 0v9c0 3-2 5-5 5h-2c-2 0-3-.5-4.5-2.5L3 13.5c-.5-.8-.2-1.7.5-2.1.7-.4 1.6-.2 2.1.5L7 14"/>'),
+    SEARCH: icon('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
+    INFO: icon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>'),
+    DOWNLOAD: icon('<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
+    CHEVRON: icon('<path d="M9 18l6-6-6-6"/>'),
+    CHEVRON_LEFT: icon('<path d="M15 18l-6-6 6-6"/>'),
+    HOME: icon('<path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V9.5z"/>'),
+    EVENTS: icon('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="12" r="1.5"/><path d="M14 10h4M14 14h4"/>'),
+    POSTS: icon('<path d="M4 5h16M4 10h16M4 15h10"/>'),
+    MORE: icon('<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'),
+    BACK: icon('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
+    TRASH: icon('<path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/>'),
+    CHECK_SQ: icon('<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/>'),
+    PLUS: icon('<path d="M12 5v14M5 12h14"/>'),
+    HEART: icon('<path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/>'),
+    CAMERA: icon('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="14" r="3.5"/>'),
+    LOCK: icon('<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/>'),
+    IMAGE: icon('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'),
+    MAIL: icon('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>'),
+    EYE: icon('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+    USER: icon('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>'),
+    GOOGLE: '<svg width="19" height="19" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.4H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1C3.4 21.3 7.4 24 12 24z"/><path fill="#FBBC05" d="M5.4 14.4c-.2-.7-.4-1.4-.4-2.4s.1-1.6.4-2.4V6.5H1.4C.5 8.2 0 10.1 0 12s.5 3.8 1.4 5.5l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.4 0 3.4 2.7 1.4 6.5l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>',
+  };
+
+  // ================= Event (loaded dynamically — see loadEventAndBoot() below) =================
+  // This is now ONE guest app file shared by every event the studio runs — real Kamero
+  // works the same way. Which event to show comes from ?event=<id> in the link/QR the
+  // studio shares (dashboard's Share & QR tab), not a hardcoded value. Starts empty;
+  // populated once the matching Firestore doc is fetched.
+  let EVENT = { id: '', name: '', date: '', cover: '' };
+
+  // Deep-link params generated by the dashboard's Share & QR > Advanced/VIP tabs —
+  // these used to be dead strings pointing at a fake domain; now the app actually
+  // reads and acts on them.
+  const DEEP_LINK_PARAMS = new URLSearchParams(window.location.search);
+  const deepLinkAlbum = DEEP_LINK_PARAMS.get('album');
+  const deepLinkPin = DEEP_LINK_PARAMS.get('pin');
+  const deepLinkPrefillId = DEEP_LINK_PARAMS.get('prefill');
+
+  // Which event to load: the link/QR's ?event=<id> wins, otherwise fall back to the
+  // last event this guest actually opened on this device (so a bookmarked bare URL
+  // still works after the first visit). No hardcoded default — every real guest link
+  // now specifies one.
+  const urlEventId = DEEP_LINK_PARAMS.get('event');
+  let lastEventId = null;
+  try { lastEventId = localStorage.getItem('sf_last_event_id'); } catch (err) {}
+  const targetEventId = urlEventId || lastEventId || null;
+
+  // Fallback contact shown in the app-info alert until the studio's real profile
+  // (with its own email) syncs in from Firestore — see applyStudioProfile().
+  let studioContactEmail = 'snapfilmergallery6@gmail.com';
+
+  // Real multi-event "follow" list — every event this guest has actually opened on this
+  // device, persisted locally (name/cover cached so the Events tab has something to show
+  // immediately, without needing to re-fetch each one). Replaces the old hardcoded
+  // single-entry array.
+  function loadFollowedEvents() {
+    try { return JSON.parse(localStorage.getItem('sf_followed_events') || '[]'); } catch (err) { return []; }
+  }
+  function saveFollowedEvents(list) {
+    try { localStorage.setItem('sf_followed_events', JSON.stringify(list)); } catch (err) {}
+  }
+  let EVENTS_LIST = loadFollowedEvents();
+
+  function addOrUpdateFollowedEvent(ev) {
+    const idx = EVENTS_LIST.findIndex(function (x) { return x.tag === ev.id; });
+    const entry = { name: ev.name, tag: ev.id, cover: ev.cover };
+    if (idx === -1) EVENTS_LIST.unshift(entry); else EVENTS_LIST[idx] = entry;
+    saveFollowedEvents(EVENTS_LIST);
+  }
+
+  const VIDEOS = [
+    { title: '06 Wedding', thumb: 'https://picsum.photos/seed/ov6/500/400' },
+    { title: '05 Vaibhav Mandva', thumb: 'https://picsum.photos/seed/ov5/500/400' },
+    { title: '04 Komal Mandva', thumb: 'https://picsum.photos/seed/ov4/500/400' },
+    { title: '03 Sangeet P2', thumb: 'https://picsum.photos/seed/ov3/500/400' },
+    { title: '02 Sangeet P1', thumb: 'https://picsum.photos/seed/ov2/500/400' },
+  ];
+
+  function makePhotos(prefix, count) {
+    return Array.from({ length: count }).map((_, i) => 'https://picsum.photos/seed/' + prefix + i + '/500/650');
+  }
+  const HIGHLIGHT_PHOTOS = makePhotos('ohl', 12);
+  const STORIES = [
+    { name: 'Highlights', cover: 'https://picsum.photos/seed/ohl0/200/200', photos: HIGHLIGHT_PHOTOS },
+    { name: 'Wedding', cover: 'https://picsum.photos/seed/opw0/200/200', photos: makePhotos('opw', 26) },
+    { name: 'Prewedding', cover: 'https://picsum.photos/seed/oppw0/200/200', photos: makePhotos('oppw', 24) },
+    { name: 'Sangeet', cover: 'https://picsum.photos/seed/osg0/200/200', photos: makePhotos('osg', 18) },
+  ];
+  const PORTFOLIO_CATS = [
+    { name: 'WEDDING', count: 26, cover: 'https://picsum.photos/seed/opw/700/500', photos: makePhotos('opw', 26) },
+    { name: 'PREWEDDING', count: 24, cover: 'https://picsum.photos/seed/oppw/700/500', photos: makePhotos('oppw', 24) },
+  ];
+
+  // Fallback posts shown only until the studio publishes real ones from the dashboard
+  // (Posts page). Once Firestore has any post targeting "all" or this event, these
+  // are replaced entirely — see startPostsSync()/renderPosts().
+  const POSTS_SEED = [
+    {
+      title: 'Where emotions meet cinematic excellence',
+      date: 'Jul 11, 2026', time: '14:33',
+      body: "At Snapfilmer, we believe every moment holds a story worth telling.\n\nWe don't just capture visuals, we create timeless experiences.\n\nFrom weddings to maternity, baby shoots to special celebrations, every frame is crafted with passion, precision, and creativity.\n\nBook your shoot today and turn your memories into a cinematic masterpiece.",
+      checkout: true,
+    },
+    { title: 'Book your next shoot today', date: 'Jun 10, 2026', time: '18:44', body: 'Your memories are calling... Book your next shoot today!' },
+    { title: "Your big day is coming, let's capture it perfectly", date: 'May 23, 2026', time: '17:28', body: "Your big day is coming, let's capture every emotion perfectly." },
+  ];
+  let POSTS_LIVE = POSTS_SEED;
+
+  // Real notifications, generated from live Firestore activity (new photos uploaded,
+  // new posts published) instead of the old hardcoded fake list. Persisted per-event in
+  // localStorage so they survive a reload; capped at 40 so the list can't grow forever.
+  // Loaded from localStorage inside bootApp() below, once EVENT.id is actually known —
+  // this used to run here immediately, before the event was resolved, using an empty id.
+  let NOTIFICATIONS = [];
+
+  function saveNotifications() {
+    try { localStorage.setItem('sf_notifications_' + EVENT.id, JSON.stringify(NOTIFICATIONS.slice(0, 40))); } catch (err) {}
+  }
+
+  function unreadNotifCount() {
+    return NOTIFICATIONS.filter(function (n) { return !n.read; }).length;
+  }
+
+  function updateNotifBadge() {
+    const show = unreadNotifCount() > 0;
+    document.querySelectorAll('.notif-badge').forEach(function (el) { el.style.display = show ? 'block' : 'none'; });
+  }
+
+  function addNotification(type, title, meta) {
+    const now = new Date();
+    NOTIFICATIONS.unshift({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2),
+      type: type,
+      title: title,
+      date: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      read: false,
+      meta: meta || null,
+    });
+    NOTIFICATIONS = NOTIFICATIONS.slice(0, 40);
+    saveNotifications();
+    updateNotifBadge();
+    if (screenStack.indexOf('notifications') !== -1) renderNotifications();
+  }
+
+  // ================= Navigation =================
+  let screenStack = [];
+  let likedPhotos = {};
+  let viewerPhotos = [];
+  let viewerIndex = 0;
+
+  function showTab(tab) {
+    document.querySelectorAll('.tab-screen').forEach(function (s) { s.classList.remove('active'); });
+    document.getElementById('screen-' + tab).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+    document.querySelectorAll('.sub-screen').forEach(function (s) { s.classList.remove('active'); });
+    document.getElementById('bottom-nav').style.display = 'flex';
+    screenStack = [];
+    // Remember where the guest was so a refresh resumes here instead of always
+    // bouncing back to Home — that's what made a refresh feel like getting "kicked out".
+    try { localStorage.setItem('sf_last_tab', tab); localStorage.removeItem('sf_last_subscreen'); } catch (err) {}
+  }
+
+  function pushScreen(name) {
+    document.querySelectorAll('.sub-screen').forEach(function (s) { s.classList.remove('active'); });
+    document.getElementById('screen-' + name).classList.add('active');
+    document.getElementById('bottom-nav').style.display = 'none';
+    screenStack.push(name);
+    // Only My Photos and Gallery are safe to auto-reopen on reload — they rebuild all
+    // their own data from Firestore/localStorage. Screens like the camera or photo
+    // viewer depend on transient state (a live camera stream, an in-memory photo array)
+    // that can't be reconstructed after a refresh, so those are deliberately not saved.
+    if (name === 'myphotos' || name === 'gallery') {
+      try { localStorage.setItem('sf_last_subscreen', name); } catch (err) {}
+    }
+  }
+
+  function popScreen() {
+    const last = screenStack.pop();
+    if (last) document.getElementById('screen-' + last).classList.remove('active');
+    if (screenStack.length) {
+      document.getElementById('screen-' + screenStack[screenStack.length - 1]).classList.add('active');
+    } else {
+      document.getElementById('bottom-nav').style.display = 'flex';
+      try { localStorage.removeItem('sf_last_subscreen'); } catch (err) {}
+    }
+  }
+
+  function openPortfolio() { renderPortfolio(); pushScreen('portfolio'); }
+
+  function openHighlights(title, photos) {
+    document.getElementById('highlights-title').textContent = title;
+    renderGrid('highlights-grid', photos);
+    pushScreen('highlights');
+  }
+
+  // Kamero's real photo viewer is a full slideshow — swipe or tap the edges to move
+  // between photos in the album instead of only ever seeing one photo at a time.
+  function renderViewerImage() {
+    document.getElementById('viewer-img').src = viewerPhotos[viewerIndex];
+    const countEl = document.getElementById('viewer-count');
+    if (countEl) countEl.textContent = (viewerIndex + 1) + ' / ' + viewerPhotos.length;
+    const prevBtn = document.getElementById('viewer-prev-btn');
+    const nextBtn = document.getElementById('viewer-next-btn');
+    if (prevBtn) prevBtn.disabled = viewerIndex <= 0;
+    if (nextBtn) nextBtn.disabled = viewerIndex >= viewerPhotos.length - 1;
+    updateLikeIcon();
+  }
+
+  function openViewer(photos, index) {
+    viewerPhotos = photos; viewerIndex = index;
+    renderViewerImage();
+    pushScreen('viewer');
+  }
+
+  function navigateViewer(delta) {
+    const next = viewerIndex + delta;
+    if (next < 0 || next >= viewerPhotos.length) return;
+    viewerIndex = next;
+    renderViewerImage();
+  }
+
+  function toggleLike() {
+    const key = viewerPhotos[viewerIndex];
+    likedPhotos[key] = !likedPhotos[key];
+    updateLikeIcon();
+  }
+  function updateLikeIcon() {
+    const btn = document.getElementById('viewer-like');
+    btn.style.color = likedPhotos[viewerPhotos[viewerIndex]] ? '#FF5A36' : '#fff';
+  }
+
+  function forceDownloadDataUrl(dataUrl, filename) {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function triggerDownload(src, filename) {
+    // data: URLs (old embedded-in-Firestore photos, or anything already base64) can be
+    // force-downloaded directly.
+    if (src.indexOf('data:') === 0) {
+      forceDownloadDataUrl(src, filename);
+      return;
+    }
+    // Real photo files live in Firebase Storage (a different origin), which doesn't
+    // send the CORS headers a client-side fetch() needs — the browser then also
+    // ignores the `download` attribute for cross-origin links, so it just opens a new
+    // tab instead of saving the file. Fixed the same way as face-indexing: the AWS
+    // Lambda fetches the photo server-to-server (no CORS restriction there) and hands
+    // it back as base64, which the browser CAN force-download since it's now a same
+    // page data: URL. Falls back to opening the photo directly if the photo's too big
+    // for that round trip or the Lambda call fails for any reason.
+    fetch(FACE_MATCH_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'download', photoUrl: src }),
+    }).then(function (res) { return res.json(); }).then(function (data) {
+      if (data.dataUrl) {
+        forceDownloadDataUrl(data.dataUrl, filename);
+      } else {
+        window.open(src, '_blank');
+      }
+    }).catch(function () {
+      // Fallback: at least get the guest to the photo if the Lambda call itself fails
+      // (e.g. offline) — better than a silent no-op.
+      window.open(src, '_blank');
+    });
+  }
+
+  // Note: this reliably force-downloads for the guest's actual event photos (now full-res
+  // files in Firebase Storage) as well as any legacy base64 data URLs. For the demo mock
+  // images (picsum.photos, used for Videos/Highlights/Portfolio placeholders) the fetch
+  // fallback above will open them in a new tab instead, since those are third-party demo
+  // URLs with no real bytes to save — not a real photo, so nothing to actually download.
+  function downloadCurrentPhoto() {
+    const src = viewerPhotos[viewerIndex];
+    if (!src) return;
+    triggerDownload(src, 'snapfilmer-photo-' + (viewerIndex + 1) + '.jpg');
+  }
+
+  function downloadAllPhotos() {
+    const matched = eventPhotos.filter(function (p) { return p.matched === true; });
+    const toDownload = matched.length ? matched : eventPhotos;
+    if (!toDownload.length) {
+      alert('No photos to download yet. Take a selfie in My Photos first, or ask your photographer to upload photos.');
+      return;
+    }
+    toDownload.forEach(function (p, i) {
+      // Stagger slightly so the browser doesn't treat rapid-fire downloads as popups.
+      setTimeout(function () { triggerDownload(p.dataUrl, 'snapfilmer-photo-' + (i + 1) + '.jpg'); }, i * 300);
+    });
+  }
+
+  function toggleDownloadAllEmailForm() {
+    const form = document.getElementById('download-all-email-form');
+    if (!form) return;
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // EmailJS sends real email straight from the browser — no backend server required,
+  // which matters here since this whole app is a single static HTML file. Fill these
+  // three in from a free emailjs.com account: Email Services (service ID), Email
+  // Templates (template ID, with {{to_email}}, {{event_name}}, {{gallery_link}}
+  // variables), and Account > General (public key).
+  const EMAILJS_SERVICE_ID = 'REPLACE_WITH_YOUR_SERVICE_ID';
+  const EMAILJS_TEMPLATE_ID = 'REPLACE_WITH_YOUR_TEMPLATE_ID';
+  const EMAILJS_PUBLIC_KEY = 'REPLACE_WITH_YOUR_PUBLIC_KEY';
+  try {
+    if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY.indexOf('REPLACE') !== 0) {
+      emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+    }
+  } catch (err) {}
+
+  // A static app with no backend can't generate/host a ZIP file to attach to the
+  // email, so the "download link" opens the guest's own personalized gallery in the
+  // app instead — they land straight on My Photos and can tap Download All there.
+  function sendDownloadAllEmail() {
+    const input = document.getElementById('dl-email-input');
+    const statusEl = document.getElementById('dl-email-msg');
+    const email = input ? input.value.trim() : '';
+    if (!email || email.indexOf('@') === -1) {
+      if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
+      return;
+    }
+    if (typeof emailjs === 'undefined' || EMAILJS_SERVICE_ID.indexOf('REPLACE') === 0) {
+      if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Email delivery isn\'t set up yet — downloading to this device instead.'; statusEl.style.display = 'block'; }
+      downloadAllPhotos();
+      return;
+    }
+    // Uses the real URL this app is actually running on (wherever it's deployed) rather
+    // than a hardcoded placeholder domain, so the link in the email actually opens
+    // something instead of a dead address.
+    const galleryLink = window.location.origin + window.location.pathname;
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: email,
+      event_name: EVENT.name,
+      gallery_link: galleryLink,
+    }).then(function () {
+      if (statusEl) { statusEl.style.color = '#1FA97A'; statusEl.textContent = 'Sent! Check ' + email + ' for your download link.'; statusEl.style.display = 'block'; }
+      if (input) input.value = '';
+    }).catch(function () {
+      if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Could not send that email — please try again.'; statusEl.style.display = 'block'; }
+    });
+  }
+
+  // Validates the typed Event ID against Firestore and adds it to this guest's real
+  // followed-events list — this is what makes the Events tab a genuine multi-event
+  // switcher instead of only ever showing the one event baked into the file.
+  function followEvent() {
+    const input = document.getElementById('follow-event-input');
+    const msg = document.getElementById('follow-msg');
+    const id = input ? input.value.trim() : '';
+    if (!msg) return;
+    if (!id) {
+      msg.style.color = '#D0342C';
+      msg.textContent = 'Enter an Event ID first.';
+      msg.style.display = 'block';
+      return;
+    }
+    if (EVENTS_LIST.some(function (e) { return e.tag === id; })) {
+      msg.style.color = '#1FA97A';
+      msg.textContent = "You're already following that event.";
+      msg.style.display = 'block';
+      if (input) input.value = '';
+      return;
+    }
+    if (!db) {
+      msg.style.color = '#D0342C';
+      msg.textContent = 'Could not check that Event ID — no connection. Please try again.';
+      msg.style.display = 'block';
+      return;
+    }
+    msg.style.color = 'var(--muted)';
+    msg.textContent = 'Checking...';
+    msg.style.display = 'block';
+    db.collection('events').doc(id).get().then(function (doc) {
+      if (!doc.exists) {
+        msg.style.color = '#D0342C';
+        msg.textContent = 'No event found with that ID. Ask your photographer for the correct Event ID or QR code.';
+        msg.style.display = 'block';
+        return;
+      }
+      const d = doc.data();
+      addOrUpdateFollowedEvent({ id: id, name: d.name || 'Untitled Event', cover: d.cover || ('https://picsum.photos/seed/' + id + '/800/900') });
+      renderEvents();
+      msg.style.color = '#1FA97A';
+      msg.textContent = "You're now following " + (d.name || id) + ".";
+      msg.style.display = 'block';
+      if (input) input.value = '';
+    }).catch(function () {
+      msg.style.color = '#D0342C';
+      msg.textContent = 'Could not check that Event ID — please try again.';
+      msg.style.display = 'block';
+    });
+  }
+
+  function scanEventQr() {
+    alert('QR scanning needs camera access wired up for barcode reading — for now, ask your photographer for the Event ID and type it in above.');
+  }
+
+  // Small helper shared by the studio-share and photo-share buttons: uses the native
+  // share sheet on mobile, falls back to copying the link on desktop.
+  function shareLinkOrCopy(url, title) {
+    if (navigator.share) {
+      navigator.share({ title: title, url: url }).catch(function () {});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        alert('Link copied to clipboard!');
+      }).catch(function () {
+        alert(url);
+      });
+    } else {
+      alert(url);
+    }
+  }
+
+  function shareStudioProfile() {
+    // Same fix as sendDownloadAllEmail() above — share the real running URL, not a
+    // placeholder domain that was never actually deployed.
+    const url = window.location.origin + window.location.pathname;
+    shareLinkOrCopy(url, document.getElementById('studio-name').textContent + ' — SnapFilmer');
+  }
+
+  function shareCurrentPhoto() {
+    const src = viewerPhotos[viewerIndex];
+    if (!src) return;
+    shareLinkOrCopy(src, 'A photo from ' + EVENT.name);
+  }
+
+  function downloadHighlightsGrid() {
+    const grid = document.getElementById('highlights-grid');
+    if (!grid) return;
+    const imgs = Array.prototype.slice.call(grid.querySelectorAll('img'));
+    if (!imgs.length) { alert('No photos here yet.'); return; }
+    const title = document.getElementById('highlights-title').textContent || 'this album';
+    if (!confirm('Download all ' + imgs.length + ' photos in ' + title + '?')) return;
+    imgs.forEach(function (img, i) {
+      setTimeout(function () { triggerDownload(img.src, 'snapfilmer-' + title.replace(/\s+/g, '-').toLowerCase() + '-' + (i + 1) + '.jpg'); }, i * 300);
+    });
+  }
+
+  function toggleBio() {
+    const p = document.getElementById('studio-bio-p');
+    const link = document.getElementById('bio-toggle-link');
+    const expanded = p.classList.toggle('expanded');
+    link.textContent = expanded ? 'Read less' : 'Read more';
+  }
+
+  function showAppInfo(context) {
+    if (context === 'create-event') {
+      alert('Creating a new event is done from the SnapFilmer Studio Dashboard — the separate app photographers use to manage events, uploads and guests.');
+      return;
+    }
+    alert('SnapFilmer — event photo sharing powered by face-recognition search.\nQuestions? Reach the studio at ' + studioContactEmail + '.');
+  }
+
+  function handleViewProfile() {
+    const isReal = !!(auth && auth.currentUser && !auth.currentUser.isAnonymous);
+    if (isReal) {
+      alert('Signed in as ' + (auth.currentUser.displayName || auth.currentUser.email));
+    } else {
+      openLoginScreen();
+    }
+  }
+
+  function requestAdminPermission() {
+    if (!db) { alert('Could not send request — check your internet connection.'); return; }
+    const user = auth && auth.currentUser;
+    const isReal = !!(user && !user.isAnonymous);
+    db.collection('adminRequests').add({
+      eventId: EVENT.id,
+      uid: user ? user.uid : null,
+      name: isReal ? (user.displayName || user.email) : 'Guest',
+      status: 'pending',
+      createdAt: Date.now(),
+    }).then(function () {
+      alert('Request sent! The photographer will review it and reach out.');
+    }).catch(function () {
+      alert('Could not send request — please try again.');
+    });
+  }
+
+  function unfollowEvent() {
+    if (!confirm('Unfollow ' + EVENT.name + '? You can follow again anytime using the Event ID.')) return;
+    EVENTS_LIST = EVENTS_LIST.filter(function (e) { return e.tag !== EVENT.id; });
+    saveFollowedEvents(EVENTS_LIST);
+    renderEvents();
+    alert('Unfollowed ' + EVENT.name + '.');
+  }
+
+  // Switching events reloads the page with the new ?event= — far safer than trying to
+  // tear down and rebuild every in-memory Firestore listener/selfie/match state live,
+  // and it's a genuinely instant reload since the app is a single static file.
+  function switchToEvent(eventId) {
+    if (eventId === EVENT.id) { showTab('home'); return; }
+    window.location.href = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(eventId);
+  }
+
+  // ================= Renderers =================
+  function renderGrid(elId, photos) {
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    photos.forEach(function (uri, i) {
+      const cell = document.createElement('div');
+      cell.className = 'photo-cell';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.src = uri;
+      const wm = document.createElement('div');
+      wm.className = 'wm-badge';
+      wm.textContent = 'SF';
+      cell.appendChild(img);
+      cell.appendChild(wm);
+      cell.addEventListener('click', function () { openViewer(photos, i); });
+      el.appendChild(cell);
+    });
+  }
+
+  function renderStories() {
+    const wrap = document.getElementById('stories-row');
+    wrap.innerHTML = '';
+    STORIES.forEach(function (s) {
+      const item = document.createElement('div');
+      item.className = 'story';
+      item.innerHTML = '<div class="story-ring"><img src="' + s.cover + '"></div><span>' + s.name + '</span>';
+      item.addEventListener('click', function () { openHighlights(s.name, s.photos); });
+      wrap.appendChild(item);
+    });
+  }
+
+  function renderEvents() {
+    const el = document.getElementById('events-list');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!EVENTS_LIST.length) {
+      el.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:12.5px;padding:24px 0;">You\'re not following any events yet. Enter an Event ID above to follow one.</p>';
+      return;
+    }
+    EVENTS_LIST.forEach(function (e) {
+      const row = document.createElement('div');
+      row.className = 'event-tile' + (e.tag === EVENT.id ? ' active-event' : '');
+      row.style.cssText = e.tag === EVENT.id ? 'outline:2px solid var(--accent);' : '';
+      row.innerHTML = '<img src="' + e.cover + '"><div><div class="name">' + e.name + (e.tag === EVENT.id ? ' <span style="color:var(--accent);font-weight:800;">(current)</span>' : '') + '</div><div class="tag">' + e.tag + '</div></div>';
+      // Tapping a followed event switches the whole app to it — see switchToEvent()
+      // for why that's a full reload instead of an in-place swap.
+      row.addEventListener('click', function () { switchToEvent(e.tag); });
+      el.appendChild(row);
+    });
+  }
+
+  function renderPosts() {
+    document.getElementById('posts-list').innerHTML = POSTS_LIVE.map(function (p) {
+      return '<div class="post-card"><div class="post-top">' +
+        '<p class="post-title">' + p.title + '</p>' +
+        '<span class="post-date">' + p.date + '<br>' + p.time + '</span></div>' +
+        '<p class="post-body">' + p.body + '</p>' +
+        (p.checkout ? '<div class="post-checkout">Checkout &rarr;</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+
+  // Posts are studio-authored from the dashboard's Posts page, each targeted either
+  // at "all" guests or one specific event (audience === eventId). We fetch the whole
+  // small collection and filter client-side rather than using a Firestore query, since
+  // an OR across "all" / this-event would need a composite index for a handful of docs.
+  let postsUnsub = null;
+  // Tracks post IDs already seen, so a notification only fires for genuinely new posts
+  // (not for the whole collection on first load, and not repeatedly for the same post).
+  let knownPostIds = null;
+  function startPostsSync() {
+    if (!db || postsUnsub) return;
+    postsUnsub = db.collection('posts').onSnapshot(function (snap) {
+      const mine = [];
+      snap.forEach(function (doc) {
+        const d = doc.data();
+        if (d.audience === 'all' || d.audience === EVENT.id) mine.push(Object.assign({ id: doc.id }, d));
+      });
+      mine.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+
+      const currentIds = mine.map(function (p) { return p.id; });
+      if (knownPostIds === null) {
+        // First sync since the app opened — just remember what's already there,
+        // don't flood the notification feed with every historical post.
+        knownPostIds = currentIds;
+      } else {
+        const newOnes = mine.filter(function (p) { return knownPostIds.indexOf(p.id) === -1; });
+        newOnes.forEach(function (p) {
+          addNotification('post', 'New post: "' + (p.title || 'Untitled') + '"', { postId: p.id });
+        });
+        knownPostIds = currentIds;
+      }
+
+      POSTS_LIVE = mine.length ? mine : POSTS_SEED;
+      renderPosts();
+    }, function () {
+      POSTS_LIVE = POSTS_SEED;
+      renderPosts();
+    });
+  }
+
+  function renderNotifications() {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+    if (!NOTIFICATIONS.length) {
+      list.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:12.5px;padding:32px 0;">No notifications yet. You\'ll see updates here when your photographer uploads new photos or posts something new.</p>';
+      return;
+    }
+    list.innerHTML = NOTIFICATIONS.map(function (n) {
+      return '<div class="notif-row" data-notif-id="' + n.id + '" style="cursor:pointer;">' +
+        '<div class="adot" style="' + (n.read ? 'background:var(--border);' : '') + '"></div>' +
+        '<div><div class="txt">' + n.title + '</div>' +
+        '<div class="tm">' + n.date + ' &middot; ' + n.time + '</div></div></div>';
+    }).join('');
+    list.querySelectorAll('[data-notif-id]').forEach(function (row) {
+      row.addEventListener('click', function () { notificationClicked(row.dataset.notifId); });
+    });
+  }
+
+  // Opened from the bell icon — shows the feed and clears the unread badge, same as
+  // any normal notification inbox.
+  function openNotifications() {
+    pushScreen('notifications');
+    renderNotifications();
+    if (unreadNotifCount() > 0) {
+      NOTIFICATIONS.forEach(function (n) { n.read = true; });
+      saveNotifications();
+      updateNotifBadge();
+    }
+  }
+
+  // Tapping a notification jumps straight to what it's about, instead of just sitting
+  // in the inbox doing nothing.
+  function notificationClicked(id) {
+    const n = NOTIFICATIONS.find(function (x) { return x.id === id; });
+    if (!n) return;
+    popScreen();
+    if (n.type === 'photo') {
+      openGallery();
+      if (n.meta && n.meta.album) setGalleryAlbumFilter(n.meta.album);
+    } else if (n.type === 'post') {
+      showTab('posts');
+    } else if (n.type === 'video') {
+      showTab('home');
+      pushScreen('videos');
+    }
+  }
+
+  function renderVideos() {
+    document.getElementById('videos-list').innerHTML = VIDEOS.map(function (v) {
+      return '<div class="video-tile"><img src="' + v.thumb + '">' +
+        '<div class="pill-play">' + ICONS.PLAY_SM.replace('width="19" height="19"', 'width="16" height="16"') + '</div>' +
+        '<div class="cap">' + v.title + '</div></div>';
+    }).join('');
+  }
+
+  function renderPortfolio() {
+    const wrap = document.getElementById('portfolio-categories');
+    wrap.innerHTML = '';
+    PORTFOLIO_CATS.forEach(function (c) {
+      const card = document.createElement('div');
+      card.className = 'cat-card';
+      card.innerHTML = '<img src="' + c.cover + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + c.count + ' photos</div></div>';
+      card.addEventListener('click', function () { openHighlights(c.name, c.photos); });
+      wrap.appendChild(card);
+    });
+  }
+
+  function applySelfie(dataUrl) {
+    const thumb = document.getElementById('selfie-thumb');
+    thumb.src = dataUrl;
+    thumb.style.display = 'block';
+    document.getElementById('selfie-add').style.display = 'none';
+    // The "N photos found" count is now kept accurate by renderMyPhotosResults() itself
+    // (real matched-photo count), not a static mock total computed here.
+    // Persist the selfie itself, not just the in-memory variable — without this, refreshing
+    // the page wiped selfieRawDataUrl and kicked the guest back to "take a selfie" with all
+    // their matches gone, even though nothing was actually wrong with their account/session.
+    try { localStorage.setItem('sf_selfie_' + EVENT.id, dataUrl); } catch (err) {}
+    runFaceMatch(dataUrl);
+  }
+
+  function handleSelfieFile(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      applySelfie(reader.result);
+      stopCameraStream();
+      popScreen();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ================= Real AI face matching =================
+  // Primary: AWS Rekognition (via a small Lambda function) — much more accurate than the
+  // free client-side library, since it's the same commercial-grade AI real event-photo
+  // platforms use. Falls back to the free in-browser face-api.js matcher if the AWS call
+  // fails (e.g. offline), so the feature still works either way.
+  const FACE_MATCH_API_URL = 'https://qnb4d2vksrtafq2vjf2jhoecyi0apyod.lambda-url.eu-north-1.on.aws/';
+  const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights';
+  let modelsLoaded = false;
+  let modelsLoadingPromise = null;
+  let testPhotos = [];
+  let selfieDescriptor = null;
+  let selfieRawDataUrl = null;
+
+  // Event photos moved to Firebase Storage during the earlier blurry-download fix are
+  // now plain https:// URLs, not base64. The first attempt to fix AWS matching for
+  // these fetched the photo bytes client-side (in the browser) before sending them to
+  // the Lambda — that seemed reasonable, but Firebase Storage doesn't send the CORS
+  // headers a cross-origin fetch() needs (an <img> tag can load the same URL fine
+  // without CORS, which is why the photo shows up on screen just fine — CORS only
+  // blocks scripted access to the response bytes, not plain image display), so every
+  // one of those fetch() calls failed with a generic "Load failed", which looked
+  // identical to the original bug. Fixed properly this time: for a Storage URL, only
+  // the URL itself is sent to the Lambda, and the LAMBDA fetches the actual bytes
+  // server-to-server — a server calling another server has no CORS restriction at all,
+  // since CORS is a browser-only security rule. See the updated Lambda code.
+  async function compareFacesAWS(payload) {
+    const res = await fetch(FACE_MATCH_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' from AWS Lambda');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return !!data.isMatch;
+  }
+
+  // Legacy/test photos are still stored as base64 data URLs directly in Firestore, so
+  // those are safe to downsize client-side (no network fetch involved, no CORS issue).
+  function downsizeImageToBase64(img) {
+    let w = img.width, h = img.height;
+    const maxW = 900;
+    if (w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.82);
+  }
+  function toMatchBase64(dataUrl) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      img.onload = function () { resolve(downsizeImageToBase64(img)); };
+      img.onerror = function () { reject(new Error('Could not load image')); };
+      img.src = dataUrl;
+    });
+  }
+
+  async function matchOnePhotoLocally(photoDataUrl) {
+    if (!selfieDescriptor || typeof faceapi === 'undefined') return false;
+    try {
+      const img = await loadImageEl(photoDataUrl);
+      const results = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
+        .withFaceLandmarks().withFaceDescriptors();
+      if (!results.length) return false;
+      return results.some(function (r) {
+        return faceapi.euclideanDistance(selfieDescriptor, r.descriptor) < 0.5;
+      });
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // ---- Firebase (Firestore) — persists test photos across reloads ----
+  const firebaseConfig = {
+    apiKey: 'AIzaSyCwVBvQuTylTt8_3Ft650y8NHAoUj-Iw8o',
+    authDomain: 'snapfilmer-ai-face-app.firebaseapp.com',
+    projectId: 'snapfilmer-ai-face-app',
+    storageBucket: 'snapfilmer-ai-face-app.firebasestorage.app',
+    messagingSenderId: '148634541857',
+    appId: '1:148634541857:web:4092d9ff8ab2aa6a262860',
+  };
+  let db = null;
+  let auth = null;
+  let testPhotosUnsub = null;
+  let eventPhotos = [];
+  let eventPhotosUnsub = null;
+  // faceRecognition: whether the selfie/AI matching feature exists at all for this event.
+  // facePrivacy: whether the general Gallery is locked until a selfie is taken.
+  // anonymousMyPhotos: whether guests can use the selfie feature without a real account —
+  // if false (the real Kamero default), a guest must sign in before taking a selfie.
+  let eventSettings = { facePrivacy: false, faceRecognition: true, anonymousMyPhotos: false, pin: '', enquiry: false };
+  let pendingCameraOpen = false;
+  let eventSettingsUnsub = null;
+  // If a guest already unlocked the full private gallery with the event PIN, remember
+  // that across screens/reloads (per event) instead of asking again every visit —
+  // matches the "enter PIN once, see everything" behavior the photographer wants.
+  // Loaded from localStorage inside bootApp() below, once EVENT.id is actually known.
+  let pinUnlocked = false;
+  // Albums (Ceremony, Reception, etc.) the photographer set up in the dashboard — shown
+  // as scrollable folder chips at the top of the Gallery so guests can browse by album
+  // instead of only ever seeing one giant, unsorted photo grid.
+  let eventAlbums = [];
+  let galleryAlbumFilter = null;
+  let myPhotosAlbumFilter = null;
+  try {
+    if (typeof firebase !== 'undefined') {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      auth = firebase.auth();
+    }
+  } catch (err) {
+    db = null;
+    auth = null;
+  }
+
+  // Guests are never forced to log in — like real Kamero, browsing/selfie-matching works
+  // instantly via a silent anonymous Firebase session (still satisfies the Firestore
+  // security rules, which only require request.auth != null). Signing up for a real
+  // account is entirely optional, offered from the More tab, and only used to persist
+  // the guest's selfie/photos across devices.
+  if (auth) {
+    auth.onAuthStateChanged(function (user) {
+      if (user) {
+        renderMoreProfile(user);
+        if (document.getElementById('screen-login').classList.contains('active')) {
+          completeLogin();
+        }
+        // Resolve + boot exactly once. Later auth changes (e.g. the guest signs into a
+        // real account mid-session, from the anonymous session set up below) must NOT
+        // re-run event loading or re-subscribe every Firestore listener a second time.
+        if (!EVENT.id) {
+          if (targetEventId) {
+            loadEventAndBoot(targetEventId);
+          } else {
+            showEventGateForm();
+          }
+        }
+      } else {
+        auth.signInAnonymously().catch(function () {
+          // Offline or anonymous auth disabled — still let the guest try entering an
+          // Event ID; Firestore reads just fail gracefully until connectivity returns.
+          if (!targetEventId) showEventGateForm('No connection — you can still try entering an Event ID once you\'re back online.');
+        });
+      }
+    });
+  } else {
+    showEventGateForm('Could not connect — check your internet connection and reload.');
+  }
+
+  // Shows the "Enter Event ID" form on the event-gate overlay (replacing the loading
+  // spinner) — used when there's no ?event=/last-visited event to try, or when one was
+  // tried and didn't work.
+  function showEventGateForm(msg) {
+    const loading = document.getElementById('event-gate-loading');
+    const form = document.getElementById('event-gate-form');
+    const msgEl = document.getElementById('event-gate-msg');
+    if (loading) loading.style.display = 'none';
+    if (form) form.style.display = 'block';
+    if (msgEl && msg) msgEl.textContent = msg;
+  }
+
+  function submitEventGate() {
+    const input = document.getElementById('event-gate-input');
+    // Mobile keyboards (iOS especially) auto-capitalize the first letter of a text
+    // field by default — event IDs are always lowercase slugs, so "Vaibhav-komal"
+    // (auto-capitalized) would silently fail to match "vaibhav-komal" in Firestore
+    // (doc IDs are case-sensitive). Lowercasing here makes that a non-issue regardless
+    // of what the keyboard does, on top of the autocapitalize="off" on the input itself.
+    const id = input ? input.value.trim().toLowerCase() : '';
+    if (!id) return;
+    const loading = document.getElementById('event-gate-loading');
+    const form = document.getElementById('event-gate-form');
+    if (form) form.style.display = 'none';
+    if (loading) loading.style.display = 'block';
+    loadEventAndBoot(id);
+  }
+
+  // Fetches the event's real data from Firestore and, once it exists, boots the rest
+  // of the app around it. This is what makes ONE deployed guest app file work for every
+  // event the studio creates, instead of a name/date/cover baked into the file itself.
+  function loadEventAndBoot(eventId) {
+    if (!db) { showEventGateForm('Could not connect — check your internet connection and try again.'); return; }
+    db.collection('events').doc(eventId).get().then(function (doc) {
+      if (!doc.exists) {
+        showEventGateForm('No event found with that ID. Double-check the link or QR code from your photographer.');
+        return;
+      }
+      const d = doc.data();
+      EVENT = {
+        id: eventId,
+        name: d.name || 'Untitled Event',
+        date: d.date || '',
+        cover: d.cover || ('https://picsum.photos/seed/' + eventId + '/800/900'),
+      };
+      try { localStorage.setItem('sf_last_event_id', EVENT.id); } catch (err) {}
+      addOrUpdateFollowedEvent(EVENT);
+      startStudioProfileSync();
+      startPostsSync();
+      startEventSettingsSync();
+      applyDeepLinkPrefill();
+      bootApp();
+    }).catch(function () {
+      showEventGateForm('Could not load this event — check your internet connection and try again.');
+    });
+  }
+
+  // ---- Studio Profile — dashboard-driven branding (name/bio/brand color/socials) ----
+  // This is what makes the Home screen studio card and accent color actually belong to
+  // whichever studio is running this app, instead of a hardcoded "SnapFilmer" everywhere.
+  let studioProfileUnsub = null;
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.replace('#', ''), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  function mixRgb(a, b, amount) {
+    return {
+      r: Math.round(a.r + (b.r - a.r) * amount),
+      g: Math.round(a.g + (b.g - a.g) * amount),
+      b: Math.round(a.b + (b.b - a.b) * amount),
+    };
+  }
+  function rgbToHex(rgb) {
+    return '#' + [rgb.r, rgb.g, rgb.b].map(function (v) {
+      return Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function applyBrandColor(hex) {
+    if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+    const rgb = hexToRgb(hex);
+    const soft = rgbToHex(mixRgb(rgb, { r: 255, g: 255, b: 255 }, 0.86)); // light tint for chips/badges
+    const ink = rgbToHex(mixRgb(rgb, { r: 0, g: 0, b: 0 }, 0.22)); // slightly darker for text-on-tint
+    const root = document.documentElement.style;
+    root.setProperty('--accent', hex);
+    root.setProperty('--accent-soft', soft);
+    root.setProperty('--accent-ink', ink);
+  }
+
+  function applyStudioProfile(profile) {
+    if (!profile) return;
+    applyBrandColor(profile.brandColor);
+
+    const nameEl = document.getElementById('studio-name');
+    const bioEl = document.getElementById('studio-bio-text');
+    const avatarEl = document.getElementById('studio-avatar');
+    const portfolioTitleEl = document.getElementById('portfolio-title');
+    if (nameEl && profile.name) nameEl.textContent = profile.name;
+    if (portfolioTitleEl && profile.name) portfolioTitleEl.textContent = profile.name;
+    if (bioEl && profile.about) bioEl.textContent = profile.about;
+    if (profile.email) studioContactEmail = profile.email;
+    if (avatarEl && profile.name) {
+      avatarEl.textContent = profile.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+    }
+
+    const strip = document.getElementById('social-strip');
+    if (strip) {
+      const social = profile.social || {};
+      const platforms = [
+        { key: 'instagram', icon: 'INSTA_O' },
+        { key: 'vimeo', icon: 'VIMEO_O' },
+        { key: 'whatsapp', icon: 'WHATSAPP_O' },
+        { key: 'youtube', icon: 'YOUTUBE_O' },
+      ];
+      const withLinks = platforms.filter(function (p) { return social[p.key]; });
+      // If nothing has been configured yet, keep the default decorative icons rather
+      // than showing an empty strip.
+      if (withLinks.length) {
+        strip.innerHTML = '';
+        withLinks.forEach(function (p) {
+          const div = document.createElement('div');
+          div.className = 'social-ghost';
+          div.style.cursor = 'pointer';
+          div.innerHTML = ICONS[p.icon] || '';
+          div.addEventListener('click', function () { window.open(social[p.key], '_blank'); });
+          strip.appendChild(div);
+        });
+      }
+    }
+  }
+
+  function startStudioProfileSync() {
+    if (!db || studioProfileUnsub) return;
+    studioProfileUnsub = db.collection('studio').doc('profile').onSnapshot(function (doc) {
+      if (doc.exists) applyStudioProfile(doc.data());
+    }, function () {
+      // Offline / no doc yet — keep the default hardcoded branding.
+    });
+  }
+
+  function startEventSettingsSync() {
+    if (!db || eventSettingsUnsub) return;
+    eventSettingsUnsub = db.collection('events').doc(EVENT.id).onSnapshot(function (doc) {
+      const d = doc.exists ? doc.data() : {};
+      eventSettings.facePrivacy = !!d.facePrivacy;
+      eventSettings.faceRecognition = d.faceRecognition !== false; // default true if unset
+      eventSettings.anonymousMyPhotos = !!d.anonymousMyPhotos;
+      eventSettings.pin = d.pin || '';
+      eventSettings.enquiry = !!d.enquiry;
+      eventAlbums = Array.isArray(d.albums) ? d.albums : [];
+      // If an album the guest had filtered by got deleted from the dashboard, fall back
+      // to "All Photos" instead of silently showing an empty grid forever.
+      if (galleryAlbumFilter && !eventAlbums.some(function (a) { return a.name === galleryAlbumFilter; })) {
+        galleryAlbumFilter = null;
+      }
+      // A VIP link with ?pin=... embedded auto-unlocks the gallery the same way typing
+      // the PIN in by hand would, the moment the real PIN syncs in from Firestore.
+      if (deepLinkPin && !pinUnlocked && eventSettings.pin && deepLinkPin === String(eventSettings.pin)) {
+        pinUnlocked = true;
+        try { localStorage.setItem('sf_pin_unlocked_' + EVENT.id, '1'); } catch (err) {}
+      }
+      renderGallery();
+      renderMyPhotosResults();
+      renderHomeEnquiry();
+      renderHomeAlbums();
+    }, function () {
+      // If this fails (offline etc.), just fall back to the open/public default.
+    });
+  }
+
+  // Matches real Kamero: every album/folder the studio creates shows up right on the
+  // Home screen as a large banner card (cover photo + name + photo count), not buried
+  // behind a small chip inside Gallery — tapping one jumps straight into that album's
+  // photos. Falls back to a plain folder icon when the studio hasn't set a cover yet.
+  function renderHomeAlbums() {
+    const wrap = document.getElementById('home-albums-wrap');
+    if (!wrap) return;
+    if (!eventAlbums.length) {
+      wrap.style.display = 'none';
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.style.display = 'block';
+    wrap.innerHTML = '<div class="stories-label" style="padding:4px 0 12px;">Folders</div>' +
+      eventAlbums.map(function (a, i) {
+        const cover = a.cover ? '<img src="' + a.cover + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
+        return '<div class="home-album-card" data-home-album="' + i + '">' + cover +
+          '<div class="overlay"></div>' +
+          '<div class="name">' + a.name + '</div>' +
+          '<div class="count-badge">' + (ICONS.IMAGE || '') + (a.count || 0) + '</div>' +
+        '</div>';
+      }).join('');
+    wrap.querySelectorAll('[data-home-album]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        const a = eventAlbums[Number(card.dataset.homeAlbum)];
+        if (a) openHomeAlbum(a.name);
+      });
+    });
+  }
+
+  function openHomeAlbum(name) {
+    openGallery();
+    setGalleryAlbumFilter(name);
+  }
+
+  // Shows on the Home screen (the first thing a guest sees) rather than buried inside
+  // Gallery, since the studio turns this on to catch people who might want to book them
+  // for their own event — it needs to be visible immediately, not after extra taps.
+  function renderHomeEnquiry() {
+    const wrap = document.getElementById('home-enquiry-wrap');
+    if (wrap) wrap.style.display = eventSettings.enquiry ? 'block' : 'none';
+  }
+
+  function startTestPhotosSync() {
+    if (!db || testPhotosUnsub) return;
+    testPhotosUnsub = db.collection('testPhotos').orderBy('createdAt', 'asc').onSnapshot(function (snapshot) {
+      testPhotos = snapshot.docs.map(function (doc) {
+        const existing = testPhotos.find(function (p) { return p.id === doc.id; });
+        return { id: doc.id, dataUrl: doc.data().dataUrl, matched: existing ? existing.matched : null };
+      });
+      if (testPhotos.length) {
+        const section = document.getElementById('test-gallery-section');
+        if (section) section.style.display = 'block';
+      }
+      renderTestGallery();
+      if (selfieRawDataUrl) matchAllTestPhotos();
+    }, function () {
+      setAiStatus('Could not sync with cloud storage — photos will only last this session.');
+    });
+  }
+
+  // Remembers which photo IDs matched last time, per event, so a reload can show the
+  // guest's known photos instantly instead of wiping the grid and waiting through a
+  // fresh AWS pass — that's what made a refresh look like photos "disappearing and
+  // coming back". Re-matching still runs quietly in the background to catch new
+  // uploads and correct anything, it just no longer blanks the screen first.
+  function loadCachedMatchIds() {
+    try { return JSON.parse(localStorage.getItem('sf_matches_' + EVENT.id) || '[]'); } catch (err) { return []; }
+  }
+  function saveCachedMatchIds() {
+    try {
+      const ids = eventPhotos.filter(function (p) { return p.matched === true; }).map(function (p) { return p.id; });
+      localStorage.setItem('sf_matches_' + EVENT.id, JSON.stringify(ids));
+    } catch (err) {}
+  }
+
+  // Same "don't flood on first load" pattern as knownPostIds above.
+  let knownPhotoIds = null;
+  function startEventPhotosSync() {
+    // No orderBy here on purpose — combining it with the where() would need a composite
+    // Firestore index; we just sort client-side after fetching instead.
+    if (!db || eventPhotosUnsub) return;
+    eventPhotosUnsub = db.collection('photos').where('eventId', '==', EVENT.id)
+      .onSnapshot(function (snapshot) {
+        const docs = snapshot.docs.slice().sort(function (a, b) {
+          const ta = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
+          const tb = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
+          return ta - tb;
+        });
+        const cachedIds = loadCachedMatchIds();
+        eventPhotos = docs.map(function (doc) {
+          const existing = eventPhotos.find(function (p) { return p.id === doc.id; });
+          let matched = existing ? existing.matched : null;
+          if (matched === null && cachedIds.indexOf(doc.id) !== -1) matched = true;
+          return { id: doc.id, dataUrl: doc.data().dataUrl, album: doc.data().album || '', matched: matched };
+        });
+
+        const currentIds = eventPhotos.map(function (p) { return p.id; });
+        if (knownPhotoIds === null) {
+          knownPhotoIds = currentIds;
+        } else {
+          const newOnes = eventPhotos.filter(function (p) { return knownPhotoIds.indexOf(p.id) === -1; });
+          if (newOnes.length) {
+            // Group into one notification instead of one per photo — uploads usually
+            // happen in a batch, and 20 separate "new photo" rows would be noisy.
+            const albums = {};
+            newOnes.forEach(function (p) { albums[p.album || ''] = (albums[p.album || ''] || 0) + 1; });
+            const albumNames = Object.keys(albums);
+            let title;
+            if (albumNames.length === 1 && albumNames[0]) {
+              title = newOnes.length + (newOnes.length === 1 ? ' new photo added to "' : ' new photos added to "') + albumNames[0] + '"';
+            } else {
+              title = newOnes.length + (newOnes.length === 1 ? ' new photo added' : ' new photos added');
+            }
+            addNotification('photo', title, { album: albumNames.length === 1 ? albumNames[0] : null });
+          }
+          knownPhotoIds = currentIds;
+        }
+
+        renderGallery();
+        renderMyPhotosResults();
+        if (selfieRawDataUrl) matchAllTestPhotos();
+      });
+  }
+
+  function resizeDataUrl(dataUrl, maxWidth) {
+    return new Promise(function (resolve) {
+      const img = new Image();
+      img.onload = function () {
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = function () { resolve(dataUrl); };
+      img.src = dataUrl;
+    });
+  }
+
+  function openMyPhotos() {
+    pushScreen('myphotos');
+    // face-api.js models used to load eagerly here on every visit to My Photos — that's
+    // a 20-30MB download from a CDN, every single time, even though AWS Rekognition
+    // (now that its CORS issue is fixed) handles real matching and rarely needs this
+    // fallback at all. That eager download was a big chunk of "reload takes forever".
+    // Now it only loads lazily, the moment an actual AWS call fails (see
+    // ensureLocalFallbackReady below) — so the common case pays nothing for it.
+    startTestPhotosSync();
+    startEventPhotosSync();
+    renderMyPhotosResults();
+  }
+
+  function openGallery() {
+    pushScreen('gallery');
+    startEventPhotosSync();
+    startEventSettingsSync();
+    renderGallery();
+  }
+
+  function setAiStatus(msg) {
+    const el = document.getElementById('ai-status');
+    if (el) el.textContent = msg;
+  }
+
+  function loadFaceModels() {
+    if (modelsLoadingPromise) return modelsLoadingPromise;
+    if (typeof faceapi === 'undefined') {
+      setAiStatus('Could not load the AI library (no internet connection?). You can still browse the sample gallery below.');
+      return Promise.resolve();
+    }
+    setAiStatus('Loading AI face recognition models (only happens once)...');
+    // SsdMobilenetv1 is slower to load than TinyFaceDetector but noticeably more accurate at
+    // finding faces at odd angles / in group shots — worth the one-time extra download since
+    // this only runs when the guest opens My Photos, not continuously like a live camera feed.
+    modelsLoadingPromise = Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL),
+    ]).then(function () {
+      modelsLoaded = true;
+      setAiStatus('AI ready. Tap + to add a few photos of yourself, then tap Selfie.');
+    }).catch(function () {
+      setAiStatus('Could not load AI models (check your internet connection) — sample gallery still works below.');
+    });
+    return modelsLoadingPromise;
+  }
+
+  function loadImageEl(src) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  function addTestPhotos(evt) {
+    const files = Array.prototype.slice.call(evt.target.files || []);
+    if (!files.length) return;
+    document.getElementById('test-gallery-section').style.display = 'block';
+    setAiStatus('Uploading photo(s)...');
+    files.forEach(function (file) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        resizeDataUrl(reader.result, 720).then(function (resized) {
+          if (db) {
+            db.collection('testPhotos').add({
+              dataUrl: resized,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            }).catch(function () {
+              addLocalTestPhoto(resized);
+            });
+          } else {
+            addLocalTestPhoto(resized);
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+    evt.target.value = '';
+  }
+
+  function addLocalTestPhoto(dataUrl) {
+    testPhotos.push({ id: 'tp_' + Date.now() + '_' + Math.random().toString(36).slice(2), dataUrl: dataUrl, matched: null });
+    renderTestGallery();
+    if (selfieDescriptor) matchAllTestPhotos();
+  }
+
+  function renderPhotoGrid(gridId, photos) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    grid.innerHTML = '';
+    photos.forEach(function (p, i) {
+      const cell = document.createElement('div');
+      cell.className = 'photo-cell';
+      let badge = '';
+      if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
+      else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
+      cell.innerHTML = '<img src="' + p.dataUrl + '" loading="lazy">' + badge;
+      cell.addEventListener('click', function () {
+        openViewer(photos.map(function (t) { return t.dataUrl; }), i);
+      });
+      grid.appendChild(cell);
+    });
+  }
+
+  // Select-mode state for the "Your Test Photos" grid — these are the guest's own
+  // calibration photos (added via +), so they're the only ones a guest is allowed to
+  // delete. Photographer-uploaded event photos are never guest-deletable.
+  let myPhotosSelectMode = false;
+  let selectedTestPhotoIds = {};
+
+  function toggleMyPhotosSelectMode() {
+    myPhotosSelectMode = !myPhotosSelectMode;
+    if (!myPhotosSelectMode) selectedTestPhotoIds = {};
+    const btn = document.getElementById('myphotos-selectmode-btn');
+    if (btn) btn.classList.toggle('accent', myPhotosSelectMode);
+    renderTestGallery();
+  }
+
+  function deleteSelectedTestPhotos() {
+    const ids = Object.keys(selectedTestPhotoIds).filter(function (id) { return selectedTestPhotoIds[id]; });
+    if (!myPhotosSelectMode || !ids.length) {
+      alert('Tap the checkbox icon above to enter select mode, then tap photos to choose which test photos to delete.');
+      return;
+    }
+    if (!confirm('Delete ' + ids.length + ' test photo(s)? This cannot be undone.')) return;
+    ids.forEach(function (id) {
+      if (db) db.collection('testPhotos').doc(id).delete().catch(function () {});
+    });
+    testPhotos = testPhotos.filter(function (p) { return !selectedTestPhotoIds[p.id]; });
+    selectedTestPhotoIds = {};
+    myPhotosSelectMode = false;
+    const btn = document.getElementById('myphotos-selectmode-btn');
+    if (btn) btn.classList.remove('accent');
+    renderTestGallery();
+  }
+
+  function renderTestGallery() {
+    const grid = document.getElementById('test-gallery-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    testPhotos.forEach(function (p) {
+      const cell = document.createElement('div');
+      cell.className = 'photo-cell';
+      let badge = '';
+      if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
+      else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
+      const selected = !!selectedTestPhotoIds[p.id];
+      const checkOverlay = myPhotosSelectMode
+        ? '<div style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:11px;background:' + (selected ? 'var(--accent)' : 'rgba(255,255,255,.85)') + ';border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;">' + (selected ? '&#10003;' : '') + '</div>'
+        : '';
+      cell.innerHTML = '<img src="' + p.dataUrl + '">' + badge + checkOverlay;
+      cell.addEventListener('click', function () {
+        if (myPhotosSelectMode) {
+          selectedTestPhotoIds[p.id] = !selectedTestPhotoIds[p.id];
+          renderTestGallery();
+        } else {
+          openViewer(testPhotos.map(function (t) { return t.dataUrl; }), testPhotos.indexOf(p));
+        }
+      });
+      grid.appendChild(cell);
+    });
+  }
+
+  // Gallery = the full/browsable event photo grid. Shown to everyone by default;
+  // if the photographer turns on Face-Based Privacy for this event, it locks until
+  // a selfie is taken and then only shows the guest's own matched photos.
+  // Folder chips above the grid — "All Photos" plus one per album the photographer set
+  // up in the dashboard (Ceremony, Reception, etc.), so browsing isn't just one giant
+  // unsorted grid, matching how albums work in real Kamero.
+  function renderGalleryAlbumChips() {
+    const wrap = document.getElementById('gallery-album-chips');
+    if (!wrap) return;
+    if (!eventAlbums.length) {
+      wrap.style.display = 'none';
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.style.display = 'flex';
+    const chips = [{ name: null, label: 'All Photos' }].concat(
+      eventAlbums.map(function (a) { return { name: a.name, label: a.name }; })
+    );
+    wrap.innerHTML = chips.map(function (c) {
+      return '<div class="album-chip' + (galleryAlbumFilter === c.name ? ' active' : '') + '" data-album="' + (c.name || '') + '">' + c.label + '</div>';
+    }).join('');
+    wrap.querySelectorAll('.album-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        setGalleryAlbumFilter(chip.dataset.album || null);
+      });
+    });
+  }
+
+  function setGalleryAlbumFilter(name) {
+    galleryAlbumFilter = name;
+    renderGallery();
+  }
+
+  // Same scrollable-folder-chip pattern as Gallery, but for the guest's own matched
+  // photos — mirrors real Kamero's My Photos screen, which lets guests browse their
+  // matches by camera/album (e.g. "Haldi Cam 3") instead of one long unsorted grid.
+  function renderMyPhotosAlbumChips() {
+    const wrap = document.getElementById('myphotos-album-chips');
+    if (!wrap) return;
+    if (!eventAlbums.length) {
+      wrap.style.display = 'none';
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.style.display = 'flex';
+    const chips = [{ name: null, label: 'All Photos' }].concat(
+      eventAlbums.map(function (a) { return { name: a.name, label: a.name }; })
+    );
+    wrap.innerHTML = chips.map(function (c) {
+      return '<div class="album-chip' + (myPhotosAlbumFilter === c.name ? ' active' : '') + '" data-album="' + (c.name || '') + '">' + c.label + '</div>';
+    }).join('');
+    wrap.querySelectorAll('.album-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        setMyPhotosAlbumFilter(chip.dataset.album || null);
+      });
+    });
+  }
+
+  function setMyPhotosAlbumFilter(name) {
+    myPhotosAlbumFilter = name;
+    renderMyPhotosResults();
+  }
+
+  function renderGallery() {
+    const empty = document.getElementById('gallery-empty');
+    const locked = document.getElementById('gallery-locked');
+    // A guest who entered the correct event PIN sees everything, exactly like a
+    // public event — the PIN is an override for the private/face-matched default,
+    // not an additional filter on top of it.
+    const isPrivate = eventSettings.facePrivacy && !pinUnlocked;
+    const needsSelfie = isPrivate && !selfieRawDataUrl;
+
+    renderGalleryAlbumChips();
+    if (locked) locked.style.display = (needsSelfie && eventPhotos.length > 0) ? 'block' : 'none';
+    const pinSection = document.getElementById('gallery-pin-section');
+    if (pinSection) pinSection.style.display = eventSettings.pin ? 'block' : 'none';
+
+    if (needsSelfie) {
+      const grid = document.getElementById('gallery-grid');
+      if (grid) grid.innerHTML = '';
+      if (empty) empty.style.display = eventPhotos.length === 0 ? 'block' : 'none';
+      return;
+    }
+
+    let visible = isPrivate ? eventPhotos.filter(function (p) { return p.matched === true; }) : eventPhotos;
+    if (galleryAlbumFilter) visible = visible.filter(function (p) { return p.album === galleryAlbumFilter; });
+    renderPhotoGrid('gallery-grid', visible);
+
+    if (empty) {
+      if (eventPhotos.length === 0) {
+        empty.textContent = 'No photos uploaded yet by your photographer. Ask them to upload from the Studio Dashboard.';
+        empty.style.display = 'block';
+      } else if (isPrivate && visible.length === 0) {
+        empty.textContent = "Still checking your selfie against the gallery — matching photos will appear here.";
+        empty.style.display = 'block';
+      } else if (galleryAlbumFilter && visible.length === 0) {
+        empty.textContent = 'No photos in "' + galleryAlbumFilter + '" yet.';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+      }
+    }
+  }
+
+  function unlockGalleryWithPin() {
+    const input = document.getElementById('gallery-pin-input');
+    const msg = document.getElementById('gallery-pin-msg');
+    const val = input ? input.value.trim() : '';
+    if (!val) return;
+    if (eventSettings.pin && val === String(eventSettings.pin)) {
+      pinUnlocked = true;
+      try { localStorage.setItem('sf_pin_unlocked_' + EVENT.id, '1'); } catch (err) {}
+      if (input) input.value = '';
+      if (msg) msg.style.display = 'none';
+      renderGallery();
+    } else if (msg) {
+      msg.textContent = 'Incorrect PIN — please check with your photographer.';
+      msg.style.color = '#D0342C';
+      msg.style.display = 'block';
+    }
+  }
+
+  // Saves to a Firestore "enquiries" collection the studio can review — this is what
+  // actually turns the dashboard's "Enquiry / Lead Capture Form" toggle into a real,
+  // working form on the guest side, instead of a setting with nothing behind it.
+  function submitEnquiry() {
+    const nameEl = document.getElementById('enq-name');
+    const emailEl = document.getElementById('enq-email');
+    const phoneEl = document.getElementById('enq-phone');
+    const msgEl = document.getElementById('enq-message');
+    const statusEl = document.getElementById('enq-msg');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const email = emailEl ? emailEl.value.trim() : '';
+    if (!name || !email) {
+      if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Please enter your name and email.'; statusEl.style.display = 'block'; }
+      return;
+    }
+    if (!db) {
+      if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Could not send — no connection. Please try again.'; statusEl.style.display = 'block'; }
+      return;
+    }
+    db.collection('enquiries').add({
+      eventId: EVENT.id,
+      name: name,
+      email: email,
+      phone: phoneEl ? phoneEl.value.trim() : '',
+      message: msgEl ? msgEl.value.trim() : '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }).then(function () {
+      if (statusEl) { statusEl.style.color = '#1FA97A'; statusEl.textContent = "Thanks! We'll get back to you soon."; statusEl.style.display = 'block'; }
+      if (nameEl) nameEl.value = '';
+      if (emailEl) emailEl.value = '';
+      if (phoneEl) phoneEl.value = '';
+      if (msgEl) msgEl.value = '';
+    }).catch(function () {
+      if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Something went wrong — please try again.'; statusEl.style.display = 'block'; }
+    });
+  }
+
+  // My Photos = always a personal, selfie-gated view. It never shows the full gallery —
+  // only photos (from the event gallery) where the guest's face was matched.
+  function renderMyPhotosResults() {
+    const prompt = document.getElementById('mp-selfie-prompt');
+    const empty = document.getElementById('mp-yourphotos-empty');
+    const grid = document.getElementById('mp-yourphotos-grid');
+    const countEl = document.getElementById('myphotos-count');
+
+    renderMyPhotosAlbumChips();
+
+    if (!selfieRawDataUrl) {
+      if (prompt) prompt.style.display = 'block';
+      if (empty) empty.style.display = 'none';
+      if (grid) grid.innerHTML = '';
+      if (countEl) countEl.textContent = '0 photos found';
+      return;
+    }
+    if (prompt) prompt.style.display = 'none';
+
+    const matchedAll = eventPhotos.filter(function (p) { return p.matched === true; });
+    const matched = myPhotosAlbumFilter ? matchedAll.filter(function (p) { return p.album === myPhotosAlbumFilter; }) : matchedAll;
+    renderPhotoGrid('mp-yourphotos-grid', matched);
+    if (countEl) countEl.textContent = matchedAll.length + (matchedAll.length === 1 ? ' photo found' : ' photos found');
+    if (empty) {
+      if (matched.length === 0 && matchInProgress) {
+        // Matching (AWS network calls) is still running — say so instead of implying
+        // nothing was found, which is what made a normal in-progress match look like
+        // previously-matched photos had vanished.
+        empty.textContent = 'Matching your selfie against the gallery — this can take a few seconds...';
+        empty.style.display = 'block';
+      } else if (matched.length === 0 && myPhotosAlbumFilter) {
+        empty.textContent = 'No matching photos in "' + myPhotosAlbumFilter + '" yet.';
+        empty.style.display = 'block';
+      } else if (matched.length === 0) {
+        empty.textContent = 'No matching photos found yet.';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+      }
+    }
+  }
+
+  // ?prefill=<docId> deep link (from the dashboard's "Generate Selfie-Prefilled Direct
+  // My Photos Link"). The dashboard already uploaded the studio-chosen photo to Storage
+  // and saved a small record in Firestore's prefillSelfies collection — this fetches it
+  // and runs the exact same matching flow as if the guest had taken their own selfie,
+  // so they land straight on their matched photos with zero extra steps.
+  let deepLinkPrefillApplied = false;
+  function applyDeepLinkPrefill() {
+    if (!deepLinkPrefillId || deepLinkPrefillApplied || selfieRawDataUrl || !db) return;
+    deepLinkPrefillApplied = true;
+    db.collection('prefillSelfies').doc(deepLinkPrefillId).get().then(function (doc) {
+      if (!doc.exists) return;
+      const d = doc.data();
+      if (!d || d.eventId !== EVENT.id || !d.dataUrl) return;
+      const thumb = document.getElementById('selfie-thumb');
+      const addBtn = document.getElementById('selfie-add');
+      if (thumb) { thumb.src = d.dataUrl; thumb.style.display = 'block'; }
+      if (addBtn) addBtn.style.display = 'none';
+      try { localStorage.setItem('sf_selfie_' + EVENT.id, d.dataUrl); } catch (err) {}
+      openMyPhotos();
+      runFaceMatch(d.dataUrl);
+    }).catch(function () {
+      // Bad/expired link ID — the app still works normally, guest just takes their own selfie.
+    });
+  }
+
+  async function runFaceMatch(selfieDataUrl) {
+    selfieRawDataUrl = selfieDataUrl;
+    if (!testPhotos.length && !eventPhotos.length) {
+      setAiStatus('Selfie captured. Once your photographer uploads event photos (or you add test photos with +), matching will run automatically.');
+      return;
+    }
+    setAiStatus('Matching against ' + (testPhotos.length + eventPhotos.length) + ' photo(s) using AWS Rekognition...');
+    renderGallery();
+    renderMyPhotosResults();
+
+    // The local face-api.js descriptor used to be computed here eagerly (loading
+    // 20-30MB of models) on every selfie, purely as a fallback for if AWS fails. Now
+    // that's only done lazily, on-demand, the moment an AWS call actually fails — see
+    // ensureLocalFallbackReady(), called from matchOnePhoto()'s catch block.
+    await matchAllTestPhotos();
+  }
+
+  // Loads face-api.js models + computes the selfie's local descriptor, but only the
+  // first time an AWS Rekognition call actually fails — not proactively on every
+  // selfie/reload. AWS handles real matching now, so this heavy (20-30MB) download is
+  // usually never needed at all.
+  async function ensureLocalFallbackReady() {
+    if (typeof faceapi === 'undefined') return;
+    if (!modelsLoaded) await loadFaceModels();
+    if (!selfieDescriptor && selfieRawDataUrl && typeof faceapi !== 'undefined') {
+      try {
+        const selfieImg = await loadImageEl(selfieRawDataUrl);
+        const selfieResult = await faceapi.detectSingleFace(selfieImg, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
+          .withFaceLandmarks().withFaceDescriptor();
+        if (selfieResult) selfieDescriptor = selfieResult.descriptor;
+      } catch (err) {
+        // ignore — matchOnePhotoLocally already handles a missing descriptor gracefully
+      }
+    }
+  }
+
+  // Tracks the first AWS failure seen this session so we can surface it in the status
+  // line — previously AWS errors were swallowed silently and the guest only ever saw
+  // "0 of N matched", which looks identical whether the AI genuinely found no match or
+  // the whole matching pipeline (AWS + local fallback) is broken. Now the real cause
+  // is visible, which is what makes future bug reports about this actually diagnosable.
+  let lastAwsError = null;
+  let usedLocalFallback = false;
+  // True while a matching pass is running. Matters because eventPhotos' `matched` flag
+  // gets reset to null the instant a fresh Firestore snapshot arrives (e.g. right after
+  // a page reload) — matching each photo against AWS then happens one network round-trip
+  // at a time, which used to run sequentially and could take many seconds for a handful
+  // of photos. During that window My Photos looked completely empty ("photos gaayab ho
+  // gaye"), even though nothing was actually lost — it just hadn't finished re-matching
+  // yet. Parallelizing the calls below + surfacing this flag in the UI fixes both the
+  // speed and the scary-looking empty state.
+  let matchInProgress = false;
+
+  async function matchOnePhoto(photo) {
+    try {
+      const isStorageUrl = photo.dataUrl && photo.dataUrl.indexOf('data:') !== 0;
+      const payload = isStorageUrl
+        ? { selfieBase64: selfieRawDataUrl, photoUrl: photo.dataUrl }
+        : { selfieBase64: selfieRawDataUrl, photoBase64: await toMatchBase64(photo.dataUrl) };
+      photo.matched = await compareFacesAWS(payload);
+    } catch (err) {
+      // AWS call itself failed (offline, cold start, quota, CORS, wrong endpoint, etc.)
+      // — fall back to the free client-side matcher so the feature still works, just
+      // less accurately, and remember what went wrong so it can be shown to the guest.
+      lastAwsError = (err && err.message) || 'Unknown AWS error';
+      usedLocalFallback = true;
+      await ensureLocalFallbackReady();
+      photo.matched = await matchOnePhotoLocally(photo.dataUrl);
+    }
+  }
+
+  // Event photos are matched with ONE Rekognition Collection search call instead of
+  // comparing the selfie against every photo one at a time — the dashboard now indexes
+  // each photo's face the moment it's uploaded, so this search is instant whether the
+  // event has 80 photos or 80,000. This is what actually fixes matching being slow AND
+  // getting slower the bigger the event gets.
+  let eventSearchFailed = false;
+  async function searchEventPhotos() {
+    eventSearchFailed = false;
+    try {
+      const res = await fetch(FACE_MATCH_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'search', eventId: EVENT.id, selfieBase64: selfieRawDataUrl }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' from AWS Lambda');
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const ids = data.matchedPhotoIds || [];
+      eventPhotos.forEach(function (p) { p.matched = ids.indexOf(p.id) !== -1; });
+    } catch (err) {
+      lastAwsError = (err && err.message) || 'Unknown AWS error';
+      eventSearchFailed = true;
+    }
+  }
+
+  async function matchAllTestPhotos() {
+    if (!selfieRawDataUrl) return;
+    lastAwsError = null;
+    usedLocalFallback = false;
+    matchInProgress = true;
+    renderMyPhotosResults();
+    renderGallery();
+    setAiStatus('Matching your face...');
+
+    // Event photos: one search call, no matter how many there are. The (possibly huge)
+    // event photo grid only gets rebuilt once, right when this resolves — rebuilding it
+    // on every single test-photo tick below (like before) was tearing down and
+    // reinserting the whole gallery's DOM repeatedly while a guest might be mid-scroll,
+    // which is what made the page visibly jump up/down during matching.
+    const eventSearchPromise = eventPhotos.length ? searchEventPhotos().then(function () {
+      renderGallery();
+      renderMyPhotosResults();
+    }) : Promise.resolve();
+
+    // Test photos (the manual "+" tray) stay on the old one-by-one compare — that tray
+    // only ever holds a handful of photos, so there's no scale problem to fix there.
+    // Only the small test-photos strip re-renders per tick, not the full gallery.
+    const total = testPhotos.length;
+    let done = 0;
+    const CONCURRENCY = 5;
+    let nextIndex = 0;
+    async function runWorker() {
+      while (nextIndex < testPhotos.length) {
+        const photo = testPhotos[nextIndex++];
+        await matchOnePhoto(photo);
+        done++;
+        renderTestGallery();
+        renderMyPhotosResults();
+      }
+    }
+    try {
+      const workers = [];
+      for (let i = 0; i < Math.min(CONCURRENCY, testPhotos.length); i++) workers.push(runWorker());
+      await Promise.all([eventSearchPromise].concat(workers));
+    } finally {
+      matchInProgress = false;
+    }
+    saveCachedMatchIds();
+    const matchedTest = testPhotos.filter(function (p) { return p.matched; }).length;
+    const matchedEvent = eventPhotos.filter(function (p) { return p.matched; }).length;
+    let status = matchedEvent + ' of ' + eventPhotos.length + ' event photo(s), ' + matchedTest + ' of ' + testPhotos.length + ' test photo(s) matched your face.';
+    if (eventSearchFailed) {
+      status += ' (Could not reach AWS for the event gallery search' + (lastAwsError ? ': ' + lastAwsError : '') + ' — try again.)';
+      console.error('SnapFilmer face-match: AWS Rekognition search failed. Error:', lastAwsError);
+    } else if (usedLocalFallback) {
+      status += ' (AWS matching failed for test photos — used the backup on-device matcher instead' + (lastAwsError ? ': ' + lastAwsError : '') + '.)';
+      console.error('SnapFilmer face-match: AWS Rekognition call failed, used local fallback. Error:', lastAwsError);
+    }
+    setAiStatus(status);
+    renderTestGallery();
+    renderGallery();
+    renderMyPhotosResults();
+  }
+
+  // ================= Login / Signup (optional) =================
+  function showSignup() {
+    document.getElementById('login-step-signin').classList.remove('active');
+    document.getElementById('login-step-signup').classList.add('active');
+  }
+
+  function showLogin() {
+    document.getElementById('login-step-signup').classList.remove('active');
+    document.getElementById('login-step-signin').classList.add('active');
+  }
+
+  // Opened voluntarily (e.g. from the More tab), or automatically when a guest tries to
+  // take a selfie on an event that requires a real account (Anonymous My Photos off).
+  function openLoginScreen() {
+    showLogin();
+    clearAuthError('signin-error');
+    clearAuthError('signup-error');
+    document.getElementById('screen-login').classList.add('active');
+  }
+
+  function closeLoginScreen() {
+    pendingCameraOpen = false;
+    document.getElementById('screen-login').classList.remove('active');
+    showTab('more');
+  }
+
+  function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  function showAuthError(elId, message) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = message;
+    el.style.display = 'block';
+  }
+  function clearAuthError(elId) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.style.display = 'none';
+    el.textContent = '';
+  }
+
+  function friendlyAuthError(err) {
+    const code = err && err.code;
+    if (code === 'auth/invalid-email') return 'That email address looks invalid.';
+    if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') return 'Incorrect email or password.';
+    if (code === 'auth/email-already-in-use') return 'An account with this email already exists — try Sign In instead.';
+    if (code === 'auth/weak-password') return 'Password should be at least 6 characters.';
+    if (code === 'auth/popup-closed-by-user') return 'Google sign-in was closed before finishing.';
+    if (code === 'auth/operation-not-allowed') return 'Email/Password sign-in is not enabled for this app yet.';
+    if (code === 'auth/network-request-failed') return 'No internet connection — check your network and try again.';
+    return (err && err.message) || 'Something went wrong. Please try again.';
+  }
+
+  function doSignIn() {
+    clearAuthError('signin-error');
+    if (!auth) { showAuthError('signin-error', 'Login is not available right now (no connection).'); return; }
+    const email = (document.getElementById('signin-email').value || '').trim();
+    const password = document.getElementById('signin-password').value || '';
+    if (!email || !password) { showAuthError('signin-error', 'Please enter both email and password.'); return; }
+    const btn = document.getElementById('signin-submit');
+    if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+    auth.signInWithEmailAndPassword(email, password)
+      .then(function () { completeLogin(); })
+      .catch(function (err) { showAuthError('signin-error', friendlyAuthError(err)); })
+      .finally(function () { if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; } });
+  }
+
+  function doSignUp() {
+    clearAuthError('signup-error');
+    if (!auth) { showAuthError('signup-error', 'Sign up is not available right now (no connection).'); return; }
+    const first = (document.getElementById('signup-firstname').value || '').trim();
+    const last = (document.getElementById('signup-lastname').value || '').trim();
+    const email = (document.getElementById('signup-email').value || '').trim();
+    const password = document.getElementById('signup-password').value || '';
+    if (!email || !password) { showAuthError('signup-error', 'Please enter an email and password.'); return; }
+    const btn = document.getElementById('signup-submit');
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating account...'; }
+    // If the guest already has a silent anonymous session (the normal case — every guest
+    // gets one on load), link the new email/password credential to it instead of creating
+    // a brand-new account, so their UID (and anything tied to it) carries over.
+    const cred = firebase.auth.EmailAuthProvider.credential(email, password);
+    const upgrade = (auth.currentUser && auth.currentUser.isAnonymous)
+      ? auth.currentUser.linkWithCredential(cred)
+      : auth.createUserWithEmailAndPassword(email, password);
+    upgrade
+      .then(function (result) {
+        const displayName = (first + ' ' + last).trim();
+        const user = result.user || auth.currentUser;
+        if (displayName && user) return user.updateProfile({ displayName: displayName });
+      })
+      .then(function () { completeLogin(); })
+      .catch(function (err) { showAuthError('signup-error', friendlyAuthError(err)); })
+      .finally(function () { if (btn) { btn.disabled = false; btn.textContent = 'Continue'; } });
+  }
+
+  function googleSignIn() {
+    if (!auth) { showAuthError('signin-error', 'Login is not available right now (no connection).'); return; }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const doLink = auth.currentUser && auth.currentUser.isAnonymous;
+    const action = doLink ? auth.currentUser.linkWithPopup(provider) : auth.signInWithPopup(provider);
+    action.then(function () { completeLogin(); })
+      .catch(function (err) {
+        if (err && err.code === 'auth/credential-already-in-use') {
+          // This Google account already has its own real account elsewhere — just sign
+          // straight into that instead of trying to link it to the anonymous session.
+          auth.signInWithPopup(provider).then(function () { completeLogin(); })
+            .catch(function (err2) { showAuthError('signin-error', friendlyAuthError(err2)); });
+          return;
+        }
+        const msg = friendlyAuthError(err);
+        showAuthError('signin-error', msg);
+        showAuthError('signup-error', msg);
+      });
+  }
+
+  function forgotPassword() {
+    clearAuthError('signin-error');
+    if (!auth) { showAuthError('signin-error', 'Not available right now (no connection).'); return; }
+    const email = (document.getElementById('signin-email').value || '').trim();
+    if (!email) { showAuthError('signin-error', 'Type your email above first, then tap "Forgot Password?".'); return; }
+    auth.sendPasswordResetEmail(email)
+      .then(function () { showAuthError('signin-error', 'Password reset email sent — check your inbox.'); })
+      .catch(function (err) { showAuthError('signin-error', friendlyAuthError(err)); });
+  }
+
+  function doSignOut() {
+    if (!auth) return;
+    if (!confirm("Sign out of your account? You can keep browsing as a guest — you won't lose access to the event.")) return;
+    auth.signOut().then(function () {
+      // Immediately re-establish an anonymous session so Firestore access (and browsing)
+      // keeps working — guests are never left at a forced login wall.
+      return auth.signInAnonymously();
+    }).then(function () {
+      showTab('more');
+    });
+  }
+
+  // Updates the More tab's profile card + auth row based on current auth state.
+  // Anonymous users (the default for every guest) see "Sign In / Create Account";
+  // guests with a real account see their name/email + a Logout option.
+  function renderMoreProfile(user) {
+    user = user || (auth && auth.currentUser);
+    const isReal = !!(user && !user.isAnonymous);
+    const nameEl = document.getElementById('profile-name');
+    const emailEl = document.getElementById('profile-email');
+    const avatarEl = document.getElementById('profile-avatar');
+    const name = isReal ? (user.displayName || (user.email ? user.email.split('@')[0] : 'Guest')) : 'Guest';
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) emailEl.textContent = isReal ? (user.email || '') : 'Not signed in';
+    if (avatarEl) avatarEl.textContent = name.split(' ').map(function (p) { return p[0]; }).join('').slice(0, 2).toUpperCase();
+
+    const authRow = document.getElementById('more-auth-row');
+    if (authRow) {
+      if (isReal) {
+        authRow.innerHTML = '<div><div class="lt">Logout</div><div class="ld">You\'ll need to sign in again to restore this account.</div></div><span class="arrow"><i data-icon="CHEVRON"></i></span>';
+        authRow.onclick = doSignOut;
+      } else {
+        authRow.innerHTML = '<div><div class="lt">Sign In / Create Account</div><div class="ld">Save your selfie and photos across devices.</div></div><span class="arrow"><i data-icon="CHEVRON"></i></span>';
+        authRow.onclick = openLoginScreen;
+      }
+    }
+  }
+
+  function completeLogin() {
+    document.getElementById('screen-login').classList.remove('active');
+    if (pendingCameraOpen) {
+      pendingCameraOpen = false;
+      openCamera();
+      return;
+    }
+    showTab('more');
+  }
+
+  // ================= Camera =================
+  let cameraStream = null;
+
+  function openCamera() {
+    // Face Recognition can be turned off entirely for an event by the photographer.
+    if (!eventSettings.faceRecognition) {
+      alert('Face recognition is turned off for this event by the photographer. Ask them to enable it in Event Settings.');
+      return;
+    }
+    // Unless the photographer has enabled "Anonymous My Photos", a guest needs a real
+    // (non-anonymous) account before they can take a selfie — matches real Kamero's
+    // default behaviour. Redirect to sign-in, then come straight back to the camera.
+    const isAnonymousSession = !!(auth && auth.currentUser && auth.currentUser.isAnonymous);
+    if (!eventSettings.anonymousMyPhotos && isAnonymousSession) {
+      pendingCameraOpen = true;
+      openLoginScreen();
+      return;
+    }
+    pushScreen('camera');
+    document.getElementById('camera-fallback').style.display = 'none';
+    document.getElementById('camera-video').style.display = 'block';
+    document.getElementById('camera-controls').style.display = 'flex';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showCameraFallback();
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then(function (stream) {
+        cameraStream = stream;
+        document.getElementById('camera-video').srcObject = stream;
+      })
+      .catch(function () {
+        showCameraFallback();
+      });
+  }
+
+  function showCameraFallback() {
+    document.getElementById('camera-video').style.display = 'none';
+    document.getElementById('camera-controls').style.display = 'none';
+    document.getElementById('camera-fallback').style.display = 'flex';
+  }
+
+  function stopCameraStream() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(function (t) { t.stop(); });
+      cameraStream = null;
+    }
+  }
+
+  function closeCamera() {
+    stopCameraStream();
+    popScreen();
+  }
+
+  function capturePhoto() {
+    const video = document.getElementById('camera-video');
+    if (!video.videoWidth) return;
+    const canvas = document.getElementById('camera-canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    applySelfie(dataUrl);
+    stopCameraStream();
+    popScreen();
+  }
+
+  // ================= Init =================
+  // Icon rendering doesn't depend on which event is loaded, so this runs immediately
+  // rather than waiting behind the event gate.
+  document.querySelectorAll('[data-icon]').forEach(function (el) {
+    el.innerHTML = ICONS[el.dataset.icon] || '';
+  });
+
+  // Everything below used to run unconditionally at page load, back when EVENT was a
+  // hardcoded constant. Now it's a function, called from loadEventAndBoot() above once
+  // the real event data has actually been fetched from Firestore.
+  function bootApp() {
+    const gate = document.getElementById('event-gate');
+    if (gate) gate.style.display = 'none';
+
+    // These used to load at top-level script parse time, before EVENT.id existed —
+    // moved here so they use the real, resolved event ID.
+    try { NOTIFICATIONS = JSON.parse(localStorage.getItem('sf_notifications_' + EVENT.id) || '[]'); } catch (err) { NOTIFICATIONS = []; }
+    try { pinUnlocked = localStorage.getItem('sf_pin_unlocked_' + EVENT.id) === '1'; } catch (err) {}
+
+    document.getElementById('home-cover').src = EVENT.cover;
+    document.getElementById('home-event-name').textContent = EVENT.name;
+    document.getElementById('home-date').textContent = EVENT.date;
+    renderStories();
+    renderEvents();
+    renderPosts();
+    renderNotifications();
+    updateNotifBadge();
+    renderVideos();
+
+    // Restore a previously-taken selfie on reload so matches don't just vanish. Photo
+    // sync + snapshot handlers already call matchAllTestPhotos() automatically once
+    // photos load if selfieRawDataUrl is set, so setting it here is enough to resume.
+    (function restoreSelfie() {
+      let saved = null;
+      try { saved = localStorage.getItem('sf_selfie_' + EVENT.id); } catch (err) {}
+      if (!saved) return;
+      selfieRawDataUrl = saved;
+      const thumb = document.getElementById('selfie-thumb');
+      const addBtn = document.getElementById('selfie-add');
+      if (thumb) { thumb.src = saved; thumb.style.display = 'block'; }
+      if (addBtn) addBtn.style.display = 'none';
+    })();
+
+    // ?album=... deep link (from the dashboard's "Link to Open Specific Album Directly")
+    // — jump straight into Gallery filtered to that folder instead of just opening Home.
+    if (deepLinkAlbum) {
+      openGallery();
+      setGalleryAlbumFilter(deepLinkAlbum);
+    }
+
+    // Swipe left/right on the photo viewer to move through the album — the tap-arrows
+    // (navigateViewer above) cover mouse/desktop use, this covers touch/mobile.
+    (function initViewerSwipe() {
+      const wrap = document.getElementById('viewer-img-wrap');
+      if (!wrap) return;
+      let startX = 0, startY = 0, tracking = false;
+      wrap.addEventListener('touchstart', function (e) {
+        if (!e.touches || !e.touches.length) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        tracking = true;
+      }, { passive: true });
+      wrap.addEventListener('touchend', function (e) {
+        if (!tracking) return;
+        tracking = false;
+        const touch = e.changedTouches && e.changedTouches[0];
+        const endX = touch ? touch.clientX : startX;
+        const endY = touch ? touch.clientY : startY;
+        const dx = endX - startX;
+        const dy = endY - startY;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+          navigateViewer(dx < 0 ? 1 : -1);
+        }
+      }, { passive: true });
+    })();
+
+    (function initMuteToggle() {
+      const toggle = document.getElementById('mute-toggle');
+      if (!toggle) return;
+      let saved = '0';
+      try { saved = localStorage.getItem('sf_muted_' + EVENT.id) || '0'; } catch (err) {}
+      toggle.checked = saved === '1';
+      toggle.addEventListener('change', function () {
+        try { localStorage.setItem('sf_muted_' + EVENT.id, toggle.checked ? '1' : '0'); } catch (err) {}
+      });
+    })();
+
+    // No login wall — go straight into the event, matching real Kamero's zero-friction
+    // guest access. The anonymous Firebase session (set up above) keeps Firestore working
+    // in the background without the guest ever seeing a sign-in screen.
+    //
+    // Resume wherever the guest actually was instead of always bouncing back to Home —
+    // that's what made a plain page refresh feel like getting kicked out of the app.
+    // Skipped when a deep link already navigated somewhere (album/prefill above), so it
+    // doesn't get immediately overridden.
+    if (!deepLinkAlbum && !deepLinkPrefillId) {
+      (function restoreLastScreen() {
+        let lastTab = 'home';
+        let lastSub = null;
+        try {
+          lastTab = localStorage.getItem('sf_last_tab') || 'home';
+          lastSub = localStorage.getItem('sf_last_subscreen');
+        } catch (err) {}
+        if (['home', 'events', 'posts', 'more'].indexOf(lastTab) === -1) lastTab = 'home';
+        showTab(lastTab);
+        if (lastSub === 'myphotos') openMyPhotos();
+        else if (lastSub === 'gallery') openGallery();
+      })();
+    }
+  }
+</script>
+</body>
+</html>
