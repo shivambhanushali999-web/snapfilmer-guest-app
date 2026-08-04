@@ -801,8 +801,14 @@
         </div>
       </div>
 
-      <div class="stories-label">Highlights</div>
-      <div class="stories-row" id="stories-row"></div>
+      <!-- Wrapped so renderStories() can hide the label along with the row — the label
+           alone used to always render regardless of whether there was anything real to
+           show underneath it (no highlighted photos yet, no albums with a cover/photos
+           yet), leaving an orphaned "Highlights" heading sitting over dead empty space. -->
+      <div id="stories-section">
+        <div class="stories-label">Highlights</div>
+        <div class="stories-row" id="stories-row"></div>
+      </div>
 
       <div id="home-enquiry-wrap" style="display:none;padding:0 16px;">
         <div class="stories-label" style="padding:20px 0 10px;">Interested in booking us?</div>
@@ -2192,6 +2198,12 @@
       });
       wrap.appendChild(item);
     });
+
+    // Hide the whole "Highlights" label + row together when nothing real ended up in
+    // it — a heading sitting over dead empty space used to look like the feature was
+    // broken, when really there was just nothing to show yet.
+    const section = document.getElementById('stories-section');
+    if (section) section.style.display = wrap.children.length ? 'block' : 'none';
   }
 
   function renderEvents() {
