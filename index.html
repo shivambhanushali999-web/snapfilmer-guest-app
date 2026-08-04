@@ -65,7 +65,11 @@
 
   /* ---- Event Gate premium redesign — scoped to its own classes/IDs so the plainer
        Home-tab studio card (which reuses .studio-block/.studio-top etc.) is untouched. ---- */
-  .gate-card { position: relative; overflow: hidden; width: 100%; max-width: 320px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; box-shadow: 0 16px 40px -20px rgba(20,16,20,.28); padding: 24px 20px; text-align: left; }
+  /* max-width was hard-capped at 320px before — fine on the 390px desktop preview frame,
+     but on a real phone (#event-gate already has its own 22px side padding) it left dead
+     cream space on either side instead of filling the screen. Now it just fills whatever
+     width the padded gate area gives it. */
+  .gate-card { position: relative; overflow: hidden; width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; box-shadow: 0 16px 40px -20px rgba(20,16,20,.28); padding: 24px 20px; text-align: left; }
   .gate-serif { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; }
   /* Qualified with the parent tag/class (not just .gate-kicker alone) so it beats the
      existing ".studio-meta p" rule's specificity instead of being silently overridden by
@@ -388,7 +392,7 @@
        before anything else can render it has to know WHICH event (from ?event=<id> in
        the link/QR, or the last one this guest opened). Sits on top of everything until
        that resolves; hidden the moment bootApp() actually runs. ========== -->
-  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;padding:36px 22px 40px;text-align:center;box-sizing:border-box;overflow-y:auto;">
+  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;padding:36px 22px 64px;text-align:center;box-sizing:border-box;overflow-y:auto;">
     <!-- Squared off (no border-radius anywhere) and merged into ONE continuous panel per
          feedback — the earlier version used 3 separate rounded cards with gaps/shadows
          between them and it read as disconnected pieces instead of one cohesive screen.
@@ -402,7 +406,10 @@
            hand-drawn leaf paths) — not traced from any reference. -->
       <div id="event-gate-studio" style="padding:24px 20px 22px;position:relative;">
         <div class="gate-corner-lines tr"></div>
-        <svg viewBox="0 0 140 120" width="118" height="101" style="position:absolute;top:0;right:0;pointer-events:none;" aria-hidden="true">
+        <!-- Shrunk and given the studio-top row its own reserved right-side padding below
+           — on a real (wider) phone the "WEDDING & PORTRAIT STUDIO" kicker text was
+           running underneath this illustration and visually "mixing" with it. -->
+        <svg viewBox="0 0 140 120" width="91" height="78" style="position:absolute;top:0;right:0;pointer-events:none;" aria-hidden="true">
           <defs>
             <filter id="gateWashBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
           </defs>
@@ -424,7 +431,7 @@
           </g>
         </svg>
 
-        <div class="studio-top" style="position:relative;">
+        <div class="studio-top" style="position:relative;padding-right:80px;">
           <div class="studio-avatar" id="gate-studio-avatar" style="width:56px;height:56px;border-radius:0;font-size:17px;">SF</div>
           <div class="studio-meta">
             <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:21px;">SnapFilmer</h3>
