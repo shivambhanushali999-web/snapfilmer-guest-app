@@ -396,13 +396,22 @@
        before anything else can render it has to know WHICH event (from ?event=<id> in
        the link/QR, or the last one this guest opened). Sits on top of everything until
        that resolves; hidden the moment bootApp() actually runs. ========== -->
-  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;padding:36px 22px 64px;text-align:center;box-sizing:border-box;overflow-y:auto;">
+  <!-- The scrolling element itself must NOT also be a flex container — WebKit/iOS Safari
+       has a long-standing bug where overflow-y:auto silently fails (or clips instead of
+       scrolling) on a display:flex;flex-direction:column element, especially combined with
+       position:absolute;inset:0. Splitting scroll (outer, plain block) from centering
+       (inner flex wrapper) is the standard fix. -->
+  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="display:flex;flex-direction:column;align-items:center;padding:36px 0 64px;text-align:center;box-sizing:border-box;min-height:100%;">
     <!-- Squared off (no border-radius anywhere) and merged into ONE continuous panel per
          feedback — the earlier version used 3 separate rounded cards with gaps/shadows
          between them and it read as disconnected pieces instead of one cohesive screen.
          Now it's a single square-cornered panel with thin divider lines between its three
          sections (studio profile / enter event id / welcome strip). -->
-    <div class="gate-card" id="event-gate-panel" style="border-radius:0;padding:0;">
+    <!-- #event-gate now has zero side padding so this panel runs fully edge-to-edge on a
+         real phone (no cream gutter down the sides) — so the left/right border is dropped
+         here too, otherwise a visible line would sit right on the screen's true edge. -->
+    <div class="gate-card" id="event-gate-panel" style="border-radius:0;padding:0;border-left:none;border-right:none;box-shadow:none;">
 
       <!-- Section 1: studio profile — same data as the Home tab (name, avatar, bio,
            socials), populated by applyStudioProfile(). The camera-and-leaves sketch is
@@ -581,6 +590,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   <!-- ========== QR SCANNER — deliberately separate from the selfie camera screen
