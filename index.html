@@ -74,6 +74,9 @@
      cream space on either side instead of filling the screen. Now it just fills whatever
      width the padded gate area gives it. */
   .gate-card { position: relative; overflow: hidden; width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; box-shadow: 0 16px 40px -20px rgba(20,16,20,.28); padding: 24px 20px; text-align: left; }
+  /* Default (desktop bezel-preview): stays contained inside .phone's own box.
+     Real-phone override (position:fixed) lives in the @media (max-width:600px) block. */
+  .gate-overlay { position: absolute; inset: 0; }
   .gate-serif { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; }
   /* Qualified with the parent tag/class (not just .gate-kicker alone) so it beats the
      existing ".studio-meta p" rule's specificity instead of being silently overridden by
@@ -114,6 +117,11 @@
       width: 100vw; height: 100vh; height: 100dvh; max-width: 100vw; max-height: 100dvh;
       border-radius: 0; border: none; box-shadow: none;
     }
+    /* Tied to the real viewport instead of nested inside .phone's own
+       display:flex + overflow:hidden box — see the comment on #event-gate itself. Since
+       .phone already fills the whole screen at this width anyway, this looks identical but
+       scrolls more reliably. */
+    .gate-overlay { position: fixed; }
   }
 
   .tab-screen { display: none; flex-direction: column; height: 100%; position: relative; }
@@ -396,13 +404,26 @@
        before anything else can render it has to know WHICH event (from ?event=<id> in
        the link/QR, or the last one this guest opened). Sits on top of everything until
        that resolves; hidden the moment bootApp() actually runs. ========== -->
-  <!-- The scrolling element itself must NOT also be a flex container — WebKit/iOS Safari
-       has a long-standing bug where overflow-y:auto silently fails (or clips instead of
-       scrolling) on a display:flex;flex-direction:column element, especially combined with
-       position:absolute;inset:0. Splitting scroll (outer, plain block) from centering
-       (inner flex wrapper) is the standard fix. -->
-  <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;">
-  <div style="display:flex;flex-direction:column;align-items:center;padding:36px 0 64px;text-align:center;box-sizing:border-box;min-height:100%;">
+  <!-- Two defensive fixes on top of each other, since this failed to scroll on real iOS
+       AND Android devices (not just one engine, so it wasn't only the classic WebKit
+       flex+overflow:auto bug):
+       1) The scrolling element itself is no longer also a flex container — a
+          display:flex;flex-direction:column element combined with overflow-y:auto has
+          known WebKit bugs; scroll vs centering are now split into outer/inner divs.
+       2) position is "fixed" (not "absolute") on real phones via .gate-overlay's media
+          query below — position:absolute;inset:0 nested inside .phone (which is itself
+          display:flex + overflow:hidden) can hit browser-specific height-resolution bugs
+          in that exact combination on some Chromium/Android builds too; position:fixed
+          ties the gate straight to the viewport instead, sidestepping .phone's own layout
+          entirely. Kept as "absolute" only on the desktop bezel-preview (where .phone is a
+          small mockup frame, not the real viewport) so that preview still stays contained. -->
+  <div id="event-gate" class="gate-overlay" style="z-index:999;background:var(--bg);box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <!-- min-height:100% was here to center short content, but this screen's content is
+       always taller than one viewport (needs scrolling) so it just added dead empty space
+       below the last section instead. Padding is now safe-area-aware (env()) instead of a
+       flat 36/64px guess, since position:fixed + viewport-fit=cover means this can render
+       under the notch/status bar and home-indicator if not accounted for. -->
+  <div style="display:flex;flex-direction:column;align-items:center;padding-top:max(20px, env(safe-area-inset-top));padding-bottom:max(28px, env(safe-area-inset-bottom));text-align:center;box-sizing:border-box;">
     <!-- Squared off (no border-radius anywhere) and merged into ONE continuous panel per
          feedback — the earlier version used 3 separate rounded cards with gaps/shadows
          between them and it read as disconnected pieces instead of one cohesive screen.
@@ -1277,7 +1298,10 @@
       // bring that overlay back instead of leaving the guest looking at an empty Home tab.
       if (gateActive) {
         const gate = document.getElementById('event-gate');
-        if (gate) gate.style.display = 'flex';
+        // 'block', not 'flex' — the outer #event-gate is a plain scroll container now
+        // (centering moved to its inner wrapper div); setting display:flex here would
+        // silently turn it back into a flex container and reopen the old scroll bug.
+        if (gate) gate.style.display = 'block';
       }
     }
   }
