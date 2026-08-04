@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<!-- maximum-scale=1 + user-scalable=no fully disables both pinch-zoom and iOS's
+     auto-zoom-on-input-focus — belt-and-suspenders on top of already using 16px+ font-size
+     on every input/textarea (the usual trigger), since the guest explicitly should never
+     see the page jump into a zoomed-in state at all. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>SnapFilmer</title>
 <!-- Real in-browser AI face detection/recognition, used by the My Photos test panel -->
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
@@ -735,7 +739,7 @@
           <div style="margin-bottom:10px;"><input id="enq-name" placeholder="Your Name" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
           <div style="margin-bottom:10px;"><input id="enq-email" placeholder="Email" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
           <div style="margin-bottom:10px;"><input id="enq-phone" placeholder="Phone (optional)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
-          <div style="margin-bottom:12px;"><textarea id="enq-message" placeholder="Tell us about your event..." rows="3" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea></div>
+          <div style="margin-bottom:12px;"><textarea id="enq-message" placeholder="Tell us about your event..." rows="3" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;resize:vertical;"></textarea></div>
           <button class="btn-solid-sm" onclick="submitEnquiry()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
           <p id="enq-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
         </div>
