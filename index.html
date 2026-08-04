@@ -389,184 +389,185 @@
        the link/QR, or the last one this guest opened). Sits on top of everything until
        that resolves; hidden the moment bootApp() actually runs. ========== -->
   <div id="event-gate" style="position:absolute;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;padding:36px 22px 40px;text-align:center;box-sizing:border-box;overflow-y:auto;">
-    <!-- Same studio-profile card as the Home tab (name, avatar, bio, socials) — populated
-         by the same applyStudioProfile(), which now also runs before any event ID is
-         known, so a guest sees who this gallery belongs to even here. Styled as its own
-         elevated card (not the plain flat block used inline on Home) so it reads as one
-         distinct, premium section instead of blending into everything below it. -->
-    <!-- Studio profile — same data as the Home tab (name, avatar, bio, socials), populated
-         by applyStudioProfile(); styled here as its own premium serif-headline card. The
-         camera-and-leaves sketch is original line-art (this app's own CAMERA icon stroke,
-         scaled up, plus a few hand-drawn leaf paths) — not traced from any reference. -->
-    <div class="gate-card" id="event-gate-studio" style="margin:0 0 18px;">
-      <div class="gate-corner-lines tr"></div>
-      <svg viewBox="0 0 140 120" width="118" height="101" style="position:absolute;top:-6px;right:-6px;pointer-events:none;" aria-hidden="true">
-        <defs>
-          <filter id="gateWashBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
-        </defs>
-        <ellipse cx="78" cy="58" rx="42" ry="36" fill="var(--accent-soft)" opacity=".8" filter="url(#gateWashBlur)"/>
-        <circle cx="24" cy="18" r="1.5" fill="var(--accent-gold)" opacity=".6"/>
-        <circle cx="36" cy="10" r="1.5" fill="var(--accent-gold)" opacity=".6"/>
-        <circle cx="50" cy="6" r="1.5" fill="var(--accent-gold)" opacity=".55"/>
-        <circle cx="65" cy="4" r="1.5" fill="var(--accent-gold)" opacity=".5"/>
-        <circle cx="16" cy="30" r="1.3" fill="var(--accent-gold)" opacity=".5"/>
-        <g stroke="var(--accent)" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8">
-          <path d="M100 8c-7 6-11 15-9 27"/>
-          <path d="M96 14c4-3 9-2 11 3-5 3-10 1-11-3z"/>
-          <path d="M92 27c4-3 9-2 11 3-5 3-10 1-11-3z"/>
-          <path d="M90 41c3-2 8-1 10 3-4 2-9 0-10-3z"/>
-        </g>
-        <g transform="translate(38,44) scale(2.8)" stroke="var(--ink)" stroke-width="0.62" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
-          <path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/>
-          <circle cx="12" cy="14" r="3.5"/>
-        </g>
-      </svg>
+    <!-- Squared off (no border-radius anywhere) and merged into ONE continuous panel per
+         feedback — the earlier version used 3 separate rounded cards with gaps/shadows
+         between them and it read as disconnected pieces instead of one cohesive screen.
+         Now it's a single square-cornered panel with thin divider lines between its three
+         sections (studio profile / enter event id / welcome strip). -->
+    <div class="gate-card" id="event-gate-panel" style="border-radius:0;padding:0;">
 
-      <div class="studio-top" style="position:relative;">
-        <div class="studio-avatar" id="gate-studio-avatar" style="width:56px;height:56px;border-radius:18px;font-size:17px;">SF</div>
-        <div class="studio-meta">
-          <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:21px;">SnapFilmer</h3>
-          <p class="gate-kicker">Wedding &amp; Portrait Studio</p>
+      <!-- Section 1: studio profile — same data as the Home tab (name, avatar, bio,
+           socials), populated by applyStudioProfile(). The camera-and-leaves sketch is
+           original line-art (this app's own CAMERA icon stroke, scaled up, plus a few
+           hand-drawn leaf paths) — not traced from any reference. -->
+      <div id="event-gate-studio" style="padding:24px 20px 22px;position:relative;">
+        <div class="gate-corner-lines tr"></div>
+        <svg viewBox="0 0 140 120" width="118" height="101" style="position:absolute;top:0;right:0;pointer-events:none;" aria-hidden="true">
+          <defs>
+            <filter id="gateWashBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
+          </defs>
+          <ellipse cx="78" cy="58" rx="42" ry="36" fill="var(--accent-soft)" opacity=".8" filter="url(#gateWashBlur)"/>
+          <circle cx="24" cy="18" r="1.5" fill="var(--accent-gold)" opacity=".6"/>
+          <circle cx="36" cy="10" r="1.5" fill="var(--accent-gold)" opacity=".6"/>
+          <circle cx="50" cy="6" r="1.5" fill="var(--accent-gold)" opacity=".55"/>
+          <circle cx="65" cy="4" r="1.5" fill="var(--accent-gold)" opacity=".5"/>
+          <circle cx="16" cy="30" r="1.3" fill="var(--accent-gold)" opacity=".5"/>
+          <g stroke="var(--accent)" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8">
+            <path d="M100 8c-7 6-11 15-9 27"/>
+            <path d="M96 14c4-3 9-2 11 3-5 3-10 1-11-3z"/>
+            <path d="M92 27c4-3 9-2 11 3-5 3-10 1-11-3z"/>
+            <path d="M90 41c3-2 8-1 10 3-4 2-9 0-10-3z"/>
+          </g>
+          <g transform="translate(38,44) scale(2.8)" stroke="var(--ink)" stroke-width="0.62" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
+            <path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/>
+            <circle cx="12" cy="14" r="3.5"/>
+          </g>
+        </svg>
+
+        <div class="studio-top" style="position:relative;">
+          <div class="studio-avatar" id="gate-studio-avatar" style="width:56px;height:56px;border-radius:0;font-size:17px;">SF</div>
+          <div class="studio-meta">
+            <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:21px;">SnapFilmer</h3>
+            <p class="gate-kicker">Wedding &amp; Portrait Studio</p>
+          </div>
+          <div class="studio-cta" id="gate-studio-contact-row">
+            <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;border-radius:0;"><i data-icon="PHONE"></i></a>
+            <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;border-radius:0;"><i data-icon="MAIL"></i></a>
+            <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;border-radius:0;"><i data-icon="GLOBE"></i></a>
+          </div>
         </div>
-        <div class="studio-cta" id="gate-studio-contact-row">
-          <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
-          <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
-          <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+
+        <h2 class="gate-serif" style="margin:16px 0 8px;font-size:22px;line-height:1.32;color:var(--ink);font-weight:600;position:relative;">Every moment,<br><em style="font-style:italic;color:var(--accent-gold);">beautifully told.</em></h2>
+
+        <p class="studio-bio" id="gate-studio-bio-p" style="position:relative;"><span id="gate-studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="gate-bio-toggle-link" onclick="toggleBio('gate-')">Read more</span></p>
+        <div class="social-strip" id="gate-social-strip" style="position:relative;">
+          <div class="social-ghost" style="border-radius:0;"><i data-icon="INSTA_O"></i></div>
+          <div class="social-ghost" style="border-radius:0;"><i data-icon="VIMEO_O"></i></div>
+          <div class="social-ghost" style="border-radius:0;"><i data-icon="WHATSAPP_O"></i></div>
+          <div class="social-ghost" style="border-radius:0;"><i data-icon="YOUTUBE_O"></i></div>
         </div>
-      </div>
-
-      <h2 class="gate-serif" style="margin:16px 0 8px;font-size:22px;line-height:1.32;color:var(--ink);font-weight:600;position:relative;">Every moment,<br><em style="font-style:italic;color:var(--accent-gold);">beautifully told.</em></h2>
-
-      <p class="studio-bio" id="gate-studio-bio-p" style="position:relative;"><span id="gate-studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="gate-bio-toggle-link" onclick="toggleBio('gate-')">Read more</span></p>
-      <div class="social-strip" id="gate-social-strip" style="position:relative;">
-        <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
-        <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
-        <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
-        <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:14px;position:relative;">
-        <button class="btn-outline" onclick="openPortfolioFromGate()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
-        <button class="ghost-btn" onclick="shareStudioProfile()" title="Share"><i data-icon="SHARE"></i></button>
-      </div>
-      <div class="gate-wave-corner"></div>
-    </div>
-
-    <div id="event-gate-loading">
-      <div style="width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);margin:0 auto 14px;animation:sf-spin 0.8s linear infinite;"></div>
-      <div style="font-size:13px;color:var(--muted);">Loading your gallery&hellip;</div>
-    </div>
-
-    <!-- Own elevated card, matching the studio card above, so this reads as a clearly
-         separate step rather than form fields floating loose on the page background. -->
-    <!-- Big circular button and the small QR icon inside the input both open the same
-         real camera scanner (scanEventQr()) — two entry points, one working feature, not
-         a decorative-only duplicate. -->
-    <div id="event-gate-form" class="gate-card" style="display:none;margin:0 0 18px;">
-      <div class="gate-corner-lines tl"></div>
-      <div class="gate-wave-corner" style="opacity:.4;"></div>
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;position:relative;">
-        <button onclick="scanEventQr()" title="Scan QR" style="flex-shrink:0;width:60px;height:60px;border-radius:50%;background:var(--ink);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="QR"></i></button>
-        <div>
-          <h2 class="gate-serif" style="margin:0 0 3px;font-size:21px;color:var(--ink);font-weight:600;">Enter Event ID</h2>
-          <p id="event-gate-msg" style="font-size:12px;color:var(--muted);margin:0;line-height:1.4;">Join your event and relive every moment.</p>
+        <div style="display:flex;gap:8px;margin-top:14px;position:relative;">
+          <button class="btn-outline" onclick="openPortfolioFromGate()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:0;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
+          <button class="ghost-btn" onclick="shareStudioProfile()" title="Share" style="border-radius:0;"><i data-icon="SHARE"></i></button>
         </div>
       </div>
-      <div style="position:relative;margin-bottom:12px;">
-        <input id="event-gate-input" placeholder="Enter the Event ID" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitEventGate()" style="width:100%;border:1px solid var(--border);border-radius:999px;padding:14px 48px 14px 18px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);">
-        <button onclick="scanEventQr()" title="Scan QR" style="position:absolute;right:5px;top:5px;bottom:5px;width:38px;border:none;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="QR"></i></button>
+
+      <div style="height:1px;background:var(--border);margin:0 20px;"></div>
+
+      <!-- Section 2: enter event id (or the loading spinner, before that resolves). Big
+           square button and the small QR icon inside the input both open the same real
+           camera scanner (scanEventQr()) — two entry points, one working feature. -->
+      <div id="event-gate-loading" style="padding:22px 20px;">
+        <div style="width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);margin:0 auto 14px;animation:sf-spin 0.8s linear infinite;"></div>
+        <div style="font-size:13px;color:var(--muted);">Loading your gallery&hellip;</div>
       </div>
-      <button onclick="submitEventGate()" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:999px;padding:15px 20px;font-weight:700;font-size:14.5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
-        <span style="display:flex;align-items:center;gap:8px;"><i data-icon="TAP"></i>Follow Event</span>
-        <i data-icon="CHEVRON"></i>
-      </button>
-      <p style="display:flex;align-items:center;justify-content:center;gap:6px;margin:12px 0 0;font-size:11.5px;color:var(--muted);"><i data-icon="LOCK" style="opacity:.7;"></i>Your privacy is 100% safe with us.</p>
-    </div>
 
-    <!-- Purely decorative "welcome" story strip — an original illustration (not traced/copied
-         art), no real data involved. Straight-row layout (matches the guest flow Scan → View
-         → Share → Enjoy), each icon carries a numbered badge top-left and a two-line caption
-         underneath. -->
-    <div class="gate-card" style="margin-top:18px;text-align:center;">
-      <div class="gate-corner-lines tl"></div>
-      <div class="gate-corner-lines tr"></div>
-      <h2 class="gate-serif" style="margin:0 0 4px;font-size:20px;color:var(--ink);line-height:1.35;font-weight:600;position:relative;">Welcome to the future<br>of Photo Sharing</h2>
-      <p style="margin:0 0 16px;font-size:11.5px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;position:relative;" id="gate-welcome-studio-name-wrap">
-        <span style="width:20px;height:1px;background:var(--border);"></span>
-        by <span id="gate-welcome-studio-name" style="color:var(--accent-gold);font-weight:700;">SnapFilmer</span>
-        <span style="width:20px;height:1px;background:var(--border);"></span>
-      </p>
-      <svg viewBox="0 0 320 100" width="100%" height="100" style="max-width:300px;display:block;margin:0 auto;position:relative;">
-        <defs>
-          <filter id="gateNodeShadow" x="-60%" y="-60%" width="220%" height="220%">
-            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(20,16,20,0.16)"/>
-          </filter>
-        </defs>
+      <div id="event-gate-form" style="display:none;padding:24px 20px 22px;position:relative;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+          <button onclick="scanEventQr()" title="Scan QR" style="flex-shrink:0;width:58px;height:58px;border-radius:0;background:var(--ink);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="QR"></i></button>
+          <div>
+            <h2 class="gate-serif" style="margin:0 0 3px;font-size:21px;color:var(--ink);font-weight:600;">Enter Event ID</h2>
+            <p id="event-gate-msg" style="font-size:12px;color:var(--muted);margin:0;line-height:1.4;">Join your event and relive every moment.</p>
+          </div>
+        </div>
+        <div style="position:relative;margin-bottom:12px;">
+          <input id="event-gate-input" placeholder="Enter the Event ID" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitEventGate()" style="width:100%;border:1px solid var(--border);border-radius:0;padding:14px 48px 14px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);">
+          <button onclick="scanEventQr()" title="Scan QR" style="position:absolute;right:5px;top:5px;bottom:5px;width:38px;border:none;border-radius:0;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="QR"></i></button>
+        </div>
+        <button onclick="submitEventGate()" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:0;padding:15px 20px;font-weight:700;font-size:14.5px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <span style="display:flex;align-items:center;gap:8px;"><i data-icon="TAP"></i>Follow Event</span>
+          <i data-icon="CHEVRON"></i>
+        </button>
+        <p style="display:flex;align-items:center;justify-content:center;gap:6px;margin:12px 0 0;font-size:11.5px;color:var(--muted);"><i data-icon="LOCK" style="opacity:.7;"></i>Your privacy is 100% safe with us.</p>
+      </div>
 
-        <path d="M63,40H257" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 7" opacity=".5" style="animation:sf-dash-flow 1s linear infinite;"/>
+      <div style="height:1px;background:var(--border);margin:0 20px;"></div>
 
-        <!-- Step 1: Scan -->
-        <g style="animation:sf-float 3s ease-in-out infinite;">
-          <circle cx="40" cy="40" r="22" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-          <circle cx="40" cy="40" r="22" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-          <g transform="translate(40,40)">
-            <path d="M-8 -8v-3a2 2 0 012-2h3M8 -8v-3a2 2 0 00-2-2H3M-8 8v3a2 2 0 002 2h3M8 8v3a2 2 0 01-2 2H3" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
-            <rect x="-3.5" y="-3.5" width="7" height="7" rx="1.2" fill="var(--accent)"/>
+      <!-- Section 3: purely decorative "welcome" story strip — an original illustration
+           (not traced/copied art), no real data involved. Each icon carries a numbered
+           badge and a two-line caption; node badges are squares (not circles) to match. -->
+      <div style="padding:22px 20px 24px;text-align:center;position:relative;">
+        <div class="gate-corner-lines tl"></div>
+        <div class="gate-corner-lines tr"></div>
+        <h2 class="gate-serif" style="margin:0 0 4px;font-size:20px;color:var(--ink);line-height:1.35;font-weight:600;position:relative;">Welcome to the future<br>of Photo Sharing</h2>
+        <p style="margin:0 0 16px;font-size:11.5px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;position:relative;" id="gate-welcome-studio-name-wrap">
+          <span style="width:20px;height:1px;background:var(--border);"></span>
+          by <span id="gate-welcome-studio-name" style="color:var(--accent-gold);font-weight:700;">SnapFilmer</span>
+          <span style="width:20px;height:1px;background:var(--border);"></span>
+        </p>
+        <svg viewBox="0 0 320 100" width="100%" height="100" style="max-width:300px;display:block;margin:0 auto;position:relative;">
+          <defs>
+            <filter id="gateNodeShadow" x="-60%" y="-60%" width="220%" height="220%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(20,16,20,0.16)"/>
+            </filter>
+          </defs>
+
+          <path d="M63,40H257" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 7" opacity=".5" style="animation:sf-dash-flow 1s linear infinite;"/>
+
+          <!-- Step 1: Scan -->
+          <g style="animation:sf-float 3s ease-in-out infinite;">
+            <rect x="18" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
+            <rect x="18" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
+            <g transform="translate(40,40)">
+              <path d="M-8 -8v-3a2 2 0 012-2h3M8 -8v-3a2 2 0 00-2-2H3M-8 8v3a2 2 0 002 2h3M8 8v3a2 2 0 01-2 2H3" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+              <rect x="-3.5" y="-3.5" width="7" height="7" fill="var(--accent)"/>
+            </g>
+            <rect x="18.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
+            <text x="26" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">1</text>
+            <text x="40" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Scan</text>
+            <text x="40" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Event Code</text>
           </g>
-          <circle cx="26" cy="26" r="7.5" fill="var(--accent)"/>
-          <text x="26" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">1</text>
-          <text x="40" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Scan</text>
-          <text x="40" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Event Code</text>
-        </g>
 
-        <!-- Step 2: View -->
-        <g style="animation:sf-float 3.2s ease-in-out infinite;animation-delay:.2s;">
-          <circle cx="120" cy="40" r="22" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-          <circle cx="120" cy="40" r="22" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-          <g transform="translate(120,40)">
-            <rect x="-9" y="-7" width="18" height="14" rx="2" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-            <circle cx="-3.8" cy="-2.8" r="1.6" fill="var(--accent)"/>
-            <path d="M-9 5l5-5 3 3 4-4 4 4" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Step 2: View -->
+          <g style="animation:sf-float 3.2s ease-in-out infinite;animation-delay:.2s;">
+            <rect x="98" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
+            <rect x="98" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
+            <g transform="translate(120,40)">
+              <rect x="-9" y="-7" width="18" height="14" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+              <circle cx="-3.8" cy="-2.8" r="1.6" fill="var(--accent)"/>
+              <path d="M-9 5l5-5 3 3 4-4 4 4" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </g>
+            <rect x="98.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
+            <text x="106" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">2</text>
+            <text x="120" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">View</text>
+            <text x="120" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Your Moments</text>
           </g>
-          <circle cx="106" cy="26" r="7.5" fill="var(--accent)"/>
-          <text x="106" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">2</text>
-          <text x="120" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">View</text>
-          <text x="120" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Your Moments</text>
-        </g>
 
-        <!-- Step 3: Share -->
-        <g style="animation:sf-float 3.4s ease-in-out infinite;animation-delay:.4s;">
-          <circle cx="200" cy="40" r="22" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-          <circle cx="200" cy="40" r="22" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-          <g transform="translate(200,40)">
-            <circle cx="6.5" cy="-7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-            <circle cx="-6.5" cy="0" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-            <circle cx="6.5" cy="7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-            <path d="M-3.9 1.6L4 5.6M4 -5.6L-3.9 -1.6" stroke="var(--accent)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          <!-- Step 3: Share -->
+          <g style="animation:sf-float 3.4s ease-in-out infinite;animation-delay:.4s;">
+            <rect x="178" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
+            <rect x="178" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
+            <g transform="translate(200,40)">
+              <circle cx="6.5" cy="-7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+              <circle cx="-6.5" cy="0" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+              <circle cx="6.5" cy="7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+              <path d="M-3.9 1.6L4 5.6M4 -5.6L-3.9 -1.6" stroke="var(--accent)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            </g>
+            <rect x="178.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
+            <text x="186" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">3</text>
+            <text x="200" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Share</text>
+            <text x="200" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">with Loved Ones</text>
           </g>
-          <circle cx="186" cy="26" r="7.5" fill="var(--accent)"/>
-          <text x="186" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">3</text>
-          <text x="200" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Share</text>
-          <text x="200" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">with Loved Ones</text>
-        </g>
 
-        <!-- Step 4: Enjoy — heart icon (reused HEART icon path, scaled) instead of the old
-             smiley, matching the guest flow's actual emotional payoff. -->
-        <g style="animation:sf-float 2.8s ease-in-out infinite;animation-delay:.6s;">
-          <circle cx="280" cy="40" r="22" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-          <circle cx="280" cy="40" r="22" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-          <g transform="translate(280,40) scale(.583) translate(-12,-11)" stroke="var(--accent)" stroke-width="3.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/>
+          <!-- Step 4: Enjoy — heart icon (reused HEART icon path, scaled) instead of the old
+               smiley, matching the guest flow's actual emotional payoff. -->
+          <g style="animation:sf-float 2.8s ease-in-out infinite;animation-delay:.6s;">
+            <rect x="258" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
+            <rect x="258" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
+            <g transform="translate(280,40) scale(.583) translate(-12,-11)" stroke="var(--accent)" stroke-width="3.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/>
+            </g>
+            <rect x="258.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
+            <text x="266" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">4</text>
+            <text x="280" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Enjoy</text>
+            <text x="280" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Every Memory</text>
           </g>
-          <circle cx="266" cy="26" r="7.5" fill="var(--accent)"/>
-          <text x="266" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">4</text>
-          <text x="280" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Enjoy</text>
-          <text x="280" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Every Memory</text>
-        </g>
-      </svg>
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;position:relative;">
-        <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
-        <i data-icon="HEART" style="color:var(--accent-gold);opacity:.7;"></i>
-        <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
+        </svg>
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;position:relative;">
+          <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
+          <i data-icon="HEART" style="color:var(--accent-gold);opacity:.7;"></i>
+          <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
+        </div>
       </div>
     </div>
   </div>
