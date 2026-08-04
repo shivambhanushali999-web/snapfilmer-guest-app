@@ -194,6 +194,9 @@
   .studio-meta p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
   .studio-cta { display: flex; gap: 8px; }
   .btn-outline { background: none; border: 1.5px solid var(--ink); color: var(--ink); border-radius:0; padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .btn-outline:disabled { opacity: .5; cursor: default; }
+  #admin-permission-btn.approved { border-color: #1FA97A; color: #1FA97A; }
+  #admin-permission-btn.denied { border-color: #D0342C; color: #D0342C; }
   .studio-bio { font-size: 13px; color: #514D53; line-height: 1.6; margin-top: 14px; }
   .studio-bio #studio-bio-text, .studio-bio #gate-studio-bio-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .studio-bio.expanded #studio-bio-text, .studio-bio.expanded #gate-studio-bio-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
@@ -867,10 +870,10 @@
       <div class="list-card">
         <div class="list-row">
           <div>
-            <div class="lt">Admin Permission</div>
-            <div class="ld">Request access to upload photos for this event.</div>
+            <div class="lt">Admin Permission Request</div>
+            <div class="ld" id="admin-permission-desc">To upload photos to this event, you can request admin permission. Your request will then be subject to approval from the photographer.</div>
           </div>
-          <button class="btn-outline" style="padding:6px 14px;font-size:11.5px;" onclick="requestAdminPermission()">Send</button>
+          <button class="btn-outline" id="admin-permission-btn" style="padding:6px 14px;font-size:11.5px;" onclick="requestAdminPermission()">Send</button>
         </div>
         <div class="list-row">
           <div>
@@ -979,6 +982,14 @@
         <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Take a selfie above — we'll show only the photos you appear in.</p>
         <button class="btn-solid-sm" onclick="openCamera()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;">Take Selfie</button>
       </div>
+      <!-- Real folders (albums the photographer created in the dashboard) shown as big
+           cards, same visual treatment as Home's — this is the default landing view
+           when the event has folders, so opening My Photos doesn't just dump every
+           matched photo into one flat pile. Only shown while myPhotosViewMode==='folders'. -->
+      <div id="mp-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
+      <div id="mp-folders-back" style="display:none;padding:0 0 10px;">
+        <span style="font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;" onclick="backToMyPhotosFolders()">&#8592; Back to Folders</span>
+      </div>
       <div class="album-chip-row" id="myphotos-album-chips" style="display:none;"></div>
       <p id="mp-yourphotos-empty" style="font-size:12px;color:var(--muted);display:none;margin:0 0 14px;">No matching photos found yet.</p>
       <div class="grid2" id="mp-yourphotos-grid"></div>
@@ -991,11 +1002,18 @@
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1>Gallery</h1>
       <div class="sub-bar-actions">
+        <button class="ghost-btn" id="gallery-upload-btn" style="display:none;" onclick="document.getElementById('guest-upload-input').click()" title="Upload Photos"><i data-icon="UPLOAD"></i></button>
         <button class="ghost-btn" style="position:relative;" onclick="openFavorites()" title="My Favorites"><i data-icon="HEART"></i><span class="fav-count-badge" style="display:none;">0</span></button>
       </div>
+      <input type="file" id="guest-upload-input" accept="image/*" multiple style="display:none" onchange="handleGuestPhotoUpload(event)">
     </div>
     <div class="myphotos-body">
       <p id="gallery-empty" style="font-size:12px;color:var(--muted);display:none;margin:0 0 14px;">No photos uploaded yet by your photographer. Ask them to upload from the Studio Dashboard.</p>
+      <!-- Only shown when the photographer has Allow Guest Uploads turned on — a real
+           limit set from the dashboard's confirmation modal, enforced here by counting
+           photos already flagged guestUploaded:true for this event. -->
+      <p id="gallery-upload-limit-note" style="display:none;font-size:11.5px;color:var(--muted);margin:0 0 10px;"></p>
+      <p id="gallery-upload-status" style="display:none;font-size:11.5px;color:var(--accent);font-weight:700;margin:0 0 10px;"></p>
       <div id="gallery-locked" style="display:none;text-align:center;padding:30px 16px;border:1px dashed var(--border);border-radius:0;">
         <i data-icon="LOCK" style="color:var(--accent);"></i>
         <p style="font-size:13px;color:var(--ink);font-weight:700;margin:10px 0 4px;">This gallery is private</p>
@@ -1981,10 +1999,76 @@
     }
   }
 
+  // Admin Permission Request — this is the actual gate on guest uploads, on top of
+  // (not instead of) the studio's own "Allow Guest Uploads" master switch + limit in
+  // the dashboard. That toggle controls whether the feature exists for the event at
+  // all; this controls which specific guest is trusted to use it, matching real
+  // Kamero's "subject to approval from the client admin" wording exactly. A guest
+  // whose request the studio hasn't approved yet can't upload no matter what the
+  // event-level setting says — see the check inside handleGuestPhotoUpload().
+  let adminRequestUnsub = null;
+  let latestAdminRequestDocs = [];
+  let myAdminRequestStatus = null; // null = never requested, 'pending' | 'approved' | 'denied'
+
+  function startAdminRequestSync() {
+    if (!db || adminRequestUnsub) return;
+    adminRequestUnsub = db.collection('adminRequests').where('eventId', '==', EVENT.id)
+      .onSnapshot(function (snap) {
+        latestAdminRequestDocs = snap.docs.map(function (doc) { return { id: doc.id, data: doc.data() }; });
+        recomputeMyAdminRequestStatus();
+      }, function () {});
+  }
+
+  // Split out from the snapshot handler so it can also be re-run the moment anonymous
+  // auth actually resolves (auth.onAuthStateChanged, below) — that can land slightly
+  // after this event's first requests snapshot, and without this the button could get
+  // stuck showing "Send" even though a prior request under this device's uid already
+  // exists.
+  function recomputeMyAdminRequestStatus() {
+    const myUid = (auth && auth.currentUser) ? auth.currentUser.uid : null;
+    let mine = null;
+    latestAdminRequestDocs.forEach(function (row) {
+      if (myUid && row.data.uid === myUid) {
+        if (!mine || (row.data.createdAt || 0) > (mine.data.createdAt || 0)) mine = row;
+      }
+    });
+    myAdminRequestStatus = mine ? mine.data.status : null;
+    renderAdminPermissionUI();
+    renderGalleryUploadUI();
+  }
+
+  function renderAdminPermissionUI() {
+    const btn = document.getElementById('admin-permission-btn');
+    const desc = document.getElementById('admin-permission-desc');
+    if (!btn) return;
+    btn.classList.remove('approved', 'denied');
+    if (myAdminRequestStatus === 'approved') {
+      btn.textContent = 'Approved';
+      btn.disabled = true;
+      btn.classList.add('approved');
+      if (desc) desc.textContent = "You're approved to upload your own photos to this event.";
+    } else if (myAdminRequestStatus === 'pending') {
+      btn.textContent = 'Sent';
+      btn.disabled = true;
+      if (desc) desc.textContent = 'To upload photos to this event, you can request admin permission. Your request will then be subject to approval from the photographer.';
+    } else if (myAdminRequestStatus === 'denied') {
+      btn.textContent = 'Request Again';
+      btn.disabled = false;
+      btn.classList.add('denied');
+      if (desc) desc.textContent = 'Your last request was declined by the photographer. You can send another request.';
+    } else {
+      btn.textContent = 'Send';
+      btn.disabled = false;
+      if (desc) desc.textContent = 'To upload photos to this event, you can request admin permission. Your request will then be subject to approval from the photographer.';
+    }
+  }
+
   function requestAdminPermission() {
     if (!db) { alert('Could not send request — check your internet connection.'); return; }
+    const btn = document.getElementById('admin-permission-btn');
     const user = auth && auth.currentUser;
     const isReal = !!(user && !user.isAnonymous);
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
     db.collection('adminRequests').add({
       eventId: EVENT.id,
       uid: user ? user.uid : null,
@@ -1992,8 +2076,11 @@
       status: 'pending',
       createdAt: Date.now(),
     }).then(function () {
-      alert('Request sent! The photographer will review it and reach out.');
+      // The live onSnapshot listener above (startAdminRequestSync) will pick this new
+      // doc up and flip the button to "Sent" on its own — no need to fake that state
+      // here, so it can never drift from what's actually saved.
     }).catch(function () {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
       alert('Could not send request — please try again.');
     });
   }
@@ -2360,7 +2447,7 @@
   // facePrivacy: whether the general Gallery is locked until a selfie is taken.
   // anonymousMyPhotos: whether guests can use the selfie feature without a real account —
   // if false (the real Kamero default), a guest must sign in before taking a selfie.
-  let eventSettings = { facePrivacy: false, faceRecognition: true, anonymousMyPhotos: false, pin: '', enquiry: false, highlightEnabled: false };
+  let eventSettings = { facePrivacy: false, faceRecognition: true, anonymousMyPhotos: false, pin: '', enquiry: false, highlightEnabled: false, guestUpload: false, guestUploadLimit: 0 };
   let pendingCameraOpen = false;
   let eventSettingsUnsub = null;
   // If a guest already unlocked the full private gallery with the event PIN, remember
@@ -2373,7 +2460,15 @@
   // instead of only ever seeing one giant, unsorted photo grid.
   let eventAlbums = [];
   let galleryAlbumFilter = null;
+  // Sentinel value for galleryAlbumFilter meaning "photos with no album tag at all" —
+  // distinct from null (which means no filter / show everything), so the Home
+  // screen's "Unsorted" folder card can jump Gallery straight into just those photos.
+  const UNSORTED_ALBUM_FILTER = '__UNSORTED__';
   let myPhotosAlbumFilter = null;
+  // 'folders' = show one big card per real album (like Home), the default landing
+  // view; 'grid' = a specific folder (or the explicit "All Photos" chip) was chosen,
+  // so show the actual matched-photo grid, filtered or not.
+  let myPhotosViewMode = 'folders';
   try {
     if (typeof firebase !== 'undefined') {
       firebase.initializeApp(firebaseConfig);
@@ -2394,6 +2489,10 @@
     auth.onAuthStateChanged(function (user) {
       if (user) {
         renderMoreProfile(user);
+        // Anonymous sign-in can resolve slightly after the admin requests snapshot
+        // already delivered once with no uid to match against yet — recompute now
+        // that a real uid exists, so "Sent"/"Approved" never gets stuck showing "Send".
+        recomputeMyAdminRequestStatus();
         if (document.getElementById('screen-login').classList.contains('active')) {
           completeLogin();
         }
@@ -2476,6 +2575,7 @@
       startStudioProfileSync();
       startPostsSync();
       startEventSettingsSync();
+      startAdminRequestSync();
       applyDeepLinkPrefill();
 
       // "Guest Registration Required" (Privacy & Access) — a guest must give name/phone
@@ -2684,11 +2784,16 @@
       eventSettings.enquiry = !!d.enquiry;
       eventSettings.registration = !!d.registration;
       eventSettings.highlightEnabled = !!d.highlightEnabled;
+      eventSettings.guestUpload = !!d.guestUpload;
+      eventSettings.guestUploadLimit = Number(d.guestUploadLimit) || 0;
+      renderGalleryUploadUI();
       eventWatermark = normalizeEventWatermark(d.watermark);
       eventAlbums = Array.isArray(d.albums) ? d.albums : [];
       // If an album the guest had filtered by got deleted from the dashboard, fall back
-      // to "All Photos" instead of silently showing an empty grid forever.
-      if (galleryAlbumFilter && !eventAlbums.some(function (a) { return a.name === galleryAlbumFilter; })) {
+      // to "All Photos" instead of silently showing an empty grid forever. The
+      // Unsorted sentinel isn't a real album name, so it's deliberately exempt from
+      // this check — it should never look "deleted".
+      if (galleryAlbumFilter && galleryAlbumFilter !== UNSORTED_ALBUM_FILTER && !eventAlbums.some(function (a) { return a.name === galleryAlbumFilter; })) {
         galleryAlbumFilter = null;
       }
       // A VIP link with ?pin=... embedded auto-unlocks the gallery the same way typing
@@ -2711,28 +2816,72 @@
   // Home screen as a large banner card (cover photo + name + photo count), not buried
   // behind a small chip inside Gallery — tapping one jumps straight into that album's
   // photos. Falls back to a plain folder icon when the studio hasn't set a cover yet.
+  // "All Photos" and "Unsorted" (mirrors the exact same two special entries the
+  // dashboard's own album sidebar always shows) used to be missing from here entirely
+  // — only named albums got a card, so a guest could only ever reach photos the
+  // photographer had actually filed into a folder. Any photo left Unsorted (often the
+  // majority, before every camera/album gets organized) had no folder card at all and
+  // was only reachable by separately opening Gallery. These two guarantee every single
+  // event photo is reachable from a folder card, same as the dashboard guarantees for
+  // the photographer.
   function renderHomeAlbums() {
     const wrap = document.getElementById('home-albums-wrap');
     if (!wrap) return;
-    if (!eventAlbums.length) {
+    if (!eventPhotos.length) {
       wrap.style.display = 'none';
       wrap.innerHTML = '';
       return;
     }
+    const unsortedCount = eventPhotos.filter(function (p) { return !p.album; }).length;
+    const highlighted = getHighlightedPhotos();
+    let html = '<div class="stories-label" style="padding:4px 0 12px;">Folders</div>';
+    // Highlights goes first, same as the dashboard's own Albums sidebar shows it
+    // prominently above every other folder (gold-highlighted row) — this is a guest's
+    // most direct way to reach the studio's curated picks, not just a small story
+    // circle further down the page.
+    if (eventSettings.highlightEnabled && highlighted.length) {
+      html += '<div class="home-album-card" data-home-special="highlights" style="background:linear-gradient(135deg,var(--accent-gold,#B08A4A),#6f5227);">' +
+        '<img src="' + highlighted[0].dataUrl + '" alt="Highlights">' +
+        '<div class="overlay"></div>' +
+        '<div class="name">Highlights</div>' +
+        '<div class="count-badge">' + (ICONS.STAR || ICONS.IMAGE || '') + highlighted.length + '</div>' +
+      '</div>';
+    }
+    html += '<div class="home-album-card" data-home-special="all" style="background:linear-gradient(135deg,var(--ink),#514D53);">' +
+        '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>' +
+        '<div class="overlay"></div>' +
+        '<div class="name">All Photos</div>' +
+        '<div class="count-badge">' + (ICONS.IMAGE || '') + eventPhotos.length + '</div>' +
+      '</div>';
+    if (unsortedCount) {
+      html += '<div class="home-album-card" data-home-special="unsorted" style="background:linear-gradient(135deg,#8A8478,#514D53);">' +
+        '<div class="folder-fallback">' + (ICONS.FOLDER || ICONS.IMAGE || '') + '</div>' +
+        '<div class="overlay"></div>' +
+        '<div class="name">Unsorted</div>' +
+        '<div class="count-badge">' + (ICONS.IMAGE || '') + unsortedCount + '</div>' +
+      '</div>';
+    }
+    html += eventAlbums.map(function (a, i) {
+      const cover = a.cover ? '<img src="' + a.cover + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
+      return '<div class="home-album-card" data-home-album="' + i + '">' + cover +
+        '<div class="overlay"></div>' +
+        '<div class="name">' + a.name + '</div>' +
+        '<div class="count-badge">' + (ICONS.IMAGE || '') + (a.count || 0) + '</div>' +
+      '</div>';
+    }).join('');
     wrap.style.display = 'block';
-    wrap.innerHTML = '<div class="stories-label" style="padding:4px 0 12px;">Folders</div>' +
-      eventAlbums.map(function (a, i) {
-        const cover = a.cover ? '<img src="' + a.cover + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
-        return '<div class="home-album-card" data-home-album="' + i + '">' + cover +
-          '<div class="overlay"></div>' +
-          '<div class="name">' + a.name + '</div>' +
-          '<div class="count-badge">' + (ICONS.IMAGE || '') + (a.count || 0) + '</div>' +
-        '</div>';
-      }).join('');
+    wrap.innerHTML = html;
     wrap.querySelectorAll('[data-home-album]').forEach(function (card) {
       card.addEventListener('click', function () {
         const a = eventAlbums[Number(card.dataset.homeAlbum)];
         if (a) openHomeAlbum(a.name);
+      });
+    });
+    wrap.querySelectorAll('[data-home-special]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        const key = card.dataset.homeSpecial;
+        if (key === 'highlights') openRealHighlights();
+        else openHomeAlbum(key === 'unsorted' ? UNSORTED_ALBUM_FILTER : null);
       });
     });
   }
@@ -2816,7 +2965,7 @@
           const existing = eventPhotos.find(function (p) { return p.id === doc.id; });
           let matched = existing ? existing.matched : null;
           if (matched === null && cachedIds.indexOf(doc.id) !== -1) matched = true;
-          return { id: doc.id, dataUrl: doc.data().dataUrl, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight };
+          return { id: doc.id, dataUrl: doc.data().dataUrl, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded };
         });
 
         const currentIds = eventPhotos.map(function (p) { return p.id; });
@@ -2845,6 +2994,12 @@
         renderMyPhotosResults();
         renderStories();
         renderFavorites();
+        renderGalleryUploadUI();
+        // Home's Highlights folder card now depends on eventPhotos (isHighlight flags,
+        // count), not just eventAlbums — needs its own refresh here too, or a newly
+        // highlighted photo wouldn't show up on Home until something else happened to
+        // also touch the event's settings doc.
+        renderHomeAlbums();
         if (selfieRawDataUrl) matchAllTestPhotos();
       });
   }
@@ -2867,6 +3022,10 @@
 
   function openMyPhotos() {
     pushScreen('myphotos');
+    // Always land on the folder picker (if this event has real folders), not
+    // whatever filter happened to be left over from the guest's last visit here.
+    myPhotosViewMode = 'folders';
+    myPhotosAlbumFilter = null;
     // face-api.js models used to load eagerly here on every visit to My Photos — that's
     // a 20-30MB download from a CDN, every single time, even though AWS Rekognition
     // (now that its CORS issue is fixed) handles real matching and rarely needs this
@@ -3178,7 +3337,11 @@
     }
 
     let visible = isPrivate ? eventPhotos.filter(function (p) { return p.matched === true; }) : eventPhotos;
-    if (galleryAlbumFilter) visible = visible.filter(function (p) { return p.album === galleryAlbumFilter; });
+    if (galleryAlbumFilter === UNSORTED_ALBUM_FILTER) {
+      visible = visible.filter(function (p) { return !p.album; });
+    } else if (galleryAlbumFilter) {
+      visible = visible.filter(function (p) { return p.album === galleryAlbumFilter; });
+    }
     renderPhotoGrid('gallery-grid', visible);
 
     if (empty) {
@@ -3188,6 +3351,9 @@
       } else if (isPrivate && visible.length === 0) {
         empty.textContent = "Still checking your selfie against the gallery — matching photos will appear here.";
         empty.style.display = 'block';
+      } else if (galleryAlbumFilter === UNSORTED_ALBUM_FILTER && visible.length === 0) {
+        empty.textContent = 'No unsorted photos — everything has been filed into a folder.';
+        empty.style.display = 'block';
       } else if (galleryAlbumFilter && visible.length === 0) {
         empty.textContent = 'No photos in "' + galleryAlbumFilter + '" yet.';
         empty.style.display = 'block';
@@ -3195,6 +3361,98 @@
         empty.style.display = 'none';
       }
     }
+    renderGalleryUploadUI();
+  }
+
+  // Real "Allow Guest Uploads" support — the dashboard toggle used to do nothing at
+  // all (not synced to Firestore, and nothing on this side ever read it or let a guest
+  // actually contribute a photo). This shows the upload entry point only while the
+  // photographer has it turned on, and enforces the exact limit they set in the
+  // dashboard's confirmation modal by counting photos already flagged
+  // guestUploaded:true against it — not just a label, an actual cap.
+  function renderGalleryUploadUI() {
+    const btn = document.getElementById('gallery-upload-btn');
+    const note = document.getElementById('gallery-upload-limit-note');
+    // Two independent gates have to both be open: the studio's event-level "Allow
+    // Guest Uploads" switch, AND this specific guest's own admin request being
+    // approved — the upload button only shows once both are true.
+    const isApproved = myAdminRequestStatus === 'approved';
+    if (btn) btn.style.display = (eventSettings.guestUpload && isApproved) ? 'flex' : 'none';
+    if (!note) return;
+    if (!eventSettings.guestUpload) {
+      note.style.display = 'none';
+      return;
+    }
+    if (!isApproved) {
+      note.textContent = 'Guest uploads are on for this event — request admin permission from More to upload your own photos.';
+      note.style.display = 'block';
+      return;
+    }
+    const used = eventPhotos.filter(function (p) { return p.guestUploaded; }).length;
+    const limit = eventSettings.guestUploadLimit || 0;
+    note.textContent = 'Guest uploads: ' + used + ' / ' + limit + ' used';
+    note.style.display = 'block';
+  }
+
+  function handleGuestPhotoUpload(evt) {
+    const files = Array.prototype.slice.call(evt.target.files || []).filter(function (f) { return f.type && f.type.indexOf('image/') === 0; });
+    evt.target.value = '';
+    if (!files.length) return;
+    if (!eventSettings.guestUpload) {
+      alert('Guest uploads are turned off for this event.');
+      return;
+    }
+    if (myAdminRequestStatus !== 'approved') {
+      alert('You need admin permission to upload photos to this event. Go to More > Admin Permission Request to ask the photographer.');
+      return;
+    }
+    const limit = eventSettings.guestUploadLimit || 0;
+    const usedSoFar = eventPhotos.filter(function (p) { return p.guestUploaded; }).length;
+    const remaining = Math.max(0, limit - usedSoFar);
+    if (remaining <= 0) {
+      alert('This event\'s guest upload limit (' + limit + (limit === 1 ? ' photo' : ' photos') + ') has already been reached.');
+      return;
+    }
+    const toUpload = files.slice(0, remaining);
+    if (files.length > toUpload.length) {
+      alert('Only ' + remaining + ' more guest upload' + (remaining === 1 ? '' : 's') + ' allowed right now — uploading the first ' + toUpload.length + '.');
+    }
+    if (!db) {
+      alert('Could not upload — no connection.');
+      return;
+    }
+    const statusEl = document.getElementById('gallery-upload-status');
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Uploading 0/' + toUpload.length + '...'; }
+    let done = 0;
+    Promise.all(toUpload.map(function (file) {
+      return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      }).then(function (raw) {
+        return resizeDataUrl(raw, 1600);
+      }).then(function (resized) {
+        return db.collection('photos').add({
+          eventId: EVENT.id,
+          dataUrl: resized,
+          album: '',
+          guestUploaded: true,
+          uid: (auth && auth.currentUser) ? auth.currentUser.uid : null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }).then(function () {
+        done++;
+        if (statusEl) statusEl.textContent = 'Uploading ' + done + '/' + toUpload.length + '...';
+      });
+    })).then(function () {
+      if (statusEl) {
+        statusEl.textContent = 'Uploaded ' + done + (done === 1 ? ' photo!' : ' photos!');
+        setTimeout(function () { statusEl.style.display = 'none'; }, 2500);
+      }
+    }).catch(function () {
+      if (statusEl) statusEl.textContent = 'Some photos failed to upload — please try again.';
+    });
   }
 
   function unlockGalleryWithPin() {
@@ -3259,22 +3517,76 @@
     const empty = document.getElementById('mp-yourphotos-empty');
     const grid = document.getElementById('mp-yourphotos-grid');
     const countEl = document.getElementById('myphotos-count');
-
-    renderMyPhotosAlbumChips();
+    const albumsWrap = document.getElementById('mp-albums-wrap');
+    const backLink = document.getElementById('mp-folders-back');
+    const chipsWrap = document.getElementById('myphotos-album-chips');
 
     if (!selfieRawDataUrl) {
       if (prompt) prompt.style.display = 'block';
       if (empty) empty.style.display = 'none';
       if (grid) grid.innerHTML = '';
+      if (albumsWrap) { albumsWrap.style.display = 'none'; albumsWrap.innerHTML = ''; }
+      if (backLink) backLink.style.display = 'none';
+      if (chipsWrap) chipsWrap.style.display = 'none';
       if (countEl) countEl.textContent = '0 photos found';
       return;
     }
     if (prompt) prompt.style.display = 'none';
 
     const matchedAll = eventPhotos.filter(function (p) { return p.matched === true; });
+    if (countEl) countEl.textContent = matchedAll.length + (matchedAll.length === 1 ? ' photo found' : ' photos found');
+
+    // Only real albums that actually have at least one of THIS guest's matched
+    // photos become folder cards — an empty folder would just be a dead end for them.
+    const albumsWithMatches = eventAlbums.filter(function (a) {
+      return matchedAll.some(function (p) { return p.album === a.name; });
+    });
+
+    if (myPhotosViewMode === 'folders' && albumsWithMatches.length) {
+      if (chipsWrap) chipsWrap.style.display = 'none';
+      if (backLink) backLink.style.display = 'none';
+      if (empty) empty.style.display = 'none';
+      if (grid) grid.innerHTML = '';
+      if (albumsWrap) {
+        albumsWrap.style.display = 'block';
+        albumsWrap.innerHTML = albumsWithMatches.map(function (a, i) {
+          const count = matchedAll.filter(function (p) { return p.album === a.name; }).length;
+          const cover = a.cover ? '<img src="' + a.cover + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
+          return '<div class="home-album-card" data-mp-album="' + i + '">' + cover +
+            '<div class="overlay"></div>' +
+            '<div class="name">' + a.name + '</div>' +
+            '<div class="count-badge">' + (ICONS.IMAGE || '') + count + '</div>' +
+          '</div>';
+        }).join('') +
+          // Matched photos that aren't tagged to any of the folders above still need a
+          // way in — this "All Your Photos" card is what makes that possible instead of
+          // those photos becoming unreachable once real folders exist.
+          '<div class="home-album-card" data-mp-album="all" style="background:linear-gradient(135deg,var(--ink),#514D53);">' +
+            '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>' +
+            '<div class="overlay"></div>' +
+            '<div class="name">All Your Photos</div>' +
+            '<div class="count-badge">' + (ICONS.IMAGE || '') + matchedAll.length + '</div>' +
+          '</div>';
+        albumsWrap.querySelectorAll('[data-mp-album]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            const key = card.dataset.mpAlbum;
+            myPhotosAlbumFilter = key === 'all' ? null : albumsWithMatches[Number(key)].name;
+            myPhotosViewMode = 'grid';
+            renderMyPhotosResults();
+          });
+        });
+        fillIcons();
+      }
+      return;
+    }
+
+    // Grid mode — either a specific folder (or "All Your Photos") was tapped, or this
+    // event has no real folders with matches at all (same flat behaviour as before).
+    if (albumsWrap) { albumsWrap.style.display = 'none'; albumsWrap.innerHTML = ''; }
+    if (backLink) backLink.style.display = albumsWithMatches.length ? 'block' : 'none';
+    renderMyPhotosAlbumChips();
     const matched = myPhotosAlbumFilter ? matchedAll.filter(function (p) { return p.album === myPhotosAlbumFilter; }) : matchedAll;
     renderPhotoGrid('mp-yourphotos-grid', matched);
-    if (countEl) countEl.textContent = matchedAll.length + (matchedAll.length === 1 ? ' photo found' : ' photos found');
     if (empty) {
       if (matched.length === 0 && matchInProgress) {
         // Matching (AWS network calls) is still running — say so instead of implying
@@ -3292,6 +3604,12 @@
         empty.style.display = 'none';
       }
     }
+  }
+
+  function backToMyPhotosFolders() {
+    myPhotosViewMode = 'folders';
+    myPhotosAlbumFilter = null;
+    renderMyPhotosResults();
   }
 
   // ?prefill=<docId> deep link (from the dashboard's "Generate Selfie-Prefilled Direct
