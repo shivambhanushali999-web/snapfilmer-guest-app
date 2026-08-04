@@ -126,7 +126,15 @@
 
   .tab-screen { display: none; flex-direction: column; height: 100%; position: relative; }
   .tab-screen.active { display: flex; }
-  .scroll { overflow-y: auto; flex: 1; padding-bottom: 100px; overscroll-behavior-y: contain; }
+  /* min-height:0 is the actual, standard-CSS fix for the gate-screen scroll bug's root
+     cause everywhere else it appears (Home/Events/Posts/More all use this same .scroll
+     class): a flex item's default min-height is "auto", not 0, which means a flex:1 child
+     refuses to shrink below its own content's natural height — so instead of shrinking to
+     fit the space and scrolling internally, it just grows past its container and the
+     overflow gets clipped by .tab-screen/.phone's own overflow rules. This is why it broke
+     identically on iOS AND Android — it's correct, standard flexbox behavior, not a
+     browser-specific quirk, so the same one-line fix applies everywhere the pattern shows up. */
+  .scroll { overflow-y: auto; flex: 1; min-height: 0; padding-bottom: 100px; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
 
   /* ---- Plain top bar (used on Events/Posts/More) ---- */
   .plainbar { padding: 20px 20px 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; background: var(--bg); }
@@ -267,7 +275,11 @@
   .tagline .t2 { color: var(--muted); font-size: 12px; margin-top: 8px; }
 
   /* ---- Videos grid ---- */
-  .videos-body { padding: 16px; overflow-y: auto; }
+  /* Same missing-flex-sizing bug as .scroll (see its comment) — these -body panels sit in
+     a flex-column .sub-screen next to a fixed-size .sub-bar header, but without flex:1 +
+     min-height:0 they never actually shrink to the available space, so overflow-y:auto has
+     nothing to scroll and long content just gets clipped by .sub-screen/.phone instead. */
+  .videos-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
   .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .video-tile img { width: 100%; height: 130px; object-fit: cover; border-radius:0; display: block; }
   .video-tile { position: relative; cursor: pointer; }
@@ -275,7 +287,7 @@
   .video-tile .cap { font-size: 11.5px; font-weight: 700; color: var(--ink); margin-top: 8px; }
 
   /* ---- My Photos ---- */
-  .myphotos-body { padding: 16px; overflow-y: auto; }
+  .myphotos-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
   .avatar-row { display: flex; gap: 14px; margin-bottom: 20px; }
   .avatar-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .add-circle { width: 58px; height: 58px; border-radius:18px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; background: var(--surface); }
@@ -290,6 +302,12 @@
   .photo-cell { position: relative; border-radius:0; overflow: hidden; aspect-ratio: 3/4; background: var(--border); cursor: pointer; }
   .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .wm-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(75,93,58,.9); color: #fff; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius:6px; letter-spacing: .3px; }
+  /* Small heart badge on any grid thumbnail already added to Favorites — top-right so
+     it never collides with the YOU/No match badge (bottom-left) or the watermark chip. */
+  .fav-badge { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%; background: rgba(20,16,20,.55); color: #E8544A; display: flex; align-items: center; justify-content: center; }
+  .fav-badge svg { width: 11px; height: 11px; }
+  .fav-count-badge { position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 50%; background: #E8544A; color: #fff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  #favorites-share-btn:disabled { opacity: .4; cursor: not-allowed; }
 
   /* ---- Studio watermark overlay (real, driven by dashboard settings — NOT baked
      into the file here, just shown on screen; downloads get the real thing baked
@@ -304,8 +322,8 @@
   .wm-overlay-lg .wm-logo { width: 32px; height: 32px; border-radius:6px; }
   .wm-overlay-lg .wm-text { font-size: 12px; padding: 5px 10px; border-radius:8px; }
 
-  .highlights-body { padding: 16px; overflow-y: auto; }
-  .portfolio-body { padding: 16px; overflow-y: auto; }
+  .highlights-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
+  .portfolio-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
   .portfolio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .cat-card { position: relative; border-radius:0; overflow: hidden; cursor: pointer; }
   .cat-card img { width: 100%; height: 160px; object-fit: cover; display: block; }
@@ -330,7 +348,7 @@
   .viewer-nav[disabled] { opacity: 0; pointer-events: none; }
 
   /* ---- Notifications ---- */
-  .notif-body { padding: 16px; overflow-y: auto; }
+  .notif-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
   .notif-row { display: flex; gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--border); }
   .notif-row .adot { width: 8px; height: 8px; border-radius:4px; background: var(--accent); margin-top: 6px; flex-shrink: 0; }
   .notif-row .txt { font-size: 13.5px; color: var(--ink); font-weight: 600; line-height: 1.45; }
@@ -612,6 +630,26 @@
       </div>
     </div>
   </div>
+  </div>
+
+  <!-- ========== GUEST REGISTRATION GATE — only shown when the studio turns on "Guest
+       Registration Required" (Privacy & Access). Sits above the app the same way
+       #event-gate does (reuses .gate-overlay for the same fixed-on-mobile scroll fix),
+       shown by showRegistrationGate() right after the event resolves and before bootApp()
+       runs, hidden again once submitGuestRegistration() succeeds. One-time per event per
+       device — sf_registered_<eventId> in localStorage skips it on repeat visits. ========== -->
+  <div id="registration-gate" class="gate-overlay" style="display:none;z-index:998;background:var(--bg);box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:24px;box-sizing:border-box;text-align:center;">
+      <div class="gate-card" style="max-width:360px;">
+        <h2 class="gate-serif" style="margin:0 0 6px;font-size:22px;color:var(--ink);font-weight:600;">Welcome!</h2>
+        <p style="font-size:12.5px;color:var(--muted);margin:0 0 18px;line-height:1.5;">Please share a few details before viewing this event's photos.</p>
+        <div style="margin-bottom:12px;"><input id="reg-name" placeholder="Your Name" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);"></div>
+        <div style="margin-bottom:12px;"><input id="reg-phone" type="tel" inputmode="tel" placeholder="Phone Number" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);"></div>
+        <div style="margin-bottom:16px;"><input id="reg-email" type="email" placeholder="Email (optional)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);"></div>
+        <p id="reg-msg" style="display:none;font-size:12px;color:#D0342C;margin:0 0 12px;text-align:left;"></p>
+        <button id="reg-submit-btn" onclick="submitGuestRegistration()" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:0;padding:15px 20px;font-weight:700;font-size:14.5px;cursor:pointer;">Continue</button>
+      </div>
+    </div>
   </div>
 
   <!-- ========== QR SCANNER — deliberately separate from the selfie camera screen
@@ -904,6 +942,7 @@
         <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted);" id="myphotos-count">15 photos found</p>
       </div>
       <div class="sub-bar-actions">
+        <button class="ghost-btn" style="position:relative;" onclick="openFavorites()" title="My Favorites"><i data-icon="HEART"></i><span class="fav-count-badge" style="display:none;">0</span></button>
         <button class="ghost-btn" onclick="deleteSelectedTestPhotos()"><i data-icon="TRASH"></i></button>
         <button class="ghost-btn" id="myphotos-selectmode-btn" onclick="toggleMyPhotosSelectMode()"><i data-icon="CHECK_SQ"></i></button>
       </div>
@@ -951,6 +990,9 @@
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1>Gallery</h1>
+      <div class="sub-bar-actions">
+        <button class="ghost-btn" style="position:relative;" onclick="openFavorites()" title="My Favorites"><i data-icon="HEART"></i><span class="fav-count-badge" style="display:none;">0</span></button>
+      </div>
     </div>
     <div class="myphotos-body">
       <p id="gallery-empty" style="font-size:12px;color:var(--muted);display:none;margin:0 0 14px;">No photos uploaded yet by your photographer. Ask them to upload from the Studio Dashboard.</p>
@@ -993,6 +1035,27 @@
       <div class="sub-bar-actions"><button class="ghost-btn" onclick="downloadHighlightsGrid()"><i data-icon="CHECK_SQ"></i></button></div>
     </div>
     <div class="highlights-body"><div class="grid2" id="highlights-grid"></div></div>
+  </div>
+
+  <!-- My Favorites — real, persistent picks a guest hearted in the viewer, kept
+       together as their own selection for editing, with a way to hand that list
+       straight to the photographer. -->
+  <div id="screen-favorites" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <div style="flex:1;">
+        <h1 style="text-align:left;">My Favorites</h1>
+        <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted);" id="favorites-count-label">0 photos selected</p>
+      </div>
+    </div>
+    <div class="myphotos-body" style="display:flex;flex-direction:column;">
+      <p id="favorites-empty" style="font-size:12px;color:var(--muted);display:none;margin:0 0 14px;line-height:1.5;">Tap the heart on any photo in Gallery or My Photos to add it here — these become your picks for the photographer to edit.</p>
+      <div class="grid2" id="favorites-grid" style="margin-bottom:16px;"></div>
+      <div style="margin-top:auto;padding-top:8px;">
+        <button class="btn-solid-sm" id="favorites-share-btn" onclick="shareFavoritesWithPhotographer()" disabled style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;opacity:1;">Share with Photographer</button>
+        <p id="favorites-share-msg" style="font-size:11.5px;margin:8px 0 0;display:none;text-align:center;line-height:1.5;"></p>
+      </div>
+    </div>
   </div>
 
   <div id="screen-notifications" class="sub-screen">
@@ -1248,7 +1311,36 @@
 
   // ================= Navigation =================
   let screenStack = [];
-  let likedPhotos = {};
+  // Real, persistent favorites — keyed by photo id (not dataUrl, which changes per
+  // render and can't survive a reload), saved to localStorage scoped per event so a
+  // guest's picks stay put across visits. This used to be an in-memory-only
+  // likedPhotos object keyed by dataUrl: it reset on every reload/tab switch, had no
+  // count shown anywhere, and nothing downstream (a Favorites list, sharing with the
+  // photographer) could even be built on top of it since dataUrl carries no photo id.
+  let favoritedPhotoIds = {};
+  function loadFavorites() {
+    favoritedPhotoIds = {};
+    try {
+      const raw = localStorage.getItem('sf_favorites_' + EVENT.id);
+      if (raw) favoritedPhotoIds = JSON.parse(raw) || {};
+    } catch (err) { favoritedPhotoIds = {}; }
+  }
+  function saveFavorites() {
+    try { localStorage.setItem('sf_favorites_' + EVENT.id, JSON.stringify(favoritedPhotoIds)); } catch (err) {}
+  }
+  // Looks across both real event photos and the guest's own test/calibration photos,
+  // so a favorite can never go "missing" from the count just because of which array
+  // its id happens to live in.
+  function getFavoritedPhotos() {
+    return eventPhotos.concat(testPhotos).filter(function (p) { return favoritedPhotoIds[p.id]; });
+  }
+  function updateFavoriteBadges() {
+    const n = Object.keys(favoritedPhotoIds).length;
+    document.querySelectorAll('.fav-count-badge').forEach(function (el) {
+      el.textContent = n > 99 ? '99+' : String(n);
+      el.style.display = n > 0 ? 'flex' : 'none';
+    });
+  }
   let viewerPhotos = [];
   let viewerIndex = 0;
   // True whenever the Event Gate overlay is the thing a guest is actually looking at
@@ -1281,7 +1373,7 @@
     // their own data from Firestore/localStorage. Screens like the camera or photo
     // viewer depend on transient state (a live camera stream, an in-memory photo array)
     // that can't be reconstructed after a refresh, so those are deliberately not saved.
-    if (name === 'myphotos' || name === 'gallery') {
+    if (name === 'myphotos' || name === 'gallery' || name === 'favorites') {
       try { localStorage.setItem('sf_last_subscreen_' + EVENT.id, name); } catch (err) {}
     }
   }
@@ -1352,13 +1444,23 @@
   }
 
   function toggleLike() {
-    const key = viewerPhotos[viewerIndex];
-    likedPhotos[key] = !likedPhotos[key];
+    const p = viewerPhotos[viewerIndex];
+    if (!p || !p.id) return;
+    if (favoritedPhotoIds[p.id]) delete favoritedPhotoIds[p.id];
+    else favoritedPhotoIds[p.id] = true;
+    saveFavorites();
     updateLikeIcon();
+    updateFavoriteBadges();
+    // Whichever grid/list is currently on screen (or waiting underneath the viewer)
+    // should reflect the new heart state the moment the guest backs out of the
+    // viewer, not just on the next full re-render.
+    renderFavorites();
   }
   function updateLikeIcon() {
     const btn = document.getElementById('viewer-like');
-    btn.style.color = likedPhotos[viewerPhotos[viewerIndex]] ? '#4B5D3A' : '#fff';
+    if (!btn) return;
+    const p = viewerPhotos[viewerIndex];
+    btn.style.color = (p && p.id && favoritedPhotoIds[p.id]) ? '#E8544A' : '#fff';
   }
 
   function forceDownloadDataUrl(dataUrl, filename) {
@@ -1527,6 +1629,12 @@
   const EMAILJS_SERVICE_ID = 'REPLACE_WITH_YOUR_SERVICE_ID';
   const EMAILJS_TEMPLATE_ID = 'REPLACE_WITH_YOUR_TEMPLATE_ID';
   const EMAILJS_PUBLIC_KEY = 'REPLACE_WITH_YOUR_PUBLIC_KEY';
+  // Optional second template for "Share with Photographer" (My Favorites) — set this
+  // up in EmailJS with {{to_email}}, {{event_name}}, {{guest_name}}, {{photo_count}},
+  // {{photo_list}} variables if you want that button to send silently in the
+  // background. Left as-is, it falls back to opening the guest's own mail app instead
+  // (see openFavoritesMailtoFallback) — that path needs zero setup and always works.
+  const EMAILJS_FAVORITES_TEMPLATE_ID = 'REPLACE_WITH_YOUR_TEMPLATE_ID';
   try {
     if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY.indexOf('REPLACE') !== 0) {
       emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
@@ -1562,6 +1670,66 @@
       if (input) input.value = '';
     }).catch(function () {
       if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Could not send that email — please try again.'; statusEl.style.display = 'block'; }
+    });
+  }
+
+  // "Share with Photographer" — hands the studio a real, numbered list of exactly
+  // which photos this guest wants edited, addressed to whatever email the studio has
+  // set on their profile (studioContactEmail — defaults to the studio's own address,
+  // overwritten by the real profile.email once that syncs). Numbers are the photo's
+  // position in the same chronological gallery order the guest sees, paired with the
+  // actual Firestore photo id so the studio can look each one up exactly even if their
+  // dashboard happens to be sorted differently.
+  function openFavoritesMailtoFallback(photoList, count, guestName) {
+    const subject = encodeURIComponent(EVENT.name + ' — ' + count + (count === 1 ? ' photo selected for editing' : ' photos selected for editing'));
+    const body = encodeURIComponent(
+      (guestName ? guestName + ' has' : 'A guest has') + ' selected ' + count + (count === 1 ? ' photo' : ' photos') +
+      ' from "' + EVENT.name + '" for editing:\n\n' + photoList + '\n\n— sent from the SnapFilmer gallery'
+    );
+    window.location.href = 'mailto:' + studioContactEmail + '?subject=' + subject + '&body=' + body;
+  }
+
+  function shareFavoritesWithPhotographer() {
+    const favs = getFavoritedPhotos();
+    const msgEl = document.getElementById('favorites-share-msg');
+    const btn = document.getElementById('favorites-share-btn');
+    if (!favs.length) {
+      if (msgEl) { msgEl.style.color = '#D0342C'; msgEl.textContent = 'Tap the heart on a photo first — nothing is selected yet.'; msgEl.style.display = 'block'; }
+      return;
+    }
+    if (!studioContactEmail) {
+      if (msgEl) { msgEl.style.color = '#D0342C'; msgEl.textContent = "Could not find the photographer's email — please contact them directly."; msgEl.style.display = 'block'; }
+      return;
+    }
+    const photoList = favs.map(function (p) {
+      const n = eventPhotos.indexOf(p) + 1;
+      return (n > 0 ? 'Photo #' + n : 'Photo') + '  (ID: ' + p.id + ')';
+    }).join('\n');
+    let guestName = '';
+    try { guestName = localStorage.getItem('sf_guest_name_' + EVENT.id) || ''; } catch (err) {}
+
+    const useEmailJs = typeof emailjs !== 'undefined' && EMAILJS_SERVICE_ID.indexOf('REPLACE') !== 0 && EMAILJS_FAVORITES_TEMPLATE_ID.indexOf('REPLACE') !== 0;
+    if (!useEmailJs) {
+      // No silent-send template configured — the guaranteed, zero-setup path is
+      // opening the guest's own mail app with everything pre-filled; they just hit send.
+      openFavoritesMailtoFallback(photoList, favs.length, guestName);
+      if (msgEl) { msgEl.style.color = 'var(--muted)'; msgEl.textContent = 'Opening your email app with the list ready to send to ' + studioContactEmail + '...'; msgEl.style.display = 'block'; }
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_FAVORITES_TEMPLATE_ID, {
+      to_email: studioContactEmail,
+      event_name: EVENT.name,
+      guest_name: guestName || 'A guest',
+      photo_count: favs.length,
+      photo_list: photoList,
+    }).then(function () {
+      if (btn) { btn.disabled = false; btn.textContent = 'Share with Photographer'; }
+      if (msgEl) { msgEl.style.color = '#1FA97A'; msgEl.textContent = 'Sent! ' + studioContactEmail + ' now has your ' + favs.length + (favs.length === 1 ? ' selected photo.' : ' selected photos.'); msgEl.style.display = 'block'; }
+    }).catch(function () {
+      if (btn) { btn.disabled = false; btn.textContent = 'Share with Photographer'; }
+      openFavoritesMailtoFallback(photoList, favs.length, guestName);
+      if (msgEl) { msgEl.style.color = '#D0342C'; msgEl.textContent = 'Could not send automatically — opening your email app instead.'; msgEl.style.display = 'block'; }
     });
   }
 
@@ -1850,23 +2018,34 @@
   }
 
   // ================= Renderers =================
+  // photos here is now an array of real photo objects ({id, dataUrl, ...}), not bare
+  // dataUrl strings — needed so the viewer opened from here still knows each photo's
+  // Firestore id (favoriting/"Share with Photographer" is keyed by id, and couldn't
+  // work at all when only a dataUrl string made it this far).
   function renderGrid(elId, photos) {
     const el = document.getElementById(elId);
     el.innerHTML = '';
-    photos.forEach(function (uri, i) {
+    photos.forEach(function (p, i) {
       const cell = document.createElement('div');
       cell.className = 'photo-cell';
       const img = document.createElement('img');
       img.loading = 'lazy';
-      img.src = uri;
+      img.src = p.dataUrl;
       const wm = document.createElement('div');
       wm.className = 'wm-badge';
       wm.textContent = 'SF';
       cell.appendChild(img);
       cell.appendChild(wm);
+      if (p.id && favoritedPhotoIds[p.id]) {
+        const fav = document.createElement('div');
+        fav.className = 'fav-badge';
+        fav.innerHTML = '<i data-icon="HEART"></i>';
+        cell.appendChild(fav);
+      }
       cell.addEventListener('click', function () { openViewer(photos, i); });
       el.appendChild(cell);
     });
+    fillIcons();
   }
 
   // Real photos the studio has starred in the dashboard's photo lightbox — replaces
@@ -1887,7 +2066,7 @@
         : 'Highlights aren\'t turned on for this event yet.');
       return;
     }
-    openHighlights('Highlights', highlighted.map(function (p) { return p.dataUrl; }));
+    openHighlights('Highlights', highlighted);
   }
 
   function renderStories() {
@@ -1921,7 +2100,7 @@
       item.className = 'story';
       item.innerHTML = '<div class="story-ring"><img src="' + cover + '"></div><span>' + escWm(a.name) + '</span>';
       item.addEventListener('click', function () {
-        openHighlights(a.name, photosInAlbum.map(function (p) { return p.dataUrl; }));
+        openHighlights(a.name, photosInAlbum);
       });
       wrap.appendChild(item);
     });
@@ -2297,10 +2476,77 @@
       startPostsSync();
       startEventSettingsSync();
       applyDeepLinkPrefill();
-      bootApp();
+
+      // "Guest Registration Required" (Privacy & Access) — a guest must give name/phone
+      // (email optional) once per event before seeing anything, matching that toggle's own
+      // description. Checked directly off the just-fetched doc (not eventSettings, which
+      // is populated a moment later by startEventSettingsSync's snapshot) so this can't
+      // race and let someone through before the flag is known.
+      let alreadyRegistered = false;
+      try { alreadyRegistered = localStorage.getItem('sf_registered_' + eventId) === '1'; } catch (err) {}
+      if (d.registration && !alreadyRegistered) {
+        showRegistrationGate();
+      } else {
+        bootApp();
+      }
     }).catch(function () {
       showEventGateForm('Could not load this event — check your internet connection and try again.');
     });
+  }
+
+  // ---- Guest Registration gate (Privacy & Access > "Guest Registration Required") ----
+  function showRegistrationGate() {
+    const gate = document.getElementById('event-gate');
+    if (gate) gate.style.display = 'none';
+    const reg = document.getElementById('registration-gate');
+    if (reg) reg.style.display = 'block';
+  }
+
+  function submitGuestRegistration() {
+    const nameEl = document.getElementById('reg-name');
+    const phoneEl = document.getElementById('reg-phone');
+    const emailEl = document.getElementById('reg-email');
+    const msgEl = document.getElementById('reg-msg');
+    const btn = document.getElementById('reg-submit-btn');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const phone = phoneEl ? phoneEl.value.trim() : '';
+    const email = emailEl ? emailEl.value.trim() : '';
+    if (!name || !phone) {
+      if (msgEl) { msgEl.textContent = 'Please enter your name and phone number to continue.'; msgEl.style.display = 'block'; }
+      return;
+    }
+    if (msgEl) msgEl.style.display = 'none';
+    if (btn) { btn.disabled = true; btn.textContent = 'Please wait…'; }
+
+    const finish = function () {
+      try {
+        localStorage.setItem('sf_registered_' + EVENT.id, '1');
+        // Also kept locally (not just in the guestRegistrations doc) so features like
+        // "Share with Photographer" can address the guest by name without asking again.
+        localStorage.setItem('sf_guest_name_' + EVENT.id, name);
+      } catch (err) {}
+      const reg = document.getElementById('registration-gate');
+      if (reg) reg.style.display = 'none';
+      bootApp();
+    };
+
+    if (db) {
+      // Real write to a dedicated collection the dashboard's Guests Data panel reads
+      // straight from — not a fake counter, an actual per-guest document.
+      db.collection('guestRegistrations').add({
+        eventId: EVENT.id,
+        name: name,
+        phone: phone,
+        email: email || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }).then(finish).catch(function () {
+        // Offline/write failure — don't trap the guest outside their own gallery over a
+        // connectivity blip; let them in, it just won't be recorded this one time.
+        finish();
+      });
+    } else {
+      finish();
+    }
   }
 
   // ---- Studio Profile — dashboard-driven branding (name/bio/brand color/socials) ----
@@ -2435,6 +2681,7 @@
       eventSettings.anonymousMyPhotos = !!d.anonymousMyPhotos;
       eventSettings.pin = d.pin || '';
       eventSettings.enquiry = !!d.enquiry;
+      eventSettings.registration = !!d.registration;
       eventSettings.highlightEnabled = !!d.highlightEnabled;
       eventWatermark = normalizeEventWatermark(d.watermark);
       eventAlbums = Array.isArray(d.albums) ? d.albums : [];
@@ -2596,6 +2843,7 @@
         renderGallery();
         renderMyPhotosResults();
         renderStories();
+        renderFavorites();
         if (selfieRawDataUrl) matchAllTestPhotos();
       });
   }
@@ -2634,6 +2882,32 @@
     startEventPhotosSync();
     startEventSettingsSync();
     renderGallery();
+  }
+
+  // My Favorites — the photos a guest has actually hearted while browsing Gallery/My
+  // Photos, shown together as their real "selects for editing" instead of only being
+  // reachable one photo at a time from inside the viewer.
+  function openFavorites() {
+    pushScreen('favorites');
+    startEventPhotosSync();
+    renderFavorites();
+  }
+
+  function renderFavorites() {
+    const favs = getFavoritedPhotos();
+    const empty = document.getElementById('favorites-empty');
+    const grid = document.getElementById('favorites-grid');
+    const label = document.getElementById('favorites-count-label');
+    const shareBtn = document.getElementById('favorites-share-btn');
+    if (label) label.textContent = favs.length + (favs.length === 1 ? ' photo selected for editing' : ' photos selected for editing');
+    if (shareBtn) shareBtn.disabled = favs.length === 0;
+    if (!favs.length) {
+      if (empty) empty.style.display = 'block';
+      if (grid) grid.innerHTML = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    if (grid) renderGrid('favorites-grid', favs);
   }
 
   function setAiStatus(msg) {
@@ -2749,12 +3023,14 @@
       let badge = '';
       if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
       else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
-      cell.innerHTML = '<img src="' + p.dataUrl + '" loading="lazy">' + badge + wmHtml;
+      const favBadge = favoritedPhotoIds[p.id] ? '<div class="fav-badge"><i data-icon="HEART"></i></div>' : '';
+      cell.innerHTML = '<img src="' + p.dataUrl + '" loading="lazy">' + badge + favBadge + wmHtml;
       cell.addEventListener('click', function () {
-        openViewer(photos.map(function (t) { return t.dataUrl; }), i);
+        openViewer(photos, i);
       });
       grid.appendChild(cell);
     });
+    fillIcons();
   }
 
   // Select-mode state for the "Your Test Photos" grid — these are the guest's own
@@ -2809,7 +3085,7 @@
           selectedTestPhotoIds[p.id] = !selectedTestPhotoIds[p.id];
           renderTestGallery();
         } else {
-          openViewer(testPhotos.map(function (t) { return t.dataUrl; }), testPhotos.indexOf(p));
+          openViewer(testPhotos, testPhotos.indexOf(p));
         }
       });
       grid.appendChild(cell);
@@ -3462,6 +3738,8 @@
     // moved here so they use the real, resolved event ID.
     try { NOTIFICATIONS = JSON.parse(localStorage.getItem('sf_notifications_' + EVENT.id) || '[]'); } catch (err) { NOTIFICATIONS = []; }
     try { pinUnlocked = localStorage.getItem('sf_pin_unlocked_' + EVENT.id) === '1'; } catch (err) {}
+    loadFavorites();
+    updateFavoriteBadges();
 
     document.getElementById('home-cover').src = EVENT.cover;
     document.getElementById('home-event-name').textContent = EVENT.name;
@@ -3551,6 +3829,7 @@
         showTab(lastTab);
         if (lastSub === 'myphotos') openMyPhotos();
         else if (lastSub === 'gallery') openGallery();
+        else if (lastSub === 'favorites') openFavorites();
       })();
     }
   }
