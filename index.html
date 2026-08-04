@@ -1095,7 +1095,8 @@
       <canvas id="camera-canvas" style="display:none;"></canvas>
       <div class="camera-fallback" id="camera-fallback">
         <i data-icon="CAMERA" style="width:40px;height:40px;color:#fff;"></i>
-        <p>Live camera preview needs this page to be served over a local server (http://) rather than opened directly as a file. You can upload a selfie photo instead.</p>
+        <p id="camera-fallback-msg">Live camera preview needs this page to be served over a local server (http://) rather than opened directly as a file. You can upload a selfie photo instead.</p>
+        <button class="btn-solid" id="camera-fallback-retry" style="display:none;" onclick="retryCamera()">Retry Camera</button>
         <label class="btn-solid">
           Upload a Selfie Instead
           <input type="file" accept="image/*" capture="user" style="display:none" onchange="handleSelfieFile(event)">
@@ -3668,12 +3669,24 @@
       return;
     }
     pushScreen('camera');
+    startCameraStream();
+  }
+
+  // Re-attempts getUserMedia without pushing a duplicate 'camera' entry onto
+  // screenStack — used by the fallback screen's "Retry Camera" button after a guest
+  // has just granted the permission they'd previously denied, so they don't have to
+  // back all the way out and tap the selfie button again.
+  function retryCamera() {
+    startCameraStream();
+  }
+
+  function startCameraStream() {
     document.getElementById('camera-fallback').style.display = 'none';
     document.getElementById('camera-video').style.display = 'block';
     document.getElementById('camera-controls').style.display = 'flex';
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showCameraFallback();
+      showCameraFallback('unsupported');
       return;
     }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
@@ -3681,15 +3694,42 @@
         cameraStream = stream;
         document.getElementById('camera-video').srcObject = stream;
       })
-      .catch(function () {
-        showCameraFallback();
+      .catch(function (err) {
+        // This used to always blame "not served over http://", even on the real,
+        // fully-https Vercel deployment — completely wrong and actively misleading
+        // whenever the true cause was a blocked permission, a busy camera, or no
+        // camera at all. Reading err.name (what getUserMedia actually reports) and
+        // showing the real reason is what makes this fixable instead of a dead end.
+        showCameraFallback(err && err.name);
       });
   }
 
-  function showCameraFallback() {
+  function showCameraFallback(reason) {
     document.getElementById('camera-video').style.display = 'none';
     document.getElementById('camera-controls').style.display = 'none';
     document.getElementById('camera-fallback').style.display = 'flex';
+    const msgEl = document.getElementById('camera-fallback-msg');
+    const retryBtn = document.getElementById('camera-fallback-retry');
+    let msg;
+    let canRetry = false;
+    if (!window.isSecureContext) {
+      msg = 'Live camera preview needs this page to be served securely (https://) rather than opened directly as a local file. You can upload a selfie photo instead.';
+    } else if (reason === 'NotAllowedError' || reason === 'PermissionDeniedError' || reason === 'SecurityError') {
+      msg = 'Camera access was blocked for this site. Open your browser\'s site settings, allow Camera, then tap Retry — or upload a selfie photo instead.';
+      canRetry = true;
+    } else if (reason === 'NotFoundError' || reason === 'DevicesNotFoundError') {
+      msg = 'No camera was found on this device. You can upload a selfie photo instead.';
+    } else if (reason === 'NotReadableError' || reason === 'TrackStartError') {
+      msg = 'Your camera seems to be in use by another app right now. Close it, then tap Retry — or upload a selfie photo instead.';
+      canRetry = true;
+    } else if (reason === 'unsupported') {
+      msg = 'This browser doesn\'t support live camera access. You can upload a selfie photo instead.';
+    } else {
+      msg = 'Couldn\'t open the camera. Tap Retry, or upload a selfie photo instead.';
+      canRetry = true;
+    }
+    if (msgEl) msgEl.textContent = msg;
+    if (retryBtn) retryBtn.style.display = canRetry ? 'inline-flex' : 'none';
   }
 
   function stopCameraStream() {
