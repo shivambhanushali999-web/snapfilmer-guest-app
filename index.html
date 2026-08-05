@@ -4102,11 +4102,24 @@
   }
 
   // ================= Init =================
+  // Fills every <i data-icon="X"> placeholder's real SVG in from the ICONS map. Needs
+  // to be a real, callable function (not just a one-off snippet run once at load) —
+  // several render functions (renderGrid, renderPhotoGrid, the camera screen, etc.)
+  // insert NEW data-icon elements into the DOM later and call fillIcons() again so
+  // those get filled too. It used to be inlined here as a bare forEach with no name,
+  // so those later calls were throwing "fillIcons is not defined" — a real, uncaught
+  // exception that silently aborted every render function queued after it in the same
+  // Firestore snapshot callback (that's what was actually stopping Home's album cards,
+  // and anything else downstream of renderGallery()/renderPhotoGrid(), from ever
+  // running — not a data or sync problem at all).
+  function fillIcons() {
+    document.querySelectorAll('[data-icon]').forEach(function (el) {
+      el.innerHTML = ICONS[el.dataset.icon] || '';
+    });
+  }
   // Icon rendering doesn't depend on which event is loaded, so this runs immediately
   // rather than waiting behind the event gate.
-  document.querySelectorAll('[data-icon]').forEach(function (el) {
-    el.innerHTML = ICONS[el.dataset.icon] || '';
-  });
+  fillIcons();
 
   // Everything below used to run unconditionally at page load, back when EVENT was a
   // hardcoded constant. Now it's a function, called from loadEventAndBoot() above once
