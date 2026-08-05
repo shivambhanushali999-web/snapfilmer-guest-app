@@ -2931,6 +2931,16 @@
     });
   }
 
+  // The dashboard's Update Profile wizard embeds this app in an iframe as a live phone
+  // preview, and posts draft field values here so the preview reflects in-progress edits
+  // instantly — before the studio hits Save. This never touches Firestore (real guests
+  // browsing the real app never see a draft); it just re-runs the exact same
+  // applyStudioProfile() the live Firestore listener above uses, purely in this tab.
+  window.addEventListener('message', function (ev) {
+    if (!ev.data || ev.data.type !== 'SNAPFILMER_PROFILE_DRAFT') return;
+    applyStudioProfile(ev.data.profile || {});
+  });
+
   function startEventSettingsSync() {
     if (!db || eventSettingsUnsub) return;
     eventSettingsUnsub = db.collection('events').doc(EVENT.id).onSnapshot(function (doc) {
