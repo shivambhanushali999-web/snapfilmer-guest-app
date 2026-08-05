@@ -2099,7 +2099,17 @@
     // switchToEvent() below: reload straight back to the Event Gate (bare URL, no
     // ?event= param, and the remembered "last event" cleared) instead of leaving the
     // guest sitting inside a gallery that's no longer theirs to be in.
-    try { localStorage.removeItem('sf_last_event_id'); } catch (err) {}
+    // Also clear this event's remembered tab/sub-screen (showTab() saves
+    // sf_last_tab_<id> on every navigation — since Unfollow itself lives on the More
+    // tab, that's almost always what got saved last). Without this, re-following the
+    // SAME event ID later silently resumes on whatever tab you unfollowed from instead
+    // of starting fresh on Home, which looked like the app randomly dropping you into
+    // "More" for no reason.
+    try {
+      localStorage.removeItem('sf_last_event_id');
+      localStorage.removeItem('sf_last_tab_' + EVENT.id);
+      localStorage.removeItem('sf_last_subscreen_' + EVENT.id);
+    } catch (err) {}
     window.location.href = window.location.origin + window.location.pathname;
   }
 
