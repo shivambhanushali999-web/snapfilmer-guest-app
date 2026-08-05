@@ -776,18 +776,9 @@
         </div>
       </div>
 
-      <div class="chip-row">
-        <!-- My Photos (find yourself via selfie) is the single most important thing a
-             guest does here — moved first so it's always visible without needing to
-             scroll the chip row, instead of being the last chip (previously partly
-             cut off at the screen edge, easy to miss entirely). -->
-        <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
-        <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
-        <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
-      </div>
-
-      <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
-
+      <!-- Moved to right under the event cover (was below the chips/folder cards) —
+           the studio's own identity/contact card should be the first thing a guest
+           sees, not something they have to scroll past everything else to find. -->
       <div class="studio-block">
         <div class="studio-top">
           <div class="studio-avatar" id="studio-avatar">SF</div>
@@ -813,6 +804,18 @@
           <button class="ghost-btn" onclick="shareStudioProfile()" title="Share"><i data-icon="SHARE"></i></button>
         </div>
       </div>
+
+      <div class="chip-row">
+        <!-- My Photos (find yourself via selfie) is the single most important thing a
+             guest does here — moved first so it's always visible without needing to
+             scroll the chip row, instead of being the last chip (previously partly
+             cut off at the screen edge, easy to miss entirely). -->
+        <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
+        <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
+        <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
+      </div>
+
+      <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
 
       <!-- Wrapped so renderStories() can hide the label along with the row — the label
            alone used to always render regardless of whether there was anything real to
