@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<!-- This is a single static HTML file redeployed by overwriting it on GitHub/Vercel —
+     with no cache-busting, a phone's browser can keep serving an old cached copy for
+     days after a real redeploy, which looks exactly like "the fix didn't work" even
+     though the server genuinely has the new file. These three tell the browser (and
+     any CDN edge) to always revalidate instead of trusting a locally cached copy. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <!-- maximum-scale=1 + user-scalable=no fully disables both pinch-zoom and iOS's
      auto-zoom-on-input-focus — belt-and-suspenders on top of already using 16px+ font-size
      on every input/textarea (the usual trigger), since the guest explicitly should never
@@ -772,6 +780,11 @@
         <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
       </div>
 
+      <!-- Temporary — shows exactly what renderHomeAlbums() sees at runtime (raw
+           eventAlbums/highlight state), so a screenshot proves whether this is a data
+           problem or a rendering problem, instead of guessing. Remove once the Cam 1
+           "not showing on Home" issue is confirmed fixed. -->
+      <div id="home-albums-debug" style="font-size:9.5px;color:#999;padding:0 16px 4px;word-break:break-all;"></div>
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
 
       <div class="studio-block">
@@ -821,6 +834,13 @@
           <p id="enq-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
         </div>
       </div>
+
+      <!-- Plain static text (not JS-generated) so it renders even if some script error
+           blocks everything after it — a screenshot showing this build tag is the
+           fastest way to confirm whether a phone is actually running the latest
+           redeployed file, or a stale cached copy from before. Bump this string any
+           time this file changes. -->
+      <div style="text-align:center;font-size:9.5px;color:var(--muted);opacity:.55;padding:4px 16px 0;">build 2026-08-05-2</div>
 
       <div style="height:10px;"></div>
     </div>
@@ -2855,6 +2875,13 @@
   // shown as its own folder here (the fix for that is uploading straight into a real
   // album on the dashboard, not surfacing an "Unsorted" bucket to guests).
   function renderHomeAlbums() {
+    const dbg = document.getElementById('home-albums-debug');
+    if (dbg) {
+      dbg.textContent = 'DEBUG albums=' + eventAlbums.length +
+        ' [' + eventAlbums.map(function (a) { return a.name; }).join(', ') + ']' +
+        ' highlights=' + getHighlightedPhotos().length +
+        ' eventPhotos=' + eventPhotos.length;
+    }
     const wrap = document.getElementById('home-albums-wrap');
     if (!wrap) return;
     if (!eventAlbums.length && !getHighlightedPhotos().length) {
