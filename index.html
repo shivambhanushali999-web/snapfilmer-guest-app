@@ -3054,9 +3054,11 @@
 
   function openMyPhotos() {
     pushScreen('myphotos');
-    // Always land on the folder picker (if this event has real folders), not
-    // whatever filter happened to be left over from the guest's last visit here.
-    myPhotosViewMode = 'folders';
+    // Always land on the small chip-row + flat grid (matches Gallery's own style) —
+    // not whatever filter happened to be left over from the guest's last visit here.
+    // Used to default to a big-banner "folder picker" step first; removed on request
+    // in favor of going straight to chips + grid, same as before that was added.
+    myPhotosViewMode = 'grid';
     myPhotosAlbumFilter = null;
     // face-api.js models used to load eagerly here on every visit to My Photos — that's
     // a 20-30MB download from a CDN, every single time, even though AWS Rekognition
@@ -3549,54 +3551,12 @@
     const matchedAll = eventPhotos.filter(function (p) { return p.matched === true; });
     if (countEl) countEl.textContent = matchedAll.length + (matchedAll.length === 1 ? ' photo found' : ' photos found');
 
-    // Only real albums that actually have at least one of THIS guest's matched
-    // photos become folder cards — an empty folder would just be a dead end for them.
-    const albumsWithMatches = eventAlbums.filter(function (a) {
-      return matchedAll.some(function (p) { return p.album === a.name; });
-    });
-
-    if (myPhotosViewMode === 'folders' && albumsWithMatches.length) {
-      if (chipsWrap) chipsWrap.style.display = 'none';
-      if (backLink) backLink.style.display = 'none';
-      if (empty) empty.style.display = 'none';
-      if (grid) grid.innerHTML = '';
-      if (albumsWrap) {
-        albumsWrap.style.display = 'block';
-        albumsWrap.innerHTML = albumsWithMatches.map(function (a, i) {
-          const count = matchedAll.filter(function (p) { return p.album === a.name; }).length;
-          const cover = a.cover ? '<img src="' + a.cover + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
-          return '<div class="home-album-card" data-mp-album="' + i + '">' + cover +
-            '<div class="overlay"></div>' +
-            '<div class="name">' + a.name + '</div>' +
-            '<div class="count-badge">' + (ICONS.IMAGE || '') + count + '</div>' +
-          '</div>';
-        }).join('') +
-          // Matched photos that aren't tagged to any of the folders above still need a
-          // way in — this "All Your Photos" card is what makes that possible instead of
-          // those photos becoming unreachable once real folders exist.
-          '<div class="home-album-card" data-mp-album="all" style="background:linear-gradient(135deg,var(--ink),#514D53);">' +
-            '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>' +
-            '<div class="overlay"></div>' +
-            '<div class="name">All Your Photos</div>' +
-            '<div class="count-badge">' + (ICONS.IMAGE || '') + matchedAll.length + '</div>' +
-          '</div>';
-        albumsWrap.querySelectorAll('[data-mp-album]').forEach(function (card) {
-          card.addEventListener('click', function () {
-            const key = card.dataset.mpAlbum;
-            myPhotosAlbumFilter = key === 'all' ? null : albumsWithMatches[Number(key)].name;
-            myPhotosViewMode = 'grid';
-            renderMyPhotosResults();
-          });
-        });
-        fillIcons();
-      }
-      return;
-    }
-
-    // Grid mode — either a specific folder (or "All Your Photos") was tapped, or this
-    // event has no real folders with matches at all (same flat behaviour as before).
+    // Small chip-row + flat grid (same style Gallery uses) — no big banner "folder
+    // picker" step. That intermediate screen got removed on request; tapping My Photos
+    // now goes straight to "All Photos"/"Cam 1"-style chips with the matched grid
+    // right below them.
     if (albumsWrap) { albumsWrap.style.display = 'none'; albumsWrap.innerHTML = ''; }
-    if (backLink) backLink.style.display = albumsWithMatches.length ? 'block' : 'none';
+    if (backLink) backLink.style.display = 'none';
     renderMyPhotosAlbumChips();
     const matched = myPhotosAlbumFilter ? matchedAll.filter(function (p) { return p.album === myPhotosAlbumFilter; }) : matchedAll;
     renderPhotoGrid('mp-yourphotos-grid', matched);
