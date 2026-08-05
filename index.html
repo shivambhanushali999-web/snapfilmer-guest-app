@@ -1462,7 +1462,13 @@
   // Kamero's real photo viewer is a full slideshow — swipe or tap the edges to move
   // between photos in the album instead of only ever seeing one photo at a time.
   function renderViewerImage() {
-    document.getElementById('viewer-img').src = viewerPhotos[viewerIndex];
+    // viewerPhotos holds full photo objects ({id, dataUrl, ...}), not bare URL strings
+    // (changed so favoriting/Share-with-Photographer could key off .id) — this line
+    // was never updated to match, so it was setting <img src> to the object itself
+    // (renders as a broken image) instead of its .dataUrl every single time a photo
+    // was opened in the viewer.
+    const currentPhoto = viewerPhotos[viewerIndex];
+    document.getElementById('viewer-img').src = currentPhoto ? currentPhoto.dataUrl : '';
     const countEl = document.getElementById('viewer-count');
     if (countEl) countEl.textContent = (viewerIndex + 1) + ' / ' + viewerPhotos.length;
     const prevBtn = document.getElementById('viewer-prev-btn');
@@ -1641,7 +1647,8 @@
   // fallback above will open them in a new tab instead, since those are third-party demo
   // URLs with no real bytes to save — not a real photo, so nothing to actually download.
   function downloadCurrentPhoto() {
-    const src = viewerPhotos[viewerIndex];
+    const p = viewerPhotos[viewerIndex];
+    const src = p && p.dataUrl;
     if (!src) return;
     triggerDownload(src, 'snapfilmer-photo-' + (viewerIndex + 1) + '.jpg');
   }
@@ -1980,7 +1987,8 @@
   }
 
   function shareCurrentPhoto() {
-    const src = viewerPhotos[viewerIndex];
+    const p = viewerPhotos[viewerIndex];
+    const src = p && p.dataUrl;
     if (!src) return;
     shareLinkOrCopy(src, 'A photo from ' + EVENT.name);
   }
