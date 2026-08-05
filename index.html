@@ -332,6 +332,8 @@
   .wm-overlay { position: absolute; display: flex; align-items: center; gap: 5px; pointer-events: none; z-index: 3; }
   .wm-overlay.wm-pos-bottom-right { right: 8px; bottom: 8px; }
   .wm-overlay.wm-pos-bottom-left { left: 8px; bottom: 8px; }
+  .wm-overlay.wm-pos-top-left { left: 8px; top: 8px; }
+  .wm-overlay.wm-pos-top-right { right: 8px; top: 8px; }
   .wm-overlay.wm-pos-center { left: 50%; top: 50%; transform: translate(-50%, -50%); }
   .wm-overlay .wm-logo { width: 18px; height: 18px; object-fit: contain; border-radius:4px; display: block; }
   .wm-overlay .wm-text { color: #fff; font-size: 9.5px; font-weight: 800; letter-spacing: .3px; background: rgba(0,0,0,.4); padding: 3px 7px; border-radius:6px; white-space: nowrap; }
@@ -1556,6 +1558,8 @@
         const shift = yShift || 0;
         if (w.position === 'center') return { x: (canvas.width - boxW) / 2, y: (canvas.height - boxH) / 2 - shift };
         if (w.position === 'bottom-left') return { x: pad, y: canvas.height - boxH - pad - shift };
+        if (w.position === 'top-left') return { x: pad, y: pad + shift };
+        if (w.position === 'top-right') return { x: canvas.width - boxW - pad, y: pad + shift };
         if (w.position === 'custom') {
           // customX/customY are a % of the photo's own width/height (set by dragging on
           // the dashboard's live preview) — the box is centered on that point, then
