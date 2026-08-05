@@ -2915,11 +2915,28 @@
           div.className = 'social-ghost';
           div.style.cursor = 'pointer';
           div.innerHTML = ICONS[p.icon] || '';
-          div.addEventListener('click', function () { window.open(social[p.key], '_blank'); });
+          div.addEventListener('click', function () {
+            const url = resolveSocialUrl(p.key, social[p.key]);
+            if (url) window.open(url, '_blank');
+          });
           strip.appendChild(div);
         });
       });
     }
+  }
+
+  // The Profile wizard's WhatsApp field just says "Link or number" — most studios type
+  // a plain phone number there, not a full wa.me link. Build the real link ourselves so
+  // typing just the number is enough; a pasted-in full link (wa.me or otherwise) still
+  // passes through untouched instead of getting mangled.
+  function resolveSocialUrl(key, value) {
+    if (!value) return '';
+    if (/^https?:\/\//i.test(value)) return value;
+    if (key === 'whatsapp') {
+      const digits = value.replace(/[^0-9]/g, '');
+      return digits ? 'https://wa.me/' + digits : '';
+    }
+    return value;
   }
 
   function startStudioProfileSync() {
