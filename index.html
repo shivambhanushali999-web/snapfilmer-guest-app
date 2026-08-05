@@ -769,7 +769,6 @@
              cut off at the screen edge, easy to miss entirely). -->
         <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
         <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
-        <div class="chip" onclick="openGallery()"><span class="dot"><i data-icon="IMAGE"></i></span>Gallery</div>
         <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
       </div>
 
@@ -1006,7 +1005,7 @@
   <div id="screen-gallery" class="sub-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
-      <h1>Gallery</h1>
+      <h1 id="gallery-title">Gallery</h1>
       <div class="sub-bar-actions">
         <button class="ghost-btn" id="gallery-upload-btn" style="display:none;" onclick="document.getElementById('guest-upload-input').click()" title="Upload Photos"><i data-icon="UPLOAD"></i></button>
         <button class="ghost-btn" style="position:relative;" onclick="openFavorites()" title="My Favorites"><i data-icon="HEART"></i><span class="fav-count-badge" style="display:none;">0</span></button>
@@ -1034,7 +1033,6 @@
           <p id="gallery-pin-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
         </div>
       </div>
-      <div class="album-chip-row" id="gallery-album-chips" style="display:none;"></div>
       <div class="grid2" id="gallery-grid"></div>
     </div>
   </div>
@@ -1394,11 +1392,15 @@
     document.getElementById('screen-' + name).classList.add('active');
     document.getElementById('bottom-nav').style.display = 'none';
     screenStack.push(name);
-    // Only My Photos and Gallery are safe to auto-reopen on reload — they rebuild all
-    // their own data from Firestore/localStorage. Screens like the camera or photo
-    // viewer depend on transient state (a live camera stream, an in-memory photo array)
-    // that can't be reconstructed after a refresh, so those are deliberately not saved.
-    if (name === 'myphotos' || name === 'gallery' || name === 'favorites') {
+    // Only My Photos and Favorites are safe to auto-reopen on reload — they rebuild all
+    // their own data from Firestore/localStorage with no extra state needed. Gallery is
+    // deliberately excluded now: it's always scoped to one specific album, and which
+    // album that was isn't persisted, so "resuming" it after a refresh would show an
+    // ambiguous, unfiltered dump with no chips left to fix it — falling back to Home
+    // instead is more honest. Screens like the camera or photo viewer depend on
+    // transient state (a live camera stream, an in-memory photo array) that can't be
+    // reconstructed after a refresh either, so those are deliberately not saved.
+    if (name === 'myphotos' || name === 'favorites') {
       try { localStorage.setItem('sf_last_subscreen_' + EVENT.id, name); } catch (err) {}
     }
   }
@@ -2323,8 +2325,16 @@
     if (!n) return;
     popScreen();
     if (n.type === 'photo') {
-      openGallery();
-      if (n.meta && n.meta.album) setGalleryAlbumFilter(n.meta.album);
+      // Gallery is always scoped to one real album now (no more unfiltered "All
+      // Photos" fallback) — if this notification covers a single album, jump straight
+      // there; if it's a mixed batch across several albums, send them to Home to pick
+      // the right folder instead of showing an ambiguous, unlabeled dump.
+      if (n.meta && n.meta.album) {
+        openGallery();
+        setGalleryAlbumFilter(n.meta.album);
+      } else {
+        showTab('home');
+      }
     } else if (n.type === 'post') {
       showTab('posts');
     } else if (n.type === 'video') {
@@ -2835,26 +2845,23 @@
   }
 
   // Matches real Kamero: every album/folder the studio creates shows up right on the
-  // Home screen as a large banner card (cover photo + name + photo count), not buried
-  // behind a small chip inside Gallery — tapping one jumps straight into that album's
-  // photos. Falls back to a plain folder icon when the studio hasn't set a cover yet.
-  // "All Photos" and "Unsorted" (mirrors the exact same two special entries the
-  // dashboard's own album sidebar always shows) used to be missing from here entirely
-  // — only named albums got a card, so a guest could only ever reach photos the
-  // photographer had actually filed into a folder. Any photo left Unsorted (often the
-  // majority, before every camera/album gets organized) had no folder card at all and
-  // was only reachable by separately opening Gallery. These two guarantee every single
-  // event photo is reachable from a folder card, same as the dashboard guarantees for
-  // the photographer.
+  // Home screen as a large banner card (cover photo + name + photo count) — tapping one
+  // jumps straight into that album's photos, no chip-switcher, no generic "browse
+  // everything" screen. Falls back to a plain folder icon when the studio hasn't set a
+  // cover yet.
+  // Deliberately only Highlights + real named albums — no "All Photos" or "Unsorted"
+  // catch-all cards. A guest reaches a folder because the photographer actually created
+  // it and filed photos into it, same as Kamero; a photo with no album simply isn't
+  // shown as its own folder here (the fix for that is uploading straight into a real
+  // album on the dashboard, not surfacing an "Unsorted" bucket to guests).
   function renderHomeAlbums() {
     const wrap = document.getElementById('home-albums-wrap');
     if (!wrap) return;
-    if (!eventPhotos.length) {
+    if (!eventAlbums.length && !getHighlightedPhotos().length) {
       wrap.style.display = 'none';
       wrap.innerHTML = '';
       return;
     }
-    const unsortedCount = eventPhotos.filter(function (p) { return !p.album; }).length;
     const highlighted = getHighlightedPhotos();
     let html = '<div class="stories-label" style="padding:4px 0 12px;">Folders</div>';
     // Highlights goes first, same as the dashboard's own Albums sidebar shows it
@@ -2867,20 +2874,6 @@
         '<div class="overlay"></div>' +
         '<div class="name">Highlights</div>' +
         '<div class="count-badge">' + (ICONS.STAR || ICONS.IMAGE || '') + highlighted.length + '</div>' +
-      '</div>';
-    }
-    html += '<div class="home-album-card" data-home-special="all" style="background:linear-gradient(135deg,var(--ink),#514D53);">' +
-        '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>' +
-        '<div class="overlay"></div>' +
-        '<div class="name">All Photos</div>' +
-        '<div class="count-badge">' + (ICONS.IMAGE || '') + eventPhotos.length + '</div>' +
-      '</div>';
-    if (unsortedCount) {
-      html += '<div class="home-album-card" data-home-special="unsorted" style="background:linear-gradient(135deg,#8A8478,#514D53);">' +
-        '<div class="folder-fallback">' + (ICONS.FOLDER || ICONS.IMAGE || '') + '</div>' +
-        '<div class="overlay"></div>' +
-        '<div class="name">Unsorted</div>' +
-        '<div class="count-badge">' + (ICONS.IMAGE || '') + unsortedCount + '</div>' +
       '</div>';
     }
     html += eventAlbums.map(function (a, i) {
@@ -2901,13 +2894,13 @@
     });
     wrap.querySelectorAll('[data-home-special]').forEach(function (card) {
       card.addEventListener('click', function () {
-        const key = card.dataset.homeSpecial;
-        if (key === 'highlights') openRealHighlights();
-        else openHomeAlbum(key === 'unsorted' ? UNSORTED_ALBUM_FILTER : null);
+        if (card.dataset.homeSpecial === 'highlights') openRealHighlights();
       });
     });
   }
 
+  // Always opens Gallery scoped to one real album — there's no "browse everything, pick
+  // via chips" mode anymore, so `name` should always be a real album name here.
   function openHomeAlbum(name) {
     openGallery();
     setGalleryAlbumFilter(name);
@@ -3277,31 +3270,6 @@
   // Gallery = the full/browsable event photo grid. Shown to everyone by default;
   // if the photographer turns on Face-Based Privacy for this event, it locks until
   // a selfie is taken and then only shows the guest's own matched photos.
-  // Folder chips above the grid — "All Photos" plus one per album the photographer set
-  // up in the dashboard (Ceremony, Reception, etc.), so browsing isn't just one giant
-  // unsorted grid, matching how albums work in real Kamero.
-  function renderGalleryAlbumChips() {
-    const wrap = document.getElementById('gallery-album-chips');
-    if (!wrap) return;
-    if (!eventAlbums.length) {
-      wrap.style.display = 'none';
-      wrap.innerHTML = '';
-      return;
-    }
-    wrap.style.display = 'flex';
-    const chips = [{ name: null, label: 'All Photos' }].concat(
-      eventAlbums.map(function (a) { return { name: a.name, label: a.name }; })
-    );
-    wrap.innerHTML = chips.map(function (c) {
-      return '<div class="album-chip' + (galleryAlbumFilter === c.name ? ' active' : '') + '" data-album="' + (c.name || '') + '">' + c.label + '</div>';
-    }).join('');
-    wrap.querySelectorAll('.album-chip').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        setGalleryAlbumFilter(chip.dataset.album || null);
-      });
-    });
-  }
-
   function setGalleryAlbumFilter(name) {
     galleryAlbumFilter = name;
     renderGallery();
@@ -3346,7 +3314,13 @@
     const isPrivate = eventSettings.facePrivacy && !pinUnlocked;
     const needsSelfie = isPrivate && !selfieRawDataUrl;
 
-    renderGalleryAlbumChips();
+    // No more chip-switcher inside Gallery — it's always scoped to whichever real album
+    // it was opened for, so the header just names that album directly (like Kamero
+    // shows "Cam 1" as the screen title, not a generic "Gallery" with a picker inside).
+    const titleEl = document.getElementById('gallery-title');
+    if (titleEl) {
+      titleEl.textContent = (galleryAlbumFilter && galleryAlbumFilter !== UNSORTED_ALBUM_FILTER) ? galleryAlbumFilter : 'Gallery';
+    }
     if (locked) locked.style.display = (needsSelfie && eventPhotos.length > 0) ? 'block' : 'none';
     const pinSection = document.getElementById('gallery-pin-section');
     if (pinSection) pinSection.style.display = eventSettings.pin ? 'block' : 'none';
@@ -4208,7 +4182,6 @@
         if (['home', 'events', 'posts', 'more'].indexOf(lastTab) === -1) lastTab = 'home';
         showTab(lastTab);
         if (lastSub === 'myphotos') openMyPhotos();
-        else if (lastSub === 'gallery') openGallery();
         else if (lastSub === 'favorites') openFavorites();
       })();
     }
