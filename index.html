@@ -1061,11 +1061,14 @@
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1 id="portfolio-title">SnapFilmer</h1>
     </div>
-    <div class="portfolio-body">
-      <div class="chip-row" style="padding:0 0 16px;">
-        <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Watch Videos</div>
+    <div class="portfolio-body" style="padding:0;">
+      <div id="portfolio-banner" style="display:none;position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;background:var(--border);"></div>
+      <div style="padding:16px;">
+        <div class="chip-row" style="padding:0 0 16px;">
+          <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Watch Videos</div>
+        </div>
+        <div class="portfolio-grid" id="portfolio-categories"></div>
       </div>
-      <div class="portfolio-grid" id="portfolio-categories"></div>
     </div>
   </div>
 
@@ -1214,14 +1217,23 @@
       // the studio drags the watermark anywhere on the dashboard's live preview instead
       // of being limited to the 4 fixed corners; stored as a % so it scales to any
       // photo's actual pixel size here.
-      standard: { enabled: true, text: 'SnapFilmer', opacity: 55, position: 'bottom-right', logoMode: 'text', customX: 88, customY: 88 },
-      original: { enabled: false, text: 'SnapFilmer', opacity: 80, position: 'center', logoMode: 'text', customX: 88, customY: 88 },
+      standard: { enabled: true, text: 'SnapFilmer', opacity: 55, position: 'bottom-right', logoMode: 'text', customX: 88, customY: 88, logoScale: 100 },
+      original: { enabled: false, text: 'SnapFilmer', opacity: 80, position: 'center', logoMode: 'text', customX: 88, customY: 88, logoScale: 100 },
       dualLogo: false,
       sponsorLogoUrl: '',
     };
   }
   let eventWatermark = defaultEventWatermark();
   let studioLogoUrl = '';
+  // Studio-wide cover photo (Profile → Photos) — used as the Portfolio screen's own
+  // banner below, since that's the one screen not tied to any specific event.
+  let studioCoverUrl = '';
+  // Portfolio Event ID (Profile → Portfolio) and the real data loaded from it —
+  // replaces the old hardcoded PORTFOLIO_CATS mock entirely once a real event is set.
+  let studioPortfolioEventId = '';
+  let portfolioEvent = null; // { id, name, cover, albums }
+  let portfolioPhotosByAlbum = {};
+  let portfolioLoaded = false;
 
   // Older event docs may still have the pre-real-watermarking flat shape
   // ({ enabled, text, opacity, position, dualLogo }) — normalize either shape into
@@ -1295,13 +1307,9 @@
     { title: '02 Sangeet P1', thumb: 'https://picsum.photos/seed/ov2/500/400' },
   ];
 
-  function makePhotos(prefix, count) {
-    return Array.from({ length: count }).map((_, i) => 'https://picsum.photos/seed/' + prefix + i + '/500/650');
-  }
-  const PORTFOLIO_CATS = [
-    { name: 'WEDDING', count: 26, cover: 'https://picsum.photos/seed/opw/700/500', photos: makePhotos('opw', 26) },
-    { name: 'PREWEDDING', count: 24, cover: 'https://picsum.photos/seed/oppw/700/500', photos: makePhotos('oppw', 24) },
-  ];
+  // Portfolio categories used to be this hardcoded mock (picsum.photos filler, plain
+  // URL strings rather than real photo objects) — replaced by loadPortfolioEventData()/
+  // renderPortfolio() below, which pull the studio's real chosen event's real albums.
 
   // Fallback posts shown only until the studio publishes real ones from the dashboard
   // (Posts page). Once Firestore has any post targeting "all" or this event, these
@@ -1459,8 +1467,11 @@
     openPortfolio();
   }
 
+  let currentHighlightsPhotos = [];
+
   function openHighlights(title, photos) {
     document.getElementById('highlights-title').textContent = title;
+    currentHighlightsPhotos = photos || [];
     renderGrid('highlights-grid', photos);
     pushScreen('highlights');
   }
@@ -1575,7 +1586,7 @@
 
       function drawLogos() {
         if (!hasLogo) return Promise.resolve();
-        const logoSize = Math.round(canvas.width * 0.1);
+        const logoSize = Math.round(canvas.width * 0.1 * ((w.logoScale || 100) / 100));
         logoBoxHeight = logoSize;
         return loadImageEl(studioLogoUrl).then(function (logoImg) {
           const wantsSponsor = eventWatermark.dualLogo && eventWatermark.sponsorLogoUrl;
@@ -1668,7 +1679,11 @@
     const p = viewerPhotos[viewerIndex];
     const src = p && p.dataUrl;
     if (!src) return;
-    triggerDownload(src, 'snapfilmer-photo-' + (viewerIndex + 1) + '.jpg');
+    // Keep the camera's own filename (e.g. "MITU7165.jpg") instead of renaming it to
+    // "snapfilmer-photo-N.jpg" — guests/studio both need the original numbering intact
+    // for their own organization. Only falls back to a generic name for the rare photo
+    // that predates filenames being stored at all.
+    triggerDownload(src, p.filename || ('snapfilmer-photo-' + (viewerIndex + 1) + '.jpg'));
   }
 
   function downloadAllPhotos() {
@@ -1680,7 +1695,7 @@
     }
     toDownload.forEach(function (p, i) {
       // Stagger slightly so the browser doesn't treat rapid-fire downloads as popups.
-      setTimeout(function () { triggerDownload(p.dataUrl, 'snapfilmer-photo-' + (i + 1) + '.jpg'); }, i * 300);
+      setTimeout(function () { triggerDownload(p.dataUrl, p.filename || ('snapfilmer-photo-' + (i + 1) + '.jpg')); }, i * 300);
     });
   }
 
@@ -2012,14 +2027,14 @@
   }
 
   function downloadHighlightsGrid() {
-    const grid = document.getElementById('highlights-grid');
-    if (!grid) return;
-    const imgs = Array.prototype.slice.call(grid.querySelectorAll('img'));
-    if (!imgs.length) { alert('No photos here yet.'); return; }
+    const photos = currentHighlightsPhotos;
+    if (!photos.length) { alert('No photos here yet.'); return; }
     const title = document.getElementById('highlights-title').textContent || 'this album';
-    if (!confirm('Download all ' + imgs.length + ' photos in ' + title + '?')) return;
-    imgs.forEach(function (img, i) {
-      setTimeout(function () { triggerDownload(img.src, 'snapfilmer-' + title.replace(/\s+/g, '-').toLowerCase() + '-' + (i + 1) + '.jpg'); }, i * 300);
+    if (!confirm('Download all ' + photos.length + ' photos in ' + title + '?')) return;
+    photos.forEach(function (p, i) {
+      // Keep the camera's own filename instead of renaming to "snapfilmer-<album>-N.jpg"
+      // — matches the same fix applied to the single-photo and My Photos downloads.
+      setTimeout(function () { triggerDownload(p.dataUrl, p.filename || ('snapfilmer-' + title.replace(/\s+/g, '-').toLowerCase() + '-' + (i + 1) + '.jpg')); }, i * 300);
     });
   }
 
@@ -2394,14 +2409,68 @@
     }).join('');
   }
 
+  // Loads the real Portfolio Event's album list + photos (one-time fetch, not a live
+  // listener — this is a low-frequency discovery screen, not something that needs to
+  // update mid-browse). Only called when the linked event actually changed since the
+  // last load (see applyStudioProfile()).
+  function loadPortfolioEventData() {
+    if (!db || !studioPortfolioEventId) { portfolioLoaded = true; return Promise.resolve(); }
+    const evId = studioPortfolioEventId;
+    return db.collection('events').doc(evId).get().then(function (doc) {
+      if (!doc.exists) { portfolioEvent = null; portfolioLoaded = true; return null; }
+      const d = doc.data();
+      portfolioEvent = { id: evId, name: d.name || '', cover: d.cover || '', albums: Array.isArray(d.albums) ? d.albums : [] };
+      return db.collection('photos').where('eventId', '==', evId).get();
+    }).then(function (snap) {
+      portfolioPhotosByAlbum = {};
+      if (snap) {
+        snap.forEach(function (doc) {
+          const p = Object.assign({ id: doc.id }, doc.data());
+          if (!p.album) return; // Unsorted photos aren't a named showcase category
+          if (!portfolioPhotosByAlbum[p.album]) portfolioPhotosByAlbum[p.album] = [];
+          portfolioPhotosByAlbum[p.album].push(p);
+        });
+      }
+      portfolioLoaded = true;
+    }).catch(function () { portfolioLoaded = true; });
+  }
+
   function renderPortfolio() {
     const wrap = document.getElementById('portfolio-categories');
+    const banner = document.getElementById('portfolio-banner');
+    if (!wrap) return;
+    if (!studioPortfolioEventId) {
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">No portfolio set up yet — ask your studio to pick a Portfolio Event in their dashboard.</div>';
+      if (banner) banner.style.display = 'none';
+      return;
+    }
+    if (!portfolioLoaded) {
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">Loading portfolio...</div>';
+      loadPortfolioEventData().then(renderPortfolio);
+      return;
+    }
+    if (banner) {
+      const coverSrc = studioCoverUrl || (portfolioEvent && portfolioEvent.cover) || '';
+      if (coverSrc) {
+        banner.style.display = 'block';
+        banner.innerHTML = '<img src="' + coverSrc + '" style="width:100%;height:100%;object-fit:cover;display:block;">' +
+          '<span style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.55);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.5px;padding:4px 9px;border-radius:7px;">PORTFOLIO</span>';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
     wrap.innerHTML = '';
-    PORTFOLIO_CATS.forEach(function (c) {
+    const cats = (portfolioEvent && portfolioEvent.albums) || [];
+    if (!cats.length) {
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">This event has no albums yet.</div>';
+      return;
+    }
+    cats.forEach(function (c) {
+      const photos = portfolioPhotosByAlbum[c.name] || [];
       const card = document.createElement('div');
       card.className = 'cat-card';
-      card.innerHTML = '<img src="' + c.cover + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + c.count + ' photos</div></div>';
-      card.addEventListener('click', function () { openHighlights(c.name, c.photos); });
+      card.innerHTML = '<img src="' + (c.cover || (photos[0] && photos[0].dataUrl) || '') + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + photos.length + ' photos</div></div>';
+      card.addEventListener('click', function () { openHighlights(c.name, photos); });
       wrap.appendChild(card);
     });
   }
@@ -2768,6 +2837,20 @@
       studioLogoUrl = profile.logoUrl || '';
       renderGallery();
       renderMyPhotosResults();
+    }
+
+    if (profile.coverUrl !== undefined) studioCoverUrl = profile.coverUrl || '';
+
+    // Portfolio used to be 2 hardcoded categories full of picsum.photos filler — this
+    // is the real thing: whichever event the studio picks as their "Portfolio Event" in
+    // Profile → Portfolio, its actual albums/photos become the categories shown here.
+    // Only reload if the studio actually changed which event is linked (not on every
+    // unrelated profile field edit).
+    if (profile.portfolioEventId !== undefined && profile.portfolioEventId !== studioPortfolioEventId) {
+      studioPortfolioEventId = profile.portfolioEventId || '';
+      portfolioLoaded = false;
+      portfolioEvent = null;
+      portfolioPhotosByAlbum = {};
     }
 
     // The exact same profile now renders in two places — the Home tab's studio card and
@@ -3221,9 +3304,15 @@
     if (!hasLogo && !hasText) return '';
     let inner = '';
     if (hasLogo) {
-      inner += '<img class="wm-logo" src="' + studioLogoUrl + '">';
+      // Logo Size (dashboard slider, 50-250%) scales the logo up/down from the base
+      // size the sizeClass already sets (18px normal / 32px in the big lightbox
+      // overlay) — a CSS transform instead of a width/height override so it doesn't
+      // fight the base .wm-logo rule and stays crisp at any scale.
+      const logoScalePct = (w.logoScale || 100) / 100;
+      const logoStyle = logoScalePct !== 1 ? ' style="transform:scale(' + logoScalePct + ');"' : '';
+      inner += '<img class="wm-logo" src="' + studioLogoUrl + '"' + logoStyle + '>';
       if (eventWatermark.dualLogo && eventWatermark.sponsorLogoUrl) {
-        inner += '<img class="wm-logo" src="' + eventWatermark.sponsorLogoUrl + '">';
+        inner += '<img class="wm-logo" src="' + eventWatermark.sponsorLogoUrl + '"' + logoStyle + '>';
       }
     }
     if (hasText) inner += '<span class="wm-text">' + escWm(w.text) + '</span>';
