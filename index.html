@@ -1208,8 +1208,12 @@
   // into the real file bytes when a photo is downloaded (see compositeForDownload()).
   function defaultEventWatermark() {
     return {
-      standard: { enabled: true, text: 'SnapFilmer', opacity: 55, position: 'bottom-right', logoMode: 'text' },
-      original: { enabled: false, text: 'SnapFilmer', opacity: 80, position: 'center', logoMode: 'text' },
+      // customX/customY: percentage placement used only when position === 'custom' —
+      // the studio drags the watermark anywhere on the dashboard's live preview instead
+      // of being limited to the 4 fixed corners; stored as a % so it scales to any
+      // photo's actual pixel size here.
+      standard: { enabled: true, text: 'SnapFilmer', opacity: 55, position: 'bottom-right', logoMode: 'text', customX: 88, customY: 88 },
+      original: { enabled: false, text: 'SnapFilmer', opacity: 80, position: 'center', logoMode: 'text', customX: 88, customY: 88 },
       dualLogo: false,
       sponsorLogoUrl: '',
     };
@@ -1552,6 +1556,16 @@
         const shift = yShift || 0;
         if (w.position === 'center') return { x: (canvas.width - boxW) / 2, y: (canvas.height - boxH) / 2 - shift };
         if (w.position === 'bottom-left') return { x: pad, y: canvas.height - boxH - pad - shift };
+        if (w.position === 'custom') {
+          // customX/customY are a % of the photo's own width/height (set by dragging on
+          // the dashboard's live preview) — the box is centered on that point, then
+          // clamped so it can never bake in partly off-canvas.
+          const cx = Math.max(0, Math.min(100, w.customX != null ? w.customX : 88)) / 100 * canvas.width;
+          const cy = Math.max(0, Math.min(100, w.customY != null ? w.customY : 88)) / 100 * canvas.height;
+          const x = Math.max(pad, Math.min(canvas.width - boxW - pad, cx - boxW / 2));
+          const y = Math.max(pad, Math.min(canvas.height - boxH - pad, cy - boxH / 2 - shift));
+          return { x: x, y: y };
+        }
         return { x: canvas.width - boxW - pad, y: canvas.height - boxH - pad - shift };
       }
 
@@ -3201,7 +3215,6 @@
     const hasLogo = (w.logoMode === 'logo' || w.logoMode === 'both') && studioLogoUrl;
     const hasText = w.logoMode !== 'logo' && w.text;
     if (!hasLogo && !hasText) return '';
-    const posClass = 'wm-pos-' + (w.position || 'bottom-right');
     let inner = '';
     if (hasLogo) {
       inner += '<img class="wm-logo" src="' + studioLogoUrl + '">';
@@ -3211,7 +3224,15 @@
     }
     if (hasText) inner += '<span class="wm-text">' + escWm(w.text) + '</span>';
     const opacity = Math.max(0, Math.min(100, w.opacity)) / 100;
-    return '<div class="wm-overlay ' + posClass + (sizeClass ? ' ' + sizeClass : '') + '" style="opacity:' + opacity + ';">' + inner + '</div>';
+    // 'custom' is a free-drag placement set on the dashboard's live preview (stored as
+    // a % of the photo's width/height) instead of one of the 4 fixed corners — placed
+    // here with an inline centered-on-point style rather than a wm-pos-* class, since
+    // the exact spot varies per studio instead of being one of 4 known positions.
+    const posAttr = w.position === 'custom'
+      ? 'left:' + Math.max(0, Math.min(100, w.customX != null ? w.customX : 88)) + '%;top:' + Math.max(0, Math.min(100, w.customY != null ? w.customY : 88)) + '%;transform:translate(-50%,-50%);'
+      : '';
+    const posClass = w.position === 'custom' ? '' : ' wm-pos-' + (w.position || 'bottom-right');
+    return '<div class="wm-overlay' + posClass + (sizeClass ? ' ' + sizeClass : '') + '" style="opacity:' + opacity + ';' + posAttr + '">' + inner + '</div>';
   }
 
   function renderPhotoGrid(gridId, photos) {
