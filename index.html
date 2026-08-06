@@ -16,6 +16,21 @@
      see the page jump into a zoomed-in state at all. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>SnapFilmer</title>
+<!-- PWA install support — manifest.json/icons/sw.js must sit next to this file at the
+     repo root on GitHub/Vercel (uploaded alongside index.html). On Android, Chrome shows
+     an "Install app"/"Add to Home Screen" prompt once these are present + served over
+     HTTPS; installed, it opens with its own icon and no browser address bar, same as any
+     other app on the phone — this is the real, working substitute for a native .apk here
+     (see the code comment on the service worker registration below for why a literal
+     signed .apk can't be produced from this project). -->
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#4B5D3A" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="SnapFilmer" />
 <!-- Real in-browser AI face detection/recognition, used by the My Photos test panel -->
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <!-- Firebase (Firestore + Auth) — persists photos and handles real login -->
@@ -872,16 +887,32 @@
         <div class="stories-label" style="padding:20px 0 10px;">Interested in booking us?</div>
         <div style="border:1px solid var(--border);border-radius:0;padding:16px;">
           <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Loved what you see? Send us an enquiry and we'll get back to you.</p>
-          <div style="margin-bottom:10px;"><input id="enq-name" placeholder="Your Name" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
-          <div style="margin-bottom:10px;"><input id="enq-email" placeholder="Email" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
-          <div style="margin-bottom:10px;"><input id="enq-phone" placeholder="Phone (optional)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
-          <div style="margin-bottom:12px;"><textarea id="enq-message" placeholder="Tell us about your event..." rows="3" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;resize:vertical;"></textarea></div>
-          <button class="btn-solid-sm" onclick="submitEnquiry()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
-          <p id="enq-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
+          <button class="btn-solid-sm" onclick="openEnquiryModal()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
         </div>
       </div>
 
       <div style="height:10px;"></div>
+    </div>
+  </div>
+
+  <!-- ========== ENQUIRY MODAL ==========
+       Opened by the "Send Enquiry" button above (openEnquiryModal). Previously the whole
+       name/email/phone/message form sat inline on Home permanently, eating space even for
+       guests who never intended to fill it — now Home just shows the button, and the form
+       itself only exists once the guest actually asks to send one. -->
+  <div id="enquiry-modal" class="gate-overlay" style="display:none;z-index:1200;background:rgba(20,17,15,.55);align-items:flex-end;justify-content:center;">
+    <div style="width:100%;max-width:420px;background:var(--bg);border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));box-sizing:border-box;max-height:88vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h2 style="margin:0;font-size:16px;">Interested in booking us?</h2>
+        <button class="glass-btn" onclick="closeEnquiryModal()" style="background:var(--accent-soft);color:var(--ink);width:32px;height:32px;"><i data-icon="CLOSE_X"></i></button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">Loved what you see? Send us an enquiry and we'll get back to you.</p>
+      <div style="margin-bottom:10px;"><input id="enq-name" placeholder="Your Name" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
+      <div style="margin-bottom:10px;"><input id="enq-email" placeholder="Email" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
+      <div style="margin-bottom:10px;"><input id="enq-phone" placeholder="Phone (optional)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;"></div>
+      <div style="margin-bottom:12px;"><textarea id="enq-message" placeholder="Tell us about your event..." rows="3" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;resize:vertical;"></textarea></div>
+      <button class="btn-solid-sm" id="enq-submit-btn" onclick="submitEnquiry()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:12px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
+      <p id="enq-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
     </div>
   </div>
 
@@ -1211,7 +1242,6 @@
     BELL: icon('<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
     PLAY_SM: icon('<path d="M8 5v14l11-7z"/>'),
     PAUSE_SM: icon('<path d="M7 4h3v16H7zM14 4h3v16h-3z"/>'),
-    EXPAND: icon('<path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/>'),
     SPARKLE: icon('<path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
     STAR: icon('<path d="M12 2l3.1 6.3 7 1-5 5 1.2 6.9L12 18l-6.3 3.2L7 14.3l-5-5 7-1z"/>'),
     SHARE: icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/>'),
@@ -1316,6 +1346,12 @@
   const deepLinkAlbum = DEEP_LINK_PARAMS.get('album');
   const deepLinkPin = DEEP_LINK_PARAMS.get('pin');
   const deepLinkPrefillId = DEEP_LINK_PARAMS.get('prefill');
+  // Set by vpShare() below (Video screen's own Share button) — jumps straight into
+  // that specific video's player instead of just opening the event, same idea as
+  // ?album= above. Applied once eventVideos actually loads (see
+  // startEventSettingsSync), not here, since videos aren't known yet this early.
+  const deepLinkVideo = DEEP_LINK_PARAMS.get('video');
+  let deepLinkVideoOpened = false;
 
   // Which event to load: the link/QR's ?event=<id> wins, otherwise fall back to the
   // last event this guest actually opened on this device (so a bookmarked bare URL
@@ -2547,7 +2583,6 @@
         '<button class="vp-play-btn" id="vp-playpause" onclick="vpTogglePlay()">' + ICONS.PAUSE_SM + '</button>' +
         '<button class="vp-seek-btn" onclick="vpSeekBy(10)" title="Forward 10s">+10</button>' +
         '<button onclick="vpShare()" title="Share">' + ICONS.SHARE + '</button>' +
-        '<button onclick="vpToggleFullscreen()" title="Fullscreen">' + ICONS.EXPAND + '</button>' +
       '</div>' +
     '</div>';
   }
@@ -2685,29 +2720,26 @@
     if (!currentPlayingVideo) return;
     // Same fix as shareStudioProfile()/sendDownloadAllEmail() — share the real running
     // URL (this app has no hardcoded GUEST_APP_URL of its own), not youtube.com/vimeo.com.
-    const url = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(EVENT.id);
+    // &video=<name> makes this a real deep link — opening it jumps straight into this
+    // specific video's player (see the deepLinkVideo handling in startEventSettingsSync)
+    // instead of just landing on the event like a bare ?event= link would.
+    const url = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(EVENT.id) + '&video=' + encodeURIComponent(currentPlayingVideo.name || '');
     shareLinkOrCopy(url, (currentPlayingVideo.name || 'A video') + ' from ' + EVENT.name);
   }
 
-  // The Fullscreen API only expands whatever element it's called on to cover the true
-  // OS-level display, hiding the browser's own tabs/address bar — CSS position:fixed
-  // (used above so the player already fills the page's own viewport) can't do that on
-  // its own, that's a genuinely different thing. Targets this screen itself (not just
-  // the video) so the exit button/back button stay usable while fullscreen.
-  function vpToggleFullscreen() {
-    vpShowControls();
-    const el = document.getElementById('screen-video-player');
-    if (!el) return;
-    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-    if (fsEl) {
-      if (document.exitFullscreen) document.exitFullscreen().catch(function () {});
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    } else if (el.requestFullscreen) {
-      el.requestFullscreen().catch(function () {});
-    } else if (el.webkitRequestFullscreen) {
-      el.webkitRequestFullscreen();
-    }
-  }
+  // A "make it truly fullscreen" button (hiding Safari's own address bar/tabs, not
+  // just filling our own page) was tried twice via the standard Fullscreen API on
+  // #screen-video-player, and confirmed on real iOS devices both times to silently do
+  // nothing. That's not a bug in this code — iOS Safari has never supported
+  // Element.requestFullscreen() for arbitrary elements/iframes, only for a native
+  // <video> tag via the older webkitEnterFullscreen(), which isn't reachable here since
+  // the actual <video> lives inside YouTube/Vimeo's cross-origin iframe, completely
+  // inaccessible to this page's JS. There's no reliable web-API workaround for that on
+  // iOS specifically (desktop Safari/Chrome/Firefox don't have this restriction — it's
+  // an iOS-only platform limitation). The one thing that WOULD reliably work is
+  // self-hosting video files (uploaded like photos, played via our own <video> tag)
+  // instead of linking to YouTube/Vimeo — that path is left deliberately unbuilt for
+  // now rather than adding a button that can't actually deliver on it.
 
   function vpTeardown() {
     vpStopPolling();
@@ -2992,6 +3024,22 @@
     db = null;
     auth = null;
   }
+
+  // Registers sw.js (see that file for why it's deliberately non-caching) purely so
+  // Android Chrome recognizes this as an installable PWA — combined with the
+  // manifest.json link + icons in <head>, this is what makes "Install app"/"Add to
+  // Home Screen" show up, giving a real app icon + no-browser-chrome window on the
+  // guest's phone. Guarded + wrapped so it's a silent no-op on browsers/contexts that
+  // don't support it (e.g. the dashboard's iframe preview, or plain http in dev).
+  try {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (err) {
+          console.warn('Service worker registration failed (PWA install may be unavailable):', err);
+        });
+      });
+    }
+  } catch (err) {}
 
   // Guests are never forced to log in — like real Kamero, browsing/selfie-matching works
   // instantly via a silent anonymous Firebase session (still satisfies the Firestore
@@ -3345,6 +3393,19 @@
       eventAlbums = Array.isArray(d.albums) ? d.albums : [];
       eventVideos = Array.isArray(d.videos) ? d.videos : [];
       renderVideos();
+      // ?video=<name> deep link (from a video's own Share button, see vpShare) — jump
+      // straight into that video's player instead of just opening the event. Only fires
+      // once (deepLinkVideoOpened guard) since this listener re-fires on every Firestore
+      // update, and only once eventVideos has actually loaded from the cloud.
+      if (deepLinkVideo && !deepLinkVideoOpened && eventVideos.length) {
+        const dlvIdx = eventVideos.findIndex(function (v) {
+          return (v.name || '').trim().toLowerCase() === deepLinkVideo.trim().toLowerCase();
+        });
+        if (dlvIdx !== -1) {
+          deepLinkVideoOpened = true;
+          playEventVideo(dlvIdx);
+        }
+      }
       // If an album the guest had filtered by got deleted from the dashboard, fall back
       // to "All Photos" instead of silently showing an empty grid forever. The
       // Unsorted sentinel isn't a real album name, so it's deliberately exempt from
@@ -4008,6 +4069,22 @@
     }
   }
 
+  // Home only shows a "Send Enquiry" button; the actual name/email/phone/message form
+  // lives in this modal and is opened on demand instead of sitting inline permanently.
+  function openEnquiryModal() {
+    const modal = document.getElementById('enquiry-modal');
+    if (!modal) return;
+    const msg = document.getElementById('enq-msg');
+    if (msg) msg.style.display = 'none';
+    modal.style.display = 'flex';
+    fillIcons();
+  }
+
+  function closeEnquiryModal() {
+    const modal = document.getElementById('enquiry-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
   // Saves to a Firestore "enquiries" collection the studio can review — this is what
   // actually turns the dashboard's "Enquiry / Lead Capture Form" toggle into a real,
   // working form on the guest side, instead of a setting with nothing behind it.
@@ -4040,6 +4117,8 @@
       if (emailEl) emailEl.value = '';
       if (phoneEl) phoneEl.value = '';
       if (msgEl) msgEl.value = '';
+      // Let the guest actually read the confirmation before the sheet closes itself.
+      setTimeout(closeEnquiryModal, 1400);
     }).catch(function () {
       if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Something went wrong — please try again.'; statusEl.style.display = 'block'; }
     });
