@@ -419,6 +419,18 @@
   .camera-fallback .btn-solid { width: auto; display: inline-flex; }
   .camera-bottom { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; z-index: 5; }
 
+  /* ---- In-app video player ---- */
+  /* No fixed aspect-ratio on purpose — YouTube/Vimeo's own embedded player letterboxes
+     or pillarboxes internally to fit whatever box it's given, so simply filling the
+     stage works correctly for both horizontal and vertical (Shorts-style) videos
+     without needing to know the real dimensions ahead of time. */
+  .video-player-screen { background: #000; }
+  .video-player-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; gap: 10px; background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent); }
+  .video-player-title { color: #fff; font-weight: 700; font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
+  .video-player-stage { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+  .video-player-stage iframe, .video-player-stage video { width: 100%; height: 100%; border: none; display: block; }
+  .video-player-stage video { object-fit: contain; background: #000; }
+
   /* ---- QR scanner (Event Gate) — independent of the selfie camera screen above:
        no login/face-recognition gating, back camera by default, runs before an event
        is even resolved. ---- */
@@ -1150,6 +1162,14 @@
     <div class="camera-bottom" id="camera-controls">
       <button class="shutter-btn" onclick="capturePhoto()"></button>
     </div>
+  </div>
+
+  <div id="screen-video-player" class="sub-screen video-player-screen">
+    <div class="video-player-top">
+      <button class="glass-btn" onclick="closeVideoPlayer()"><i data-icon="BACK"></i></button>
+      <h1 class="video-player-title" id="video-player-title">Video</h1>
+    </div>
+    <div class="video-player-stage" id="video-player-stage"></div>
   </div>
 
 </div>
@@ -2410,16 +2430,62 @@
       wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">No videos added yet — your studio hasn\'t added any videos to this event.</div>';
       return;
     }
-    wrap.innerHTML = eventVideos.map(function (v) {
+    wrap.innerHTML = eventVideos.map(function (v, i) {
       const thumb = youtubeThumbnailUrl(v.link);
-      const safeLink = (v.link || '').replace(/'/g, '&#39;');
-      return '<div class="video-tile" onclick="window.open(\'' + safeLink + '\', \'_blank\')">' +
+      return '<div class="video-tile" onclick="playEventVideo(' + i + ')">' +
         (thumb
           ? '<img src="' + thumb + '">'
           : '<div style="width:100%;height:130px;background:#EAE6DA;display:flex;align-items:center;justify-content:center;color:var(--accent);">' + ICONS.PLAY_SM + '</div>') +
         '<div class="pill-play">' + ICONS.PLAY_SM.replace('width="19" height="19"', 'width="16" height="16"') + '</div>' +
         '<div class="cap">' + (v.name || 'Video') + '</div></div>';
     }).join('');
+  }
+
+  // Recognizes YouTube/Vimeo links well enough to build their standard embed URL, so
+  // the video plays inline in the app's own player instead of bouncing the guest out
+  // to YouTube/Vimeo's site. Both players letterbox/pillarbox internally to fit
+  // whatever box they're given, so this works for horizontal and vertical (Shorts)
+  // video without needing to know the real dimensions up front — and both come with
+  // their own native seek bar, so fast-forwarding "just works" without extra code.
+  function parseVideoEmbed(link) {
+    if (!link) return null;
+    const l = String(link).trim();
+    let m = l.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/);
+    if (m) return { type: 'youtube', id: m[1] };
+    m = l.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{6,})/);
+    if (m) return { type: 'youtube', id: m[1] };
+    m = l.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+    if (m) return { type: 'vimeo', id: m[1] };
+    if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(l)) return { type: 'file', url: l };
+    return { type: 'unknown', url: l };
+  }
+
+  function playEventVideo(index) {
+    const v = eventVideos[index];
+    if (!v || !v.link) return;
+    const stage = document.getElementById('video-player-stage');
+    const titleEl = document.getElementById('video-player-title');
+    if (!stage) return;
+    if (titleEl) titleEl.textContent = v.name || 'Video';
+    const info = parseVideoEmbed(v.link);
+    if (info.type === 'youtube') {
+      stage.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+    } else if (info.type === 'vimeo') {
+      stage.innerHTML = '<iframe src="https://player.vimeo.com/video/' + info.id + '?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+    } else {
+      // Direct video file, or an unrecognized host — a native <video> tag at least
+      // tries to play it inline with the browser's own controls (which include
+      // seeking/fast-forward); if the URL genuinely isn't playable the browser shows
+      // its own inline error instead of this silently doing nothing.
+      stage.innerHTML = '<video src="' + info.url + '" controls autoplay playsinline></video>';
+    }
+    pushScreen('video-player');
+  }
+
+  function closeVideoPlayer() {
+    const stage = document.getElementById('video-player-stage');
+    if (stage) stage.innerHTML = ''; // stops playback/audio immediately, not just visually
+    popScreen();
   }
 
   // Loads the real Portfolio Event's album list + photos (one-time fetch, not a live
