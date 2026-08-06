@@ -427,9 +427,23 @@
   .video-player-screen { background: #000; }
   .video-player-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; gap: 10px; background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent); }
   .video-player-title { color: #fff; font-weight: 700; font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
-  .video-player-stage { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+  .video-player-stage { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; position: relative; }
   .video-player-stage iframe, .video-player-stage video { width: 100%; height: 100%; border: none; display: block; }
   .video-player-stage video { object-fit: contain; background: #000; }
+  .vp-mount { width: 100%; height: 100%; }
+  /* Our own minimal control bar drawn over the YouTube/Vimeo embed (which itself runs
+     with controls=0/false) — nothing here can navigate away to youtube.com/vimeo.com,
+     unlike each platform's own default player chrome. */
+  .vp-controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 14px 18px; background: linear-gradient(to top, rgba(0,0,0,.8), transparent); z-index: 6; }
+  .vp-progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .vp-progress-row span { color: #fff; font-size: 11px; font-weight: 700; min-width: 32px; text-align: center; }
+  .vp-seek { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,.3); outline: none; margin: 0; }
+  .vp-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #fff; cursor: pointer; }
+  .vp-seek::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #fff; border: none; cursor: pointer; }
+  .vp-btn-row { display: flex; align-items: center; justify-content: center; gap: 22px; }
+  .vp-btn-row button { background: none; border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 6px; }
+  .vp-btn-row .vp-seek-btn { font-size: 12px; font-weight: 800; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.12); }
+  .vp-btn-row .vp-play-btn { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.2); }
 
   /* ---- QR scanner (Event Gate) — independent of the selfie camera screen above:
        no login/face-recognition gating, back camera by default, runs before an event
@@ -1182,6 +1196,8 @@
   const ICONS = {
     BELL: icon('<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
     PLAY_SM: icon('<path d="M8 5v14l11-7z"/>'),
+    PAUSE_SM: icon('<path d="M7 4h3v16H7zM14 4h3v16h-3z"/>'),
+    EXPAND: icon('<path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/>'),
     SPARKLE: icon('<path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
     STAR: icon('<path d="M12 2l3.1 6.3 7 1-5 5 1.2 6.9L12 18l-6.3 3.2L7 14.3l-5-5 7-1z"/>'),
     SHARE: icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/>'),
@@ -2441,12 +2457,9 @@
     }).join('');
   }
 
-  // Recognizes YouTube/Vimeo links well enough to build their standard embed URL, so
+  // Recognizes YouTube/Vimeo links well enough to build their standard embed target, so
   // the video plays inline in the app's own player instead of bouncing the guest out
-  // to YouTube/Vimeo's site. Both players letterbox/pillarbox internally to fit
-  // whatever box they're given, so this works for horizontal and vertical (Shorts)
-  // video without needing to know the real dimensions up front — and both come with
-  // their own native seek bar, so fast-forwarding "just works" without extra code.
+  // to YouTube/Vimeo's site.
   function parseVideoEmbed(link) {
     if (!link) return null;
     const l = String(link).trim();
@@ -2460,29 +2473,233 @@
     return { type: 'unknown', url: l };
   }
 
+  // YouTube's/Vimeo's own embedded player UI (title/channel overlay, their share
+  // button, the platform logo) all link straight out to youtube.com/vimeo.com — that's
+  // what was happening before. Loading each platform's JS Player API and requesting
+  // controls=0/false hides all of that, and this custom bar (play/pause, ±10s seek,
+  // scrub, our own Share, fullscreen) replaces it with something that can't navigate
+  // the guest anywhere outside the app. Both platforms' embeds letterbox/pillarbox
+  // internally to fit whatever box they're given, so this same setup already works for
+  // horizontal and vertical (Shorts-style) video without extra handling.
+  let ytApiLoadPromise = null;
+  function loadYouTubeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (ytApiLoadPromise) return ytApiLoadPromise;
+    ytApiLoadPromise = new Promise(function (resolve) {
+      const prevReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () { if (prevReady) prevReady(); resolve(); };
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    });
+    return ytApiLoadPromise;
+  }
+
+  let vimeoApiLoadPromise = null;
+  function loadVimeoApi() {
+    if (window.Vimeo && window.Vimeo.Player) return Promise.resolve();
+    if (vimeoApiLoadPromise) return vimeoApiLoadPromise;
+    vimeoApiLoadPromise = new Promise(function (resolve, reject) {
+      const tag = document.createElement('script');
+      tag.src = 'https://player.vimeo.com/api/player.js';
+      tag.onload = function () { resolve(); };
+      tag.onerror = reject;
+      document.head.appendChild(tag);
+    });
+    return vimeoApiLoadPromise;
+  }
+
+  let activeVideoPlayer = null; // { type: 'youtube'|'vimeo'|'file', api }
+  let currentPlayingVideo = null;
+  let vpPollTimer = null;
+  let vpSeeking = false;
+
+  function formatVideoTime(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function vpControlsHtml() {
+    return '<div class="vp-controls">' +
+      '<div class="vp-progress-row">' +
+        '<span id="vp-time-current">0:00</span>' +
+        '<input type="range" class="vp-seek" id="vp-seek" min="0" max="100" value="0" step="0.1">' +
+        '<span id="vp-time-duration">0:00</span>' +
+      '</div>' +
+      '<div class="vp-btn-row">' +
+        '<button class="vp-seek-btn" onclick="vpSeekBy(-10)" title="Rewind 10s">-10</button>' +
+        '<button class="vp-play-btn" id="vp-playpause" onclick="vpTogglePlay()">' + ICONS.PAUSE_SM + '</button>' +
+        '<button class="vp-seek-btn" onclick="vpSeekBy(10)" title="Forward 10s">+10</button>' +
+        '<button onclick="vpShare()" title="Share">' + ICONS.SHARE + '</button>' +
+        '<button onclick="vpToggleFullscreen()" title="Fullscreen">' + ICONS.EXPAND + '</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function wireVpControls() {
+    const seek = document.getElementById('vp-seek');
+    if (!seek) return;
+    seek.addEventListener('input', function () {
+      // Visual-only while dragging (updates the time label as the thumb moves) — the
+      // actual seek happens on release below, so scrubbing doesn't spam seek calls.
+      vpSeeking = true;
+    });
+    seek.addEventListener('change', function () {
+      const pct = Number(seek.value) / 100;
+      if (activeVideoPlayer && activeVideoPlayer.type === 'youtube') {
+        vpSeekTo(pct * activeVideoPlayer.api.getDuration());
+      } else if (activeVideoPlayer && activeVideoPlayer.type === 'vimeo') {
+        activeVideoPlayer.api.getDuration().then(function (dur) { vpSeekTo(pct * dur); }).catch(function () {});
+      }
+      vpSeeking = false;
+    });
+  }
+
+  function vpSetPlayIcon(isPlaying) {
+    const btn = document.getElementById('vp-playpause');
+    if (btn) btn.innerHTML = isPlaying ? ICONS.PAUSE_SM : ICONS.PLAY_SM;
+  }
+
+  function vpUpdateProgress(cur, dur) {
+    const curEl = document.getElementById('vp-time-current');
+    const durEl = document.getElementById('vp-time-duration');
+    const seek = document.getElementById('vp-seek');
+    if (curEl) curEl.textContent = formatVideoTime(cur);
+    if (durEl) durEl.textContent = formatVideoTime(dur);
+    if (seek && dur) seek.value = (cur / dur) * 100;
+  }
+
+  function vpStartPolling() {
+    clearInterval(vpPollTimer);
+    // Neither Player API pushes continuous time updates on its own, so this polls
+    // twice a second to keep the scrub bar honest — paused whenever the guest is
+    // actively dragging the thumb (vpSeeking) so it can't fight their own input.
+    vpPollTimer = setInterval(function () {
+      if (!activeVideoPlayer || vpSeeking) return;
+      if (activeVideoPlayer.type === 'youtube') {
+        vpUpdateProgress(activeVideoPlayer.api.getCurrentTime(), activeVideoPlayer.api.getDuration());
+      } else if (activeVideoPlayer.type === 'vimeo') {
+        Promise.all([activeVideoPlayer.api.getCurrentTime(), activeVideoPlayer.api.getDuration()])
+          .then(function (r) { vpUpdateProgress(r[0], r[1]); }).catch(function () {});
+      }
+    }, 500);
+  }
+
+  function vpStopPolling() {
+    clearInterval(vpPollTimer);
+    vpPollTimer = null;
+  }
+
+  function vpSeekTo(seconds) {
+    if (!activeVideoPlayer) return;
+    if (activeVideoPlayer.type === 'youtube') activeVideoPlayer.api.seekTo(seconds, true);
+    else if (activeVideoPlayer.type === 'vimeo') activeVideoPlayer.api.setCurrentTime(seconds).catch(function () {});
+  }
+
+  function vpSeekBy(delta) {
+    if (!activeVideoPlayer) return;
+    if (activeVideoPlayer.type === 'youtube') {
+      activeVideoPlayer.api.seekTo(Math.max(0, activeVideoPlayer.api.getCurrentTime() + delta), true);
+    } else if (activeVideoPlayer.type === 'vimeo') {
+      activeVideoPlayer.api.getCurrentTime().then(function (cur) {
+        return activeVideoPlayer.api.setCurrentTime(Math.max(0, cur + delta));
+      }).catch(function () {});
+    }
+  }
+
+  function vpTogglePlay() {
+    if (!activeVideoPlayer) return;
+    if (activeVideoPlayer.type === 'youtube') {
+      const state = activeVideoPlayer.api.getPlayerState();
+      if (state === 1) activeVideoPlayer.api.pauseVideo(); else activeVideoPlayer.api.playVideo();
+    } else if (activeVideoPlayer.type === 'vimeo') {
+      activeVideoPlayer.api.getPaused().then(function (paused) {
+        return paused ? activeVideoPlayer.api.play() : activeVideoPlayer.api.pause();
+      }).catch(function () {});
+    }
+  }
+
+  // Shares the real running SnapFilmer gallery link (with the video's name in the
+  // share title) instead of anything pointing at youtube.com/vimeo.com — reuses the
+  // same native-share-sheet-or-copy helper already used for photo/profile sharing.
+  function vpShare() {
+    if (!currentPlayingVideo) return;
+    // Same fix as shareStudioProfile()/sendDownloadAllEmail() — share the real running
+    // URL (this app has no hardcoded GUEST_APP_URL of its own), not youtube.com/vimeo.com.
+    const url = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(EVENT.id);
+    shareLinkOrCopy(url, (currentPlayingVideo.name || 'A video') + ' from ' + EVENT.name);
+  }
+
+  function vpToggleFullscreen() {
+    const stage = document.getElementById('video-player-stage');
+    if (!stage) return;
+    if (document.fullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen();
+    } else if (stage.requestFullscreen) {
+      stage.requestFullscreen().catch(function () {});
+    }
+  }
+
+  function vpTeardown() {
+    vpStopPolling();
+    if (activeVideoPlayer) {
+      try {
+        if ((activeVideoPlayer.type === 'youtube' || activeVideoPlayer.type === 'vimeo') && activeVideoPlayer.api.destroy) {
+          activeVideoPlayer.api.destroy();
+        }
+      } catch (err) {}
+    }
+    activeVideoPlayer = null;
+    currentPlayingVideo = null;
+  }
+
   function playEventVideo(index) {
     const v = eventVideos[index];
     if (!v || !v.link) return;
     const stage = document.getElementById('video-player-stage');
     const titleEl = document.getElementById('video-player-title');
     if (!stage) return;
+    vpTeardown();
+    currentPlayingVideo = v;
     if (titleEl) titleEl.textContent = v.name || 'Video';
     const info = parseVideoEmbed(v.link);
     if (info.type === 'youtube') {
-      stage.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+      stage.innerHTML = '<div class="vp-mount" id="vp-mount"></div>' + vpControlsHtml();
+      wireVpControls();
+      loadYouTubeApi().then(function () {
+        activeVideoPlayer = { type: 'youtube', api: new YT.Player('vp-mount', {
+          videoId: info.id,
+          playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, playsinline: 1, fs: 0, disablekb: 1, iv_load_policy: 3 },
+          events: {
+            onReady: function (e) { e.target.playVideo(); vpStartPolling(); },
+            onStateChange: function (e) { vpSetPlayIcon(e.data === 1); },
+          },
+        }) };
+      });
     } else if (info.type === 'vimeo') {
-      stage.innerHTML = '<iframe src="https://player.vimeo.com/video/' + info.id + '?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+      stage.innerHTML = '<div class="vp-mount" id="vp-mount"></div>' + vpControlsHtml();
+      wireVpControls();
+      loadVimeoApi().then(function () {
+        const player = new Vimeo.Player('vp-mount', { id: info.id, autoplay: true, controls: false, playsinline: true });
+        activeVideoPlayer = { type: 'vimeo', api: player };
+        player.on('play', function () { vpSetPlayIcon(true); });
+        player.on('pause', function () { vpSetPlayIcon(false); });
+        vpStartPolling();
+      });
     } else {
-      // Direct video file, or an unrecognized host — a native <video> tag at least
-      // tries to play it inline with the browser's own controls (which include
-      // seeking/fast-forward); if the URL genuinely isn't playable the browser shows
-      // its own inline error instead of this silently doing nothing.
+      // Direct video file, or an unrecognized host — a native <video controls> tag
+      // has its own working seek/fast-forward/fullscreen and no outside-linking
+      // branding problem, so no custom control bar is needed for this case.
       stage.innerHTML = '<video src="' + info.url + '" controls autoplay playsinline></video>';
+      activeVideoPlayer = { type: 'file', api: stage.querySelector('video') };
     }
     pushScreen('video-player');
   }
 
   function closeVideoPlayer() {
+    vpTeardown();
     const stage = document.getElementById('video-player-stage');
     if (stage) stage.innerHTML = ''; // stops playback/audio immediately, not just visually
     popScreen();
