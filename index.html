@@ -424,13 +424,18 @@
      or pillarboxes internally to fit whatever box it's given, so simply filling the
      stage works correctly for both horizontal and vertical (Shorts-style) videos
      without needing to know the real dimensions ahead of time. */
-  .video-player-screen { background: #000; }
+  /* Breaks out of the fake 390x844 ".phone" device-mockup frame — on an actual phone
+     .phone already fills the real screen so this looks the same either way, but on a
+     wide desktop/tablet browser .phone is a fixed, narrow, centered box, and a video
+     confined inside it wastes almost the entire real screen with black bars either
+     side. position:fixed here escapes that box and covers the true viewport. */
+  .video-player-screen { background: #000; position: fixed !important; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 9999; }
   .video-player-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding: 18px 16px; display: flex; align-items: center; gap: 10px; background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent); }
   .video-player-title { color: #fff; font-weight: 700; font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
   .video-player-stage { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; position: relative; }
   .video-player-stage iframe, .video-player-stage video { width: 100%; height: 100%; border: none; display: block; }
   .video-player-stage video { object-fit: contain; background: #000; }
-  .vp-mount { width: 100%; height: 100%; }
+  .vp-mount { width: 100%; height: 100%; overflow: hidden; }
   /* Our own minimal control bar drawn over the YouTube/Vimeo embed (which itself runs
      with controls=0/false) — nothing here can navigate away to youtube.com/vimeo.com,
      unlike each platform's own default player chrome. */
@@ -1197,7 +1202,6 @@
     BELL: icon('<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
     PLAY_SM: icon('<path d="M8 5v14l11-7z"/>'),
     PAUSE_SM: icon('<path d="M7 4h3v16H7zM14 4h3v16h-3z"/>'),
-    EXPAND: icon('<path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/>'),
     SPARKLE: icon('<path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
     STAR: icon('<path d="M12 2l3.1 6.3 7 1-5 5 1.2 6.9L12 18l-6.3 3.2L7 14.3l-5-5 7-1z"/>'),
     SHARE: icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/>'),
@@ -2533,7 +2537,6 @@
         '<button class="vp-play-btn" id="vp-playpause" onclick="vpTogglePlay()">' + ICONS.PAUSE_SM + '</button>' +
         '<button class="vp-seek-btn" onclick="vpSeekBy(10)" title="Forward 10s">+10</button>' +
         '<button onclick="vpShare()" title="Share">' + ICONS.SHARE + '</button>' +
-        '<button onclick="vpToggleFullscreen()" title="Fullscreen">' + ICONS.EXPAND + '</button>' +
       '</div>' +
     '</div>';
   }
@@ -2630,16 +2633,6 @@
     // URL (this app has no hardcoded GUEST_APP_URL of its own), not youtube.com/vimeo.com.
     const url = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(EVENT.id);
     shareLinkOrCopy(url, (currentPlayingVideo.name || 'A video') + ' from ' + EVENT.name);
-  }
-
-  function vpToggleFullscreen() {
-    const stage = document.getElementById('video-player-stage');
-    if (!stage) return;
-    if (document.fullscreenElement) {
-      if (document.exitFullscreen) document.exitFullscreen();
-    } else if (stage.requestFullscreen) {
-      stage.requestFullscreen().catch(function () {});
-    }
   }
 
   function vpTeardown() {
