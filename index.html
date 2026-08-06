@@ -436,9 +436,18 @@
   .video-player-stage iframe, .video-player-stage video { width: 100%; height: 100%; border: none; display: block; }
   .video-player-stage video { object-fit: contain; background: #000; }
   .vp-mount { width: 100%; height: 100%; overflow: hidden; }
+  /* Sits above the iframe purely to catch taps — a cross-origin YouTube/Vimeo iframe
+     never lets its own click events bubble out to our page, so without this, tapping
+     the video itself (as opposed to one of our own buttons) would do nothing. Tapping
+     it toggles the controls below between shown/auto-hidden. */
+  .vp-tap-catcher { position: absolute; inset: 0; z-index: 3; background: transparent; }
   /* Our own minimal control bar drawn over the YouTube/Vimeo embed (which itself runs
      with controls=0/false) — nothing here can navigate away to youtube.com/vimeo.com,
-     unlike each platform's own default player chrome. */
+     unlike each platform's own default player chrome. Auto-hides after a few seconds so
+     it doesn't sit permanently over the video; tapping the video (or any button, which
+     resets the timer) brings it back. */
+  .video-player-top, .vp-controls { transition: opacity .25s ease; opacity: 1; }
+  .video-player-top.vp-hidden, .vp-controls.vp-hidden { opacity: 0; pointer-events: none; }
   .vp-controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 14px 18px; background: linear-gradient(to top, rgba(0,0,0,.8), transparent); z-index: 6; }
   .vp-progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .vp-progress-row span { color: #fff; font-size: 11px; font-weight: 700; min-width: 32px; text-align: center; }
@@ -1202,6 +1211,7 @@
     BELL: icon('<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>'),
     PLAY_SM: icon('<path d="M8 5v14l11-7z"/>'),
     PAUSE_SM: icon('<path d="M7 4h3v16H7zM14 4h3v16h-3z"/>'),
+    EXPAND: icon('<path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/>'),
     SPARKLE: icon('<path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
     STAR: icon('<path d="M12 2l3.1 6.3 7 1-5 5 1.2 6.9L12 18l-6.3 3.2L7 14.3l-5-5 7-1z"/>'),
     SHARE: icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/>'),
@@ -2537,17 +2547,57 @@
         '<button class="vp-play-btn" id="vp-playpause" onclick="vpTogglePlay()">' + ICONS.PAUSE_SM + '</button>' +
         '<button class="vp-seek-btn" onclick="vpSeekBy(10)" title="Forward 10s">+10</button>' +
         '<button onclick="vpShare()" title="Share">' + ICONS.SHARE + '</button>' +
+        '<button onclick="vpToggleFullscreen()" title="Fullscreen">' + ICONS.EXPAND + '</button>' +
       '</div>' +
     '</div>';
   }
 
+  // Combines the actual player mount with a transparent full-stage tap target (needed
+  // because a cross-origin YouTube/Vimeo iframe never lets its clicks bubble out to
+  // this page) and our control bar — used for both YouTube and Vimeo so they share one
+  // consistent overlay/auto-hide setup.
+  function vpPlayerHtml() {
+    return '<div class="vp-mount" id="vp-mount"></div>' +
+      '<div class="vp-tap-catcher" id="vp-tap-catcher"></div>' +
+      vpControlsHtml();
+  }
+
+  let vpHideControlsTimer = null;
+  function vpShowControls() {
+    const controls = document.querySelector('.vp-controls');
+    const top = document.querySelector('.video-player-top');
+    if (controls) controls.classList.remove('vp-hidden');
+    if (top) top.classList.remove('vp-hidden');
+    clearTimeout(vpHideControlsTimer);
+    // Only auto-hides while actually playing — no point hiding the controls over a
+    // paused frame the guest has nothing else to look at.
+    vpHideControlsTimer = setTimeout(function () {
+      if (activeVideoPlayer) vpHideControlsNow();
+    }, 3000);
+  }
+  function vpHideControlsNow() {
+    clearTimeout(vpHideControlsTimer);
+    const controls = document.querySelector('.vp-controls');
+    const top = document.querySelector('.video-player-top');
+    if (controls) controls.classList.add('vp-hidden');
+    if (top) top.classList.add('vp-hidden');
+  }
+  function vpToggleControlsVisibility() {
+    const controls = document.querySelector('.vp-controls');
+    if (controls && controls.classList.contains('vp-hidden')) vpShowControls();
+    else vpHideControlsNow();
+  }
+
   function wireVpControls() {
     const seek = document.getElementById('vp-seek');
+    const tapCatcher = document.getElementById('vp-tap-catcher');
+    if (tapCatcher) tapCatcher.addEventListener('click', vpToggleControlsVisibility);
     if (!seek) return;
     seek.addEventListener('input', function () {
       // Visual-only while dragging (updates the time label as the thumb moves) — the
       // actual seek happens on release below, so scrubbing doesn't spam seek calls.
       vpSeeking = true;
+      vpShowControls();
     });
     seek.addEventListener('change', function () {
       const pct = Number(seek.value) / 100;
@@ -2557,6 +2607,7 @@
         activeVideoPlayer.api.getDuration().then(function (dur) { vpSeekTo(pct * dur); }).catch(function () {});
       }
       vpSeeking = false;
+      vpShowControls();
     });
   }
 
@@ -2602,6 +2653,7 @@
   }
 
   function vpSeekBy(delta) {
+    vpShowControls();
     if (!activeVideoPlayer) return;
     if (activeVideoPlayer.type === 'youtube') {
       activeVideoPlayer.api.seekTo(Math.max(0, activeVideoPlayer.api.getCurrentTime() + delta), true);
@@ -2613,6 +2665,7 @@
   }
 
   function vpTogglePlay() {
+    vpShowControls();
     if (!activeVideoPlayer) return;
     if (activeVideoPlayer.type === 'youtube') {
       const state = activeVideoPlayer.api.getPlayerState();
@@ -2628,6 +2681,7 @@
   // share title) instead of anything pointing at youtube.com/vimeo.com — reuses the
   // same native-share-sheet-or-copy helper already used for photo/profile sharing.
   function vpShare() {
+    vpShowControls();
     if (!currentPlayingVideo) return;
     // Same fix as shareStudioProfile()/sendDownloadAllEmail() — share the real running
     // URL (this app has no hardcoded GUEST_APP_URL of its own), not youtube.com/vimeo.com.
@@ -2635,8 +2689,29 @@
     shareLinkOrCopy(url, (currentPlayingVideo.name || 'A video') + ' from ' + EVENT.name);
   }
 
+  // The Fullscreen API only expands whatever element it's called on to cover the true
+  // OS-level display, hiding the browser's own tabs/address bar — CSS position:fixed
+  // (used above so the player already fills the page's own viewport) can't do that on
+  // its own, that's a genuinely different thing. Targets this screen itself (not just
+  // the video) so the exit button/back button stay usable while fullscreen.
+  function vpToggleFullscreen() {
+    vpShowControls();
+    const el = document.getElementById('screen-video-player');
+    if (!el) return;
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(function () {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(function () {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    }
+  }
+
   function vpTeardown() {
     vpStopPolling();
+    clearTimeout(vpHideControlsTimer);
     if (activeVideoPlayer) {
       try {
         if ((activeVideoPlayer.type === 'youtube' || activeVideoPlayer.type === 'vimeo') && activeVideoPlayer.api.destroy) {
@@ -2659,20 +2734,20 @@
     if (titleEl) titleEl.textContent = v.name || 'Video';
     const info = parseVideoEmbed(v.link);
     if (info.type === 'youtube') {
-      stage.innerHTML = '<div class="vp-mount" id="vp-mount"></div>' + vpControlsHtml();
+      stage.innerHTML = vpPlayerHtml();
       wireVpControls();
       loadYouTubeApi().then(function () {
         activeVideoPlayer = { type: 'youtube', api: new YT.Player('vp-mount', {
           videoId: info.id,
           playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, playsinline: 1, fs: 0, disablekb: 1, iv_load_policy: 3 },
           events: {
-            onReady: function (e) { e.target.playVideo(); vpStartPolling(); },
+            onReady: function (e) { e.target.playVideo(); vpStartPolling(); vpShowControls(); },
             onStateChange: function (e) { vpSetPlayIcon(e.data === 1); },
           },
         }) };
       });
     } else if (info.type === 'vimeo') {
-      stage.innerHTML = '<div class="vp-mount" id="vp-mount"></div>' + vpControlsHtml();
+      stage.innerHTML = vpPlayerHtml();
       wireVpControls();
       loadVimeoApi().then(function () {
         const player = new Vimeo.Player('vp-mount', { id: info.id, autoplay: true, controls: false, playsinline: true });
@@ -2680,6 +2755,7 @@
         player.on('play', function () { vpSetPlayIcon(true); });
         player.on('pause', function () { vpSetPlayIcon(false); });
         vpStartPolling();
+        vpShowControls();
       });
     } else {
       // Direct video file, or an unrecognized host — a native <video controls> tag
