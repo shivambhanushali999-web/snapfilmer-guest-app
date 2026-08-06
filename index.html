@@ -1299,13 +1299,6 @@
     saveFollowedEvents(EVENTS_LIST);
   }
 
-  const VIDEOS = [
-    { title: '06 Wedding', thumb: 'https://picsum.photos/seed/ov6/500/400' },
-    { title: '05 Vaibhav Mandva', thumb: 'https://picsum.photos/seed/ov5/500/400' },
-    { title: '04 Komal Mandva', thumb: 'https://picsum.photos/seed/ov4/500/400' },
-    { title: '03 Sangeet P2', thumb: 'https://picsum.photos/seed/ov3/500/400' },
-    { title: '02 Sangeet P1', thumb: 'https://picsum.photos/seed/ov2/500/400' },
-  ];
 
   // Portfolio categories used to be this hardcoded mock (picsum.photos filler, plain
   // URL strings rather than real photo objects) — replaced by loadPortfolioEventData()/
@@ -2401,11 +2394,31 @@
     }
   }
 
+  // YouTube exposes a stable, no-auth, no-CORS thumbnail URL per video ID — Vimeo
+  // doesn't (its oEmbed API needs a fetch call), so Vimeo/other links just fall back to
+  // a plain play-icon tile instead of a broken image.
+  function youtubeThumbnailUrl(link) {
+    if (!link) return '';
+    const m = String(link).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{6,})/);
+    return m ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : '';
+  }
+
   function renderVideos() {
-    document.getElementById('videos-list').innerHTML = VIDEOS.map(function (v) {
-      return '<div class="video-tile"><img src="' + v.thumb + '">' +
+    const wrap = document.getElementById('videos-list');
+    if (!wrap) return;
+    if (!eventVideos.length) {
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">No videos added yet — your studio hasn\'t added any videos to this event.</div>';
+      return;
+    }
+    wrap.innerHTML = eventVideos.map(function (v) {
+      const thumb = youtubeThumbnailUrl(v.link);
+      const safeLink = (v.link || '').replace(/'/g, '&#39;');
+      return '<div class="video-tile" onclick="window.open(\'' + safeLink + '\', \'_blank\')">' +
+        (thumb
+          ? '<img src="' + thumb + '">'
+          : '<div style="width:100%;height:130px;background:#EAE6DA;display:flex;align-items:center;justify-content:center;color:var(--accent);">' + ICONS.PLAY_SM + '</div>') +
         '<div class="pill-play">' + ICONS.PLAY_SM.replace('width="19" height="19"', 'width="16" height="16"') + '</div>' +
-        '<div class="cap">' + v.title + '</div></div>';
+        '<div class="cap">' + (v.name || 'Video') + '</div></div>';
     }).join('');
   }
 
@@ -2603,6 +2616,10 @@
   // as scrollable folder chips at the top of the Gallery so guests can browse by album
   // instead of only ever seeing one giant, unsorted photo grid.
   let eventAlbums = [];
+  // The dashboard's per-event "Videos" panel (Video Name + Link) writes here — kept in
+  // sync live below (startEventSettingsSync), not a one-time fetch, so a video added
+  // mid-visit shows up without the guest needing to reload.
+  let eventVideos = [];
   let galleryAlbumFilter = null;
   // Sentinel value for galleryAlbumFilter meaning "photos with no album tag at all" —
   // distinct from null (which means no filter / show everything), so the Home
@@ -2974,6 +2991,8 @@
       renderGalleryUploadUI();
       eventWatermark = normalizeEventWatermark(d.watermark);
       eventAlbums = Array.isArray(d.albums) ? d.albums : [];
+      eventVideos = Array.isArray(d.videos) ? d.videos : [];
+      renderVideos();
       // If an album the guest had filtered by got deleted from the dashboard, fall back
       // to "All Photos" instead of silently showing an empty grid forever. The
       // Unsorted sentinel isn't a real album name, so it's deliberately exempt from
