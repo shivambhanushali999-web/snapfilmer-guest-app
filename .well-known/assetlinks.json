@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.snapfilmer_guest_app.twa",
+        "sha256_cert_fingerprints": ["EC:E9:83:6D:A3:41:2E:AA:10:04:51:82:A2:A7:44:0B:32:6B:19:11:84:9A:DA:A9:68:C6:EC:68:EA:01:5A:DE"]
+      }
+    }]
