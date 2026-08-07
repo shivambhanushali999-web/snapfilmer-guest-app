@@ -37,6 +37,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<!-- Real push notifications (Firebase Cloud Messaging) — lets a guest get notified about
+     new photos/videos even when this tab/app isn't open, via sw.js's background handler.
+     See initNotifyToggle()/enablePushNotifications() below and the Cloud Functions that
+     actually send these (functions/index.js, deployed separately). -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <!-- EmailJS: lets this static, backend-less app send a real email (no server needed) —
      used for the "Download All Photos" > email-me-a-link flow. Needs a free EmailJS
      account; see EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY below. -->
@@ -970,10 +975,21 @@
           </div>
           <button class="btn-outline" id="admin-permission-btn" style="padding:6px 14px;font-size:11.5px;" onclick="requestAdminPermission()">Send</button>
         </div>
+        <!-- Real push notifications (Firebase Cloud Messaging) — turning this on asks the
+             browser/OS for notification permission and registers this device so the
+             studio's Cloud Function can actually push to it later (new photos/videos),
+             even with the app closed. See initNotifyToggle()/toggleNotifications() below. -->
+        <div class="list-row">
+          <div>
+            <div class="lt">Notifications</div>
+            <div class="ld" id="notify-desc">Get notified when new photos or videos are added to this event.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="notify-toggle" onchange="toggleNotifications(this.checked)"><span class="slider"></span></label>
+        </div>
         <div class="list-row">
           <div>
             <div class="lt">Mute Event</div>
-            <div class="ld">Pause notifications for this event only.</div>
+            <div class="ld">Pause notifications for this event only, without turning them off everywhere.</div>
           </div>
           <label class="switch"><input type="checkbox" id="mute-toggle"><span class="slider"></span></label>
         </div>
@@ -1440,6 +1456,116 @@
     saveNotifications();
     updateNotifBadge();
     if (screenStack.indexOf('notifications') !== -1) renderNotifications();
+  }
+
+  // ================= Push Notifications (Firebase Cloud Messaging) =================
+  // Real, works-when-the-app-is-closed push — distinct from the addNotification() bell
+  // list above, which only ever updates while this tab is actually open and synced live
+  // off Firestore. The Cloud Function that sends these lives outside this file
+  // (functions/index.js, deployed via Firebase); this half only handles asking
+  // permission, registering this device's token, and reacting to a push that arrives
+  // while the tab happens to be open (onMessage — background arrival is handled by
+  // sw.js instead, since this page's JS isn't running at all at that point).
+  function pushSupported() {
+    try {
+      return 'Notification' in window && 'serviceWorker' in navigator &&
+        typeof firebase !== 'undefined' && !!firebase.messaging && firebase.messaging.isSupported();
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function initNotifyToggle() {
+    const toggle = document.getElementById('notify-toggle');
+    if (!toggle) return;
+    if (!pushSupported()) {
+      toggle.disabled = true;
+      const desc = document.getElementById('notify-desc');
+      if (desc) desc.textContent = 'Notifications are not supported on this browser — try installing the app or using Chrome on Android.';
+      return;
+    }
+    let wasEnabled = false;
+    try { wasEnabled = localStorage.getItem('sf_notify_' + EVENT.id) === '1'; } catch (err) {}
+    toggle.checked = wasEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+    // Permission was granted before but the app never got a live tab open to receive a
+    // push (or the OS revoked it) — re-arm the foreground listener either way so an
+    // already-enabled guest doesn't have to retoggle anything.
+    if (toggle.checked) initForegroundPush();
+  }
+
+  function toggleNotifications(enable) {
+    if (enable) enablePushNotifications();
+    else disablePushNotifications();
+  }
+
+  function enablePushNotifications() {
+    const toggle = document.getElementById('notify-toggle');
+    if (!pushSupported() || !db) {
+      if (toggle) toggle.checked = false;
+      alert('Notifications are not supported on this browser/device.');
+      return;
+    }
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') {
+        if (toggle) toggle.checked = false;
+        return;
+      }
+      let reg;
+      navigator.serviceWorker.register('sw.js').then(function (r) {
+        reg = r;
+        return firebase.messaging().getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: r });
+      }).then(function (token) {
+        if (!token) throw new Error('No FCM token returned');
+        let guestName = '';
+        try { guestName = localStorage.getItem('sf_guest_name_' + EVENT.id) || ''; } catch (err) {}
+        let muted = false;
+        try { muted = localStorage.getItem('sf_muted_' + EVENT.id) === '1'; } catch (err) {}
+        return db.collection('pushTokens').doc(token).set({
+          eventId: EVENT.id,
+          guestName: guestName,
+          muted: muted,
+          platform: (navigator.userAgent || '').slice(0, 120),
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }).then(function () { return token; });
+      }).then(function (token) {
+        try {
+          localStorage.setItem('sf_notify_' + EVENT.id, '1');
+          localStorage.setItem('sf_notify_token_' + EVENT.id, token);
+        } catch (err) {}
+        initForegroundPush();
+      }).catch(function (err) {
+        console.error('enablePushNotifications failed', err);
+        if (toggle) toggle.checked = false;
+        alert('Could not enable notifications. Please try again.');
+      });
+    });
+  }
+
+  function disablePushNotifications() {
+    let token = null;
+    try {
+      token = localStorage.getItem('sf_notify_token_' + EVENT.id);
+      localStorage.setItem('sf_notify_' + EVENT.id, '0');
+    } catch (err) {}
+    if (token && db) {
+      db.collection('pushTokens').doc(token).delete().catch(function () {});
+    }
+  }
+
+  // Push arrives while this tab is actually open and focused — the browser won't show
+  // its own native banner for that case (by design, across all browsers), so this drops
+  // it straight into the same in-app bell list new photos/posts already use instead of
+  // the guest never seeing it at all.
+  function initForegroundPush() {
+    if (!pushSupported()) return;
+    try {
+      firebase.messaging().onMessage(function (payload) {
+        const n = payload && payload.notification;
+        if (!n) return;
+        addNotification('push', n.title + (n.body ? ': ' + n.body : ''), null);
+      });
+    } catch (err) {}
   }
 
   // ================= Navigation =================
@@ -2979,6 +3105,11 @@
     messagingSenderId: '148634541857',
     appId: '1:148634541857:web:4092d9ff8ab2aa6a262860',
   };
+  // Web Push certificate key pair from Firebase Console > Project settings > Cloud
+  // Messaging > Web configuration — required by messaging.getToken() below to actually
+  // register this browser for push. Public by design (same as apiKey above); it can't be
+  // used to send anything on its own, only Cloud Functions with the admin SDK can send.
+  const FCM_VAPID_KEY = 'BCVCnFkyBodOrh06zStjFqVkQFAhB3jH0_DwJAxGd0hDH-54sHZumheSUYJp4frNdyhcWdej5j88652FcQm8qYI';
   let db = null;
   let auth = null;
   let testPhotosUnsub = null;
@@ -4749,8 +4880,18 @@
       toggle.checked = saved === '1';
       toggle.addEventListener('change', function () {
         try { localStorage.setItem('sf_muted_' + EVENT.id, toggle.checked ? '1' : '0'); } catch (err) {}
+        // Actually gates the push Cloud Function now (see sendToEventGuests in
+        // functions/index.js, which skips any pushTokens doc with muted:true) — previously
+        // this toggle only wrote to localStorage and didn't affect anything real.
+        let token = null;
+        try { token = localStorage.getItem('sf_notify_token_' + EVENT.id); } catch (err) {}
+        if (token && db) {
+          db.collection('pushTokens').doc(token).set({ muted: toggle.checked }, { merge: true }).catch(function () {});
+        }
       });
     })();
+
+    initNotifyToggle();
 
     // No login wall — go straight into the event, matching real Kamero's zero-friction
     // guest access. The anonymous Firebase session (set up above) keeps Firestore working
