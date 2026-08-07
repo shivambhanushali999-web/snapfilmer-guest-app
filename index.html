@@ -562,7 +562,7 @@
           </g>
         </svg>
 
-        <div class="studio-top" style="position:relative;padding-right:80px;">
+        <div class="studio-top" style="position:relative;">
           <div class="studio-avatar" id="gate-studio-avatar" style="width:56px;height:56px;border-radius:10px;font-size:17px;">SF</div>
           <div class="studio-meta">
             <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:21px;">SnapFilmer</h3>
@@ -1368,6 +1368,12 @@
   // startEventSettingsSync), not here, since videos aren't known yet this early.
   const deepLinkVideo = DEEP_LINK_PARAMS.get('video');
   let deepLinkVideoOpened = false;
+  // Set by the push notification Cloud Functions (functions/index.js's deepLinkSuffix on
+  // each notification type) — without this, tapping a notification just reopened the
+  // app wherever its last tab happened to be (e.g. landing on "More" because that's
+  // where the guest was sitting when they turned notifications on), instead of the
+  // actual new content the notification was about.
+  const deepLinkScreen = DEEP_LINK_PARAMS.get('screen');
 
   // Which event to load: the link/QR's ?event=<id> wins, otherwise fall back to the
   // last event this guest actually opened on this device (so a bookmarked bare URL
@@ -1484,9 +1490,17 @@
       if (desc) desc.textContent = 'Notifications are not supported on this browser — try installing the app or using Chrome on Android.';
       return;
     }
-    let wasEnabled = false;
-    try { wasEnabled = localStorage.getItem('sf_notify_' + EVENT.id) === '1'; } catch (err) {}
-    toggle.checked = wasEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+    let stored = null;
+    try { stored = localStorage.getItem('sf_notify_' + EVENT.id); } catch (err) {}
+    // First time this guest has ever opened this event (no stored decision either way) —
+    // default notifications to ON and ask for permission right away, instead of leaving
+    // it off until they happen to find the toggle buried in More. If they say no, or
+    // turn it off later, that choice is remembered and never overridden again.
+    if (stored === null) {
+      enablePushNotifications(true);
+      return;
+    }
+    toggle.checked = stored === '1' && typeof Notification !== 'undefined' && Notification.permission === 'granted';
     // Permission was granted before but the app never got a live tab open to receive a
     // push (or the OS revoked it) — re-arm the foreground listener either way so an
     // already-enabled guest doesn't have to retoggle anything.
@@ -1498,16 +1512,25 @@
     else disablePushNotifications();
   }
 
-  function enablePushNotifications() {
+  // silent: true when called automatically on first boot (initNotifyToggle) rather than
+  // from the guest actually tapping the toggle — an alert() popping up unprompted before
+  // the guest has done anything would just be confusing, so failures there are logged
+  // and remembered (sf_notify_=0) instead of surfaced with a popup.
+  function enablePushNotifications(silent) {
     const toggle = document.getElementById('notify-toggle');
     if (!pushSupported() || !db) {
       if (toggle) toggle.checked = false;
-      alert('Notifications are not supported on this browser/device.');
+      if (!silent) alert('Notifications are not supported on this browser/device.');
       return;
     }
     Notification.requestPermission().then(function (perm) {
       if (perm !== 'granted') {
         if (toggle) toggle.checked = false;
+        // Remember this was actually decided (denied), not just never asked — otherwise
+        // initNotifyToggle()'s "first visit" auto-prompt (stored === null) would keep
+        // firing this same permission request on every single reload, which browsers
+        // just silently re-deny once a guest has said no once anyway.
+        try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
         return;
       }
       let reg;
@@ -1537,11 +1560,15 @@
       }).catch(function (err) {
         console.error('enablePushNotifications failed', err);
         if (toggle) toggle.checked = false;
+        // Remembered as a real decision (not "never asked") so the first-boot auto-
+        // enable in initNotifyToggle() doesn't keep retrying — and failing — silently on
+        // every single reload. The guest can still retry manually via the toggle anytime.
+        try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err2) {}
         // Same fix as uploadStudioCover()'s error handling in the dashboard — a bare
         // "please try again" hides the actual reason (wrong VAPID key, missing
         // gcm_sender_id, service worker registration failure, etc.) and makes this
         // impossible to diagnose from a phone with no visible console.
-        alert('Could not enable notifications' + (err && err.message ? ': ' + err.message : '') + '. Please try again.');
+        if (!silent) alert('Could not enable notifications' + (err && err.message ? ': ' + err.message : '') + '. Please try again.');
       });
     });
   }
@@ -4850,6 +4877,15 @@
       setGalleryAlbumFilter(deepLinkAlbum);
     }
 
+    // ?screen=... deep link (from a tapped push notification) — "gallery" for new-photo
+    // pushes, "posts" for new-post pushes. New-video pushes use ?video=... instead (see
+    // deepLinkVideo below), since that opens the actual video player, not just a tab.
+    if (deepLinkScreen === 'gallery') {
+      openGallery();
+    } else if (deepLinkScreen === 'posts') {
+      showTab('posts');
+    }
+
     // Swipe left/right on the photo viewer to move through the album — the tap-arrows
     // (navigateViewer above) cover mouse/desktop use, this covers touch/mobile.
     (function initViewerSwipe() {
@@ -4905,7 +4941,7 @@
     // that's what made a plain page refresh feel like getting kicked out of the app.
     // Skipped when a deep link already navigated somewhere (album/prefill above), so it
     // doesn't get immediately overridden.
-    if (!deepLinkAlbum && !deepLinkPrefillId) {
+    if (!deepLinkAlbum && !deepLinkPrefillId && !deepLinkScreen) {
       (function restoreLastScreen() {
         let lastTab = 'home';
         let lastSub = null;
