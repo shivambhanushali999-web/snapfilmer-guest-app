@@ -229,7 +229,14 @@
   .studio-bio #studio-bio-text, .studio-bio #gate-studio-bio-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .studio-bio.expanded #studio-bio-text, .studio-bio.expanded #gate-studio-bio-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
   .studio-bio .more-link { color: var(--accent); font-weight: 700; cursor: pointer; }
-  .social-strip { display: flex; gap: 8px; margin-top: 10px; }
+  .social-strip { display: flex; gap: 8px; }
+  /* Holds the phone/mail/website ghost-buttons (.studio-cta) and the Instagram/WhatsApp/etc
+     icons (.social-strip) side by side in one row, right under the bio. These used to be
+     split — contact icons top-right next to the studio name, socials further down — which
+     on the Event Gate screen also collided with the decorative camera-and-leaves sketch
+     that sits absolutely-positioned in that same top-right corner, hiding the website icon
+     behind it. Moving both rows to live together here removes that overlap entirely. */
+  .social-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
   .social-ghost { width: 36px; height: 36px; border-radius:10px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
 
   /* ---- Stories row (highlights) ---- */
@@ -568,21 +575,26 @@
             <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:21px;">SnapFilmer</h3>
             <p class="gate-kicker">Wedding &amp; Portrait Studio</p>
           </div>
-          <div class="studio-cta" id="gate-studio-contact-row">
-            <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="PHONE"></i></a>
-            <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="MAIL"></i></a>
-            <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="GLOBE"></i></a>
-          </div>
         </div>
 
         <h2 class="gate-serif" style="margin:16px 0 8px;font-size:22px;line-height:1.32;color:var(--ink);font-weight:600;position:relative;">Every moment,<br><em style="font-style:italic;color:var(--accent-gold);">beautifully told.</em></h2>
 
         <p class="studio-bio" id="gate-studio-bio-p" style="position:relative;"><span id="gate-studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="gate-bio-toggle-link" onclick="toggleBio('gate-')">Read more</span></p>
-        <div class="social-strip" id="gate-social-strip" style="position:relative;">
-          <div class="social-ghost" style="border-radius:10px;"><i data-icon="INSTA_O"></i></div>
-          <div class="social-ghost" style="border-radius:10px;"><i data-icon="VIMEO_O"></i></div>
-          <div class="social-ghost" style="border-radius:10px;"><i data-icon="WHATSAPP_O"></i></div>
-          <div class="social-ghost" style="border-radius:10px;"><i data-icon="YOUTUBE_O"></i></div>
+        <!-- Call/mail/website ghost-buttons now share this same row as the Instagram/
+             WhatsApp/etc icons instead of sitting up top next to the studio name, where on
+             this screen they used to collide with the decorative camera sketch. -->
+        <div class="social-row" style="position:relative;">
+          <div class="studio-cta" id="gate-studio-contact-row">
+            <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="PHONE"></i></a>
+            <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="MAIL"></i></a>
+            <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="GLOBE"></i></a>
+          </div>
+          <div class="social-strip" id="gate-social-strip">
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="INSTA_O"></i></div>
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="VIMEO_O"></i></div>
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="WHATSAPP_O"></i></div>
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="YOUTUBE_O"></i></div>
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;position:relative;">
           <button class="btn-outline" onclick="openPortfolioFromGate()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:0;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
@@ -848,18 +860,22 @@
             <h3 onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
             <p>Wedding &amp; Portrait Studio</p>
           </div>
+        </div>
+        <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
+        <!-- Call/mail/website ghost-buttons now share this same row as the Instagram/
+             WhatsApp/etc icons instead of sitting up top next to the studio name. -->
+        <div class="social-row">
           <div class="studio-cta" id="studio-contact-row">
             <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
             <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
             <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
           </div>
-        </div>
-        <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
-        <div class="social-strip" id="social-strip">
-          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
-          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
-          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
-          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+          <div class="social-strip" id="social-strip">
+            <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+            <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+            <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+            <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn-outline" onclick="openPortfolio()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
