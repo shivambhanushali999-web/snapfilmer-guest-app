@@ -3203,6 +3203,47 @@
     }
   } catch (err) {}
 
+  // Android's hardware/gesture back button otherwise just kills the whole app
+  // instantly the moment there's no more browser history to go back through — since
+  // this is a single-page app, that's almost always true, so one back-press from
+  // anywhere used to silently close the app with no warning at all. This makes back
+  // behave like a real native app instead: close an open sub-screen first, then back
+  // out tab-by-tab to Home, and only actually offer to exit once there's nothing left
+  // to back out of.
+  //
+  // The mechanism: keep one extra dummy history entry pushed at all times. The back
+  // button pops it (firing popstate) instead of leaving the page; the handler below
+  // decides what that press should actually do, then re-pushes the guard entry unless
+  // the guest confirmed they want to exit.
+  try {
+    history.pushState({ sfBackGuard: true }, '', location.href);
+  } catch (err) {}
+
+  function currentTabName() {
+    const active = document.querySelector('.tab-screen.active');
+    return active ? active.id.replace('screen-', '') : null;
+  }
+
+  window.addEventListener('popstate', function () {
+    if (screenStack.length) {
+      popScreen();
+      try { history.pushState({ sfBackGuard: true }, '', location.href); } catch (err) {}
+      return;
+    }
+    const tab = currentTabName();
+    if (tab && tab !== 'home') {
+      showTab('home');
+      try { history.pushState({ sfBackGuard: true }, '', location.href); } catch (err) {}
+      return;
+    }
+    // Nothing left to back out of — on Home (or the event gate, before a tab even
+    // exists) with no sub-screen open. This is the one point where actually leaving
+    // makes sense, so ask instead of just vanishing.
+    const wantsToExit = confirm('Exit SnapFilmer?');
+    if (wantsToExit) return;
+    try { history.pushState({ sfBackGuard: true }, '', location.href); } catch (err) {}
+  });
+
   // Guests are never forced to log in — like real Kamero, browsing/selfie-matching works
   // instantly via a silent anonymous Firebase session (still satisfies the Firestore
   // security rules, which only require request.auth != null). Signing up for a real
