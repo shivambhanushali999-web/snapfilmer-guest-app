@@ -39,7 +39,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <!-- Real push notifications (Firebase Cloud Messaging) — lets a guest get notified about
      new photos/videos even when this tab/app isn't open, via sw.js's background handler.
-     See initNotifyToggle()/enablePushNotifications() below and the Cloud Functions that
+     See initNotifyMuteToggle()/enablePushNotifications() below and the Cloud Functions that
      actually send these (functions/index.js, deployed separately). -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <!-- EmailJS: lets this static, backend-less app send a real email (no server needed) —
@@ -195,9 +195,14 @@
   /* ---- Home hero ---- */
   .hero { position: relative; margin: 0 0 16px; }
   .hero img { width: 100%; height: 220px; object-fit: cover; display: block; }
-  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.75), rgba(10,8,6,0) 55%); }
+  /* Two gradients: the original bottom-up one (for the date/title text), plus a new
+     top-down one so the bell button in .hero-top always has a dark backdrop to sit on.
+     Without the top gradient, a bright/light-colored cover photo (e.g. a light-colored
+     outfit near the top of frame) could wash out the translucent-white glass-btn to the
+     point of being invisible against it — happened with this event's actual cover photo. */
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.75), rgba(10,8,6,0) 55%), linear-gradient(to bottom, rgba(10,8,6,.45), rgba(10,8,6,0) 32%); }
   .hero-top { position: absolute; top: 20px; left: 16px; right: 16px; display: flex; justify-content: flex-end; z-index: 2; }
-  .glass-btn { width: 40px; height: 40px; border-radius:10px; background: rgba(255,255,255,.22); backdrop-filter: blur(8px); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .glass-btn { width: 40px; height: 40px; border-radius:10px; background: rgba(255,255,255,.3); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.4); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .notif-badge { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius:6px; background: #FF4747; border: 1.5px solid var(--bg); }
   .hero-info { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 2; }
   .hero-info .date-pill { display: inline-block; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius:10px; margin-bottom: 8px; letter-spacing: .3px; }
@@ -237,6 +242,10 @@
      that sits absolutely-positioned in that same top-right corner, hiding the website icon
      behind it. Moving both rows to live together here removes that overlap entirely. */
   .social-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  /* .ghost-btn's global size (40px, used elsewhere for share/back buttons etc.) is a touch
+     bigger than .social-ghost (36px) — scoped down here only, so the call/mail/website
+     icons visually match the Instagram/WhatsApp icons they now sit right next to. */
+  .social-row .ghost-btn { width: 36px; height: 36px; }
   .social-ghost { width: 36px; height: 36px; border-radius:10px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
 
   /* ---- Stories row (highlights) ---- */
@@ -728,12 +737,20 @@
        #event-gate does (reuses .gate-overlay for the same fixed-on-mobile scroll fix),
        shown by showRegistrationGate() right after the event resolves and before bootApp()
        runs, hidden again once submitGuestRegistration() succeeds. One-time per event per
-       device — sf_registered_<eventId> in localStorage skips it on repeat visits. ========== -->
+       device — sf_registered_<eventId> in localStorage skips it on repeat visits.
+       "Continue with Google" (googleSignInForRegistration()) is a shortcut, not a
+       replacement for the fields below it — Google only ever hands back a name + email,
+       never a phone number, so it just pre-fills those two and leaves phone for the guest
+       to type. Signing in this way also links a real (non-anonymous) account, same as the
+       separate optional Sign In/Create Account in More — so a guest who registers this way
+       gets that cross-device benefit for free, without a second signup step later. ========== -->
   <div id="registration-gate" class="gate-overlay" style="display:none;z-index:998;background:var(--bg);box-sizing:border-box;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:24px;box-sizing:border-box;text-align:center;">
       <div class="gate-card" style="max-width:360px;">
         <h2 class="gate-serif" style="margin:0 0 6px;font-size:22px;color:var(--ink);font-weight:600;">Welcome!</h2>
         <p style="font-size:12.5px;color:var(--muted);margin:0 0 18px;line-height:1.5;">Please share a few details before viewing this event's photos.</p>
+        <button class="oauth-btn" style="margin-bottom:14px;" onclick="googleSignInForRegistration()"><i data-icon="GOOGLE"></i>Continue with Google</button>
+        <div class="login-divider" style="margin-bottom:14px;"><span>OR ENTER MANUALLY</span></div>
         <div style="margin-bottom:12px;"><input id="reg-name" placeholder="Your Name" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);"></div>
         <div style="margin-bottom:12px;"><input id="reg-phone" type="tel" inputmode="tel" placeholder="Phone Number" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);"></div>
         <div style="margin-bottom:16px;"><input id="reg-email" type="email" placeholder="Email (optional)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;box-sizing:border-box;color:var(--ink);background:var(--bg);"></div>
@@ -991,21 +1008,18 @@
           </div>
           <button class="btn-outline" id="admin-permission-btn" style="padding:6px 14px;font-size:11.5px;" onclick="requestAdminPermission()">Send</button>
         </div>
-        <!-- Real push notifications (Firebase Cloud Messaging) — turning this on asks the
-             browser/OS for notification permission and registers this device so the
-             studio's Cloud Function can actually push to it later (new photos/videos),
-             even with the app closed. See initNotifyToggle()/toggleNotifications() below. -->
-        <div class="list-row">
-          <div>
-            <div class="lt">Notifications</div>
-            <div class="ld" id="notify-desc">Get notified when new photos or videos are added to this event.</div>
-          </div>
-          <label class="switch"><input type="checkbox" id="notify-toggle" onchange="toggleNotifications(this.checked)"><span class="slider"></span></label>
-        </div>
+        <!-- Real push notifications (Firebase Cloud Messaging) — one toggle now, not two.
+             It used to be split into a separate "Notifications" on/off switch plus this
+             "Mute Event" switch, but both answered the exact same question from a guest's
+             point of view ("do I get notified for this event?"), which just read as
+             confusing/redundant. Unchecked = actively receiving notifications for this
+             event; checked = muted/paused. First-visit auto opt-in (asks for permission
+             right away) and the actual browser/FCM registration still happen behind this
+             one control — see initNotifyMuteToggle()/enablePushNotifications() below. -->
         <div class="list-row">
           <div>
             <div class="lt">Mute Event</div>
-            <div class="ld">Pause notifications for this event only, without turning them off everywhere.</div>
+            <div class="ld" id="notify-desc">Pause notifications for this event only, without turning them off everywhere.</div>
           </div>
           <label class="switch"><input type="checkbox" id="mute-toggle"><span class="slider"></span></label>
         </div>
@@ -1502,8 +1516,13 @@
     }
   }
 
-  function initNotifyToggle() {
-    const toggle = document.getElementById('notify-toggle');
+  // Single "Mute Event" toggle drives both the actual push subscription (browser
+  // permission + FCM token registration) and the per-event mute flag. Checked = muted/
+  // paused; unchecked = actively receiving notifications for this event — matching the
+  // toggle's existing label/meaning, so there's no separate "Notifications" switch for
+  // guests to reconcile against it anymore.
+  function initNotifyMuteToggle() {
+    const toggle = document.getElementById('mute-toggle');
     if (!toggle) return;
     if (!pushSupported()) {
       toggle.disabled = true;
@@ -1511,44 +1530,70 @@
       if (desc) desc.textContent = 'Notifications are not supported on this browser — try installing the app or using Chrome on Android.';
       return;
     }
-    let stored = null;
-    try { stored = localStorage.getItem('sf_notify_' + EVENT.id); } catch (err) {}
+    let notifyStored = null;
+    try { notifyStored = localStorage.getItem('sf_notify_' + EVENT.id); } catch (err) {}
     // First time this guest has ever opened this event (no stored decision either way) —
-    // default notifications to ON and ask for permission right away, instead of leaving
-    // it off until they happen to find the toggle buried in More. If they say no, or
-    // turn it off later, that choice is remembered and never overridden again.
-    if (stored === null) {
+    // default to unmuted and ask for permission right away, instead of leaving it muted
+    // until they happen to find this toggle buried in More. If they say no, or mute
+    // later, that choice is remembered and never overridden again.
+    if (notifyStored === null) {
+      toggle.checked = false;
       enablePushNotifications(true);
-      return;
+    } else {
+      let muted = false;
+      try { muted = localStorage.getItem('sf_muted_' + EVENT.id) === '1'; } catch (err) {}
+      // No working subscription (permission denied, or granted but revoked since) reads
+      // the same as muted from the guest's point of view — nothing will arrive either way.
+      toggle.checked = muted || notifyStored !== '1';
+      // Permission was granted before but the app never got a live tab open to receive a
+      // push (or the OS revoked it) — re-arm the foreground listener either way so an
+      // already-enabled guest doesn't have to retoggle anything.
+      if (notifyStored === '1') initForegroundPush();
     }
-    toggle.checked = stored === '1' && typeof Notification !== 'undefined' && Notification.permission === 'granted';
-    // Permission was granted before but the app never got a live tab open to receive a
-    // push (or the OS revoked it) — re-arm the foreground listener either way so an
-    // already-enabled guest doesn't have to retoggle anything.
-    if (toggle.checked) initForegroundPush();
+    toggle.addEventListener('change', function () {
+      if (toggle.checked) {
+        // Muting: keep the underlying subscription/token alive (so unmuting later is
+        // instant, no re-asking for permission) — just pause delivery for this event.
+        try { localStorage.setItem('sf_muted_' + EVENT.id, '1'); } catch (err) {}
+        let token = null;
+        try { token = localStorage.getItem('sf_notify_token_' + EVENT.id); } catch (err) {}
+        if (token && db) {
+          db.collection('pushTokens').doc(token).set({ muted: true }, { merge: true }).catch(function () {});
+        }
+      } else {
+        // Unmuting: if a subscription already exists, just flip muted back off; otherwise
+        // (first time, or permission was previously denied) actually (re)request it.
+        try { localStorage.setItem('sf_muted_' + EVENT.id, '0'); } catch (err) {}
+        let token = null, notifyOk = false;
+        try {
+          token = localStorage.getItem('sf_notify_token_' + EVENT.id);
+          notifyOk = localStorage.getItem('sf_notify_' + EVENT.id) === '1';
+        } catch (err) {}
+        if (token && db && notifyOk) {
+          db.collection('pushTokens').doc(token).set({ muted: false }, { merge: true }).catch(function () {});
+        } else {
+          enablePushNotifications();
+        }
+      }
+    });
   }
 
-  function toggleNotifications(enable) {
-    if (enable) enablePushNotifications();
-    else disablePushNotifications();
-  }
-
-  // silent: true when called automatically on first boot (initNotifyToggle) rather than
-  // from the guest actually tapping the toggle — an alert() popping up unprompted before
-  // the guest has done anything would just be confusing, so failures there are logged
-  // and remembered (sf_notify_=0) instead of surfaced with a popup.
+  // silent: true when called automatically on first boot (initNotifyMuteToggle) rather
+  // than from the guest actually tapping the toggle — an alert() popping up unprompted
+  // before the guest has done anything would just be confusing, so failures there are
+  // logged and remembered (sf_notify_=0) instead of surfaced with a popup.
   function enablePushNotifications(silent) {
-    const toggle = document.getElementById('notify-toggle');
+    const toggle = document.getElementById('mute-toggle');
     if (!pushSupported() || !db) {
-      if (toggle) toggle.checked = false;
+      if (toggle) toggle.checked = true;
       if (!silent) alert('Notifications are not supported on this browser/device.');
       return;
     }
     Notification.requestPermission().then(function (perm) {
       if (perm !== 'granted') {
-        if (toggle) toggle.checked = false;
+        if (toggle) toggle.checked = true;
         // Remember this was actually decided (denied), not just never asked — otherwise
-        // initNotifyToggle()'s "first visit" auto-prompt (stored === null) would keep
+        // initNotifyMuteToggle()'s "first visit" auto-prompt (stored === null) would keep
         // firing this same permission request on every single reload, which browsers
         // just silently re-deny once a guest has said no once anyway.
         try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
@@ -1577,13 +1622,14 @@
           localStorage.setItem('sf_notify_' + EVENT.id, '1');
           localStorage.setItem('sf_notify_token_' + EVENT.id, token);
         } catch (err) {}
+        if (toggle) toggle.checked = false;
         initForegroundPush();
       }).catch(function (err) {
         console.error('enablePushNotifications failed', err);
-        if (toggle) toggle.checked = false;
+        if (toggle) toggle.checked = true;
         // Remembered as a real decision (not "never asked") so the first-boot auto-
-        // enable in initNotifyToggle() doesn't keep retrying — and failing — silently on
-        // every single reload. The guest can still retry manually via the toggle anytime.
+        // enable in initNotifyMuteToggle() doesn't keep retrying — and failing — silently
+        // on every single reload. The guest can still retry manually via the toggle anytime.
         try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err2) {}
         // Same fix as uploadStudioCover()'s error handling in the dashboard — a bare
         // "please try again" hides the actual reason (wrong VAPID key, missing
@@ -1594,6 +1640,11 @@
     });
   }
 
+  // Full unsubscribe (deletes the token doc entirely, not just a muted:true patch) — no
+  // longer wired to the Mute toggle itself (muting now deliberately keeps the token alive
+  // so unmuting is instant), but still used when a guest unfollows an event entirely, so
+  // an unfollowed event doesn't keep silently pushing to a device that no longer follows
+  // it. See unfollowEvent() below.
   function disablePushNotifications() {
     let token = null;
     try {
@@ -2412,6 +2463,9 @@
     if (!confirm('Unfollow ' + EVENT.name + '? You can follow again anytime using the Event ID.')) return;
     EVENTS_LIST = EVENTS_LIST.filter(function (e) { return e.tag !== EVENT.id; });
     saveFollowedEvents(EVENTS_LIST);
+    // Fully unsubscribe this device's push token for the event being unfollowed — an
+    // event you've unfollowed shouldn't keep silently pushing notifications to you.
+    disablePushNotifications();
     // Can't keep browsing an event you just unfollowed — same reasoning as
     // switchToEvent() below: reload straight back to the Event Gate (bare URL, no
     // ?event= param, and the remembered "last event" cleared) instead of leaving the
@@ -3386,6 +3440,49 @@
     if (gate) gate.style.display = 'none';
     const reg = document.getElementById('registration-gate');
     if (reg) reg.style.display = 'block';
+  }
+
+  // Google-assisted shortcut for the registration gate above — pre-fills name + email
+  // from the Google account (that's all Google ever hands back; it never includes a
+  // phone number) and links a real account to the guest's existing anonymous session, so
+  // this doubles as the same account-linking the separate optional Sign In/Create Account
+  // (More tab) offers. Reuses the exact same anonymous-link-first pattern as googleSignIn()
+  // below, just without navigating away afterward — the guest finishes by filling in their
+  // phone number and tapping Continue (submitGuestRegistration()), same as the manual path.
+  function googleSignInForRegistration() {
+    const msgEl = document.getElementById('reg-msg');
+    if (msgEl) msgEl.style.display = 'none';
+    if (!auth) {
+      if (msgEl) { msgEl.textContent = 'Google Sign-In is not available right now (no connection).'; msgEl.style.display = 'block'; }
+      return;
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const applyProfile = function (user) {
+      if (!user) return;
+      const nameEl = document.getElementById('reg-name');
+      const emailEl = document.getElementById('reg-email');
+      const phoneEl = document.getElementById('reg-phone');
+      if (nameEl && user.displayName) nameEl.value = user.displayName;
+      if (emailEl && user.email) emailEl.value = user.email;
+      if (phoneEl) phoneEl.focus();
+    };
+    const doLink = auth.currentUser && auth.currentUser.isAnonymous;
+    const action = doLink ? auth.currentUser.linkWithPopup(provider) : auth.signInWithPopup(provider);
+    action.then(function (result) {
+      applyProfile((result && result.user) || auth.currentUser);
+    }).catch(function (err) {
+      if (err && err.code === 'auth/credential-already-in-use') {
+        // This Google account already has its own real account elsewhere — just sign
+        // straight into that instead of trying to link it to the anonymous session.
+        auth.signInWithPopup(provider).then(function (result) {
+          applyProfile((result && result.user) || auth.currentUser);
+        }).catch(function (err2) {
+          if (msgEl) { msgEl.textContent = friendlyAuthError(err2); msgEl.style.display = 'block'; }
+        });
+        return;
+      }
+      if (msgEl) { msgEl.textContent = friendlyAuthError(err); msgEl.style.display = 'block'; }
+    });
   }
 
   function submitGuestRegistration() {
@@ -4974,26 +5071,9 @@
       }, { passive: true });
     })();
 
-    (function initMuteToggle() {
-      const toggle = document.getElementById('mute-toggle');
-      if (!toggle) return;
-      let saved = '0';
-      try { saved = localStorage.getItem('sf_muted_' + EVENT.id) || '0'; } catch (err) {}
-      toggle.checked = saved === '1';
-      toggle.addEventListener('change', function () {
-        try { localStorage.setItem('sf_muted_' + EVENT.id, toggle.checked ? '1' : '0'); } catch (err) {}
-        // Actually gates the push Cloud Function now (see sendToEventGuests in
-        // functions/index.js, which skips any pushTokens doc with muted:true) — previously
-        // this toggle only wrote to localStorage and didn't affect anything real.
-        let token = null;
-        try { token = localStorage.getItem('sf_notify_token_' + EVENT.id); } catch (err) {}
-        if (token && db) {
-          db.collection('pushTokens').doc(token).set({ muted: toggle.checked }, { merge: true }).catch(function () {});
-        }
-      });
-    })();
-
-    initNotifyToggle();
+    // Sets up the single Mute Event toggle (both the mute flag and, on first visit, the
+    // actual push permission/registration) — see initNotifyMuteToggle() above.
+    initNotifyMuteToggle();
 
     // No login wall — go straight into the event, matching real Kamero's zero-friction
     // guest access. The anonymous Firebase session (set up above) keeps Firestore working
