@@ -194,7 +194,7 @@
 
   /* ---- Home hero ---- */
   .hero { position: relative; margin: 0 0 16px; }
-  .hero img { width: 100%; height: 320px; object-fit: cover; display: block; }
+  .hero img { width: 100%; height: 220px; object-fit: cover; display: block; }
   .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.75), rgba(10,8,6,0) 55%); }
   .hero-top { position: absolute; top: 20px; left: 16px; right: 16px; display: flex; justify-content: flex-end; z-index: 2; }
   .glass-btn { width: 40px; height: 40px; border-radius:10px; background: rgba(255,255,255,.22); backdrop-filter: blur(8px); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -214,7 +214,7 @@
   .album-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
   /* ---- Studio card ---- */
-  .studio-block { margin: 0 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius:0; padding: 18px; }
+  .studio-block { margin: 0 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius:0; padding: 16px; }
   .studio-top { display: flex; align-items: center; gap: 12px; }
   .studio-avatar { width: 50px; height: 50px; border-radius:10px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex-shrink: 0; }
   .studio-meta { flex: 1; min-width: 0; }
@@ -225,11 +225,11 @@
   .btn-outline:disabled { opacity: .5; cursor: default; }
   #admin-permission-btn.approved { border-color: #1FA97A; color: #1FA97A; }
   #admin-permission-btn.denied { border-color: #D0342C; color: #D0342C; }
-  .studio-bio { font-size: 13px; color: #514D53; line-height: 1.6; margin-top: 14px; }
+  .studio-bio { font-size: 13px; color: #514D53; line-height: 1.6; margin-top: 10px; }
   .studio-bio #studio-bio-text, .studio-bio #gate-studio-bio-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .studio-bio.expanded #studio-bio-text, .studio-bio.expanded #gate-studio-bio-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
   .studio-bio .more-link { color: var(--accent); font-weight: 700; cursor: pointer; }
-  .social-strip { display: flex; gap: 8px; margin-top: 14px; }
+  .social-strip { display: flex; gap: 8px; margin-top: 10px; }
   .social-ghost { width: 36px; height: 36px; border-radius:10px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
 
   /* ---- Stories row (highlights) ---- */
@@ -584,7 +584,7 @@
           <div class="social-ghost" style="border-radius:10px;"><i data-icon="WHATSAPP_O"></i></div>
           <div class="social-ghost" style="border-radius:10px;"><i data-icon="YOUTUBE_O"></i></div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:14px;position:relative;">
+        <div style="display:flex;gap:8px;margin-top:10px;position:relative;">
           <button class="btn-outline" onclick="openPortfolioFromGate()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:0;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
           <button class="ghost-btn" onclick="shareStudioProfile()" title="Share" style="border-radius:10px;"><i data-icon="SHARE"></i></button>
         </div>
@@ -861,7 +861,7 @@
           <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
           <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:14px;">
+        <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn-outline" onclick="openPortfolio()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
           <button class="ghost-btn" onclick="shareStudioProfile()" title="Share"><i data-icon="SHARE"></i></button>
         </div>
@@ -1261,10 +1261,15 @@
     SPARKLE: icon('<path d="M12 2l1.8 5.6L19 9l-5.2 1.4L12 16l-1.8-5.6L5 9l5.2-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
     STAR: icon('<path d="M12 2l3.1 6.3 7 1-5 5 1.2 6.9L12 18l-6.3 3.2L7 14.3l-5-5 7-1z"/>'),
     SHARE: icon('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/>'),
-    INSTA_O: icon('<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".8"/>'),
-    VIMEO_O: icon('<path d="M22 7c-.2 2-1.7 4.9-4.4 8.6-2.8 3.7-5.2 5.6-7.2 5.6-1.2 0-2.2-1.1-3-3.4L5.3 11c-.5-2-1.1-3-1.7-3-.1 0-.6.3-1.3.8L1.4 7.8C3 6.4 4.6 5 5.7 4.9c1.5-.1 2.4.9 2.8 3 .5 3.2.9 5.2 1.2 6 .6 1.5 1.3 2.2 2 2.2.5 0 1.3-.8 2.3-2.5s1.5-3 1.6-3.9c.1-1.5-.5-2.2-1.7-2.2-.6 0-1.2.1-1.9.4C13.2 4.6 15.1 2.6 18.3 2.5 20.6 2.4 22.2 4.1 22 7z"/>'),
-    WHATSAPP_O: icon('<path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2z"/><path d="M8.5 8c.3-.5.6-.5.9-.4.3.1 1 1.6 1 1.9s-.1.4-.3.6c-.2.2-.4.4-.2.7.2.4 1 1.5 2 2.2 1.2.8 1.8 1 2.1 1 .3 0 .5-.1.7-.4.2-.3.6-.7.9-.7.3 0 1.6.6 1.9.7.3.1.5.2.5.4.1.5-.5 1.6-1.6 2-1.1.3-2 .3-4.5-.9C9.5 13.9 7.5 11.5 7.3 11.1c-.2-.4-1.1-1.7-.6-2.7z"/>'),
-    YOUTUBE_O: icon('<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.5 9.3l4.5 2.7-4.5 2.7z"/>'),
+    // All four social icons deliberately share the same ~18x18 rounded-square (or, for
+    // WhatsApp, an equivalently-sized round bubble) frame with a single bold inner glyph
+    // — previously WhatsApp in particular used a much thinner, more intricate inner path
+    // than Instagram's bold circle+dot, so the two looked mismatched in weight/size when
+    // shown side by side in the same row even though both rendered at the same 19x19px.
+    INSTA_O: icon('<rect x="3" y="3" width="18" height="18" rx="6"/><circle cx="12" cy="12" r="4.3"/><circle cx="17.3" cy="6.7" r=".9"/>'),
+    VIMEO_O: icon('<rect x="3" y="3" width="18" height="18" rx="6"/><path d="M8 9c.8 4.7 2.3 7.5 3.8 7.5S15 14 16 9"/>'),
+    WHATSAPP_O: icon('<path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2z"/><path d="M8.3 9c0 3.7 3 6.7 6.7 6.7"/><circle cx="8.3" cy="9" r=".9"/><circle cx="15" cy="15.7" r=".9"/>'),
+    YOUTUBE_O: icon('<rect x="3" y="3" width="18" height="18" rx="6"/><path d="M10 8.5l6 3.5-6 3.5z"/>'),
     PLUS_SQ: icon('<rect x="3" y="3" width="18" height="18" rx="6"/><path d="M12 8v8M8 12h8"/>'),
     QR: icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17.5 17.5h.01M20 20h.01"/>'),
     TAP: icon('<path d="M9 12V4.5a1.5 1.5 0 013 0V11m0 .5V3.5a1.5 1.5 0 013 0V11m0 .5v-4a1.5 1.5 0 013 0v9c0 3-2 5-5 5h-2c-2 0-3-.5-4.5-2.5L3 13.5c-.5-.8-.2-1.7.5-2.1.7-.4 1.6-.2 2.1.5L7 14"/>'),
