@@ -904,6 +904,19 @@
         </div>
       </div>
 
+      <!-- Small, always-on-Home fallback for once the banner above has been dismissed (or
+           the guest missed it) — re-enabling used to mean finding "More > Mute Event",
+           three taps deep and easy to never discover. This stays visible right on Home
+           any time notifications aren't actively on, so there's always an obvious, one-tap
+           way back in without hunting through menus. See updateNotifyPill()/
+           handleNotifyPillTap() below. -->
+      <div id="notify-pill" onclick="handleNotifyPillTap()" style="display:none;margin:0 16px 18px;cursor:pointer;">
+        <div style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:20px;padding:8px 14px 8px 10px;font-size:12.5px;font-weight:700;">
+          <i data-icon="BELL" style="width:15px;height:15px;"></i>
+          <span id="notify-pill-text">Enable notifications</span>
+        </div>
+      </div>
+
       <!-- Moved to right under the event cover (was below the chips/folder cards) —
            the studio's own identity/contact card should be the first thing a guest
            sees, not something they have to scroll past everything else to find. -->
@@ -1595,6 +1608,7 @@
     if (notifyStored === null) {
       toggle.checked = true;
       showNotifyBanner();
+      hideNotifyPill();
     } else {
       hideNotifyBanner();
       let muted = false;
@@ -1606,6 +1620,7 @@
       // push (or the OS revoked it) — re-arm the foreground listener either way so an
       // already-enabled guest doesn't have to retoggle anything.
       if (notifyStored === '1') initForegroundPush();
+      updateNotifyPill();
     }
     toggle.addEventListener('change', function () {
       // A real tap on the toggle itself is just as much a user gesture as the banner
@@ -1622,6 +1637,11 @@
         if (token && db) {
           db.collection('pushTokens').doc(token).set({ muted: true }, { merge: true }).catch(function () {});
         }
+        // Deliberate mute, not "never got a subscription" — the Home pill is specifically
+        // for guests with no working subscription at all, so it must stay hidden here
+        // (already subscribed, just paused) rather than re-appearing and implying they
+        // need to do something again.
+        hideNotifyPill();
       } else {
         // Unmuting: if a subscription already exists, just flip muted back off; otherwise
         // (first time, or permission was previously denied) actually (re)request it.
@@ -1633,6 +1653,7 @@
         } catch (err) {}
         if (token && db && notifyOk) {
           db.collection('pushTokens').doc(token).set({ muted: false }, { merge: true }).catch(function () {});
+          hideNotifyPill();
         } else {
           enablePushNotifications();
         }
@@ -1652,14 +1673,54 @@
     if (banner) banner.style.display = 'none';
   }
 
-  // Guest tapped the X on the banner instead of Enable — treat that the same as a denied
-  // permission (a real, considered "no") so it's remembered and the banner doesn't keep
-  // reappearing on every visit, without ever actually calling requestPermission().
+  function hideNotifyPill() {
+    const pill = document.getElementById('notify-pill');
+    if (pill) pill.style.display = 'none';
+  }
+
+  // Single source of truth for the Home-tab pill: visible any time this guest has no
+  // working notification subscription (never decided, dismissed the banner, or a past
+  // attempt failed) so there's always a one-tap way back in, right on Home — not just
+  // buried in More > Mute Event. Deliberately excludes the "subscribed but muted" state
+  // (that's an intentional choice the guest already made via the toggle, not something to
+  // re-nag about). Call this any time sf_notify_/Notification.permission could have changed.
+  function updateNotifyPill() {
+    const pill = document.getElementById('notify-pill');
+    if (!pill) return;
+    let notifyStored = null;
+    try { notifyStored = localStorage.getItem('sf_notify_' + EVENT.id); } catch (err) {}
+    if (notifyStored === '1') { pill.style.display = 'none'; return; }
+    let blocked = false;
+    try { blocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'; } catch (err) {}
+    const label = document.getElementById('notify-pill-text');
+    if (label) label.textContent = blocked ? 'Notifications blocked — tap for help' : 'Enable notifications';
+    pill.style.display = 'block';
+    fillIcons();
+  }
+
+  // Browsers never let a site re-trigger its own permission dialog once the guest has
+  // actually clicked "Block" at the OS/browser level — trying again just silently resolves
+  // to 'denied' with no UI at all, which would make the pill look broken. In that case this
+  // explains how to fix it manually instead of firing a request that can't succeed.
+  function handleNotifyPillTap() {
+    let blocked = false;
+    try { blocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'; } catch (err) {}
+    if (blocked) {
+      alert('Notifications are blocked for this site in your browser settings. To turn them back on, open your browser\'s site settings for this page and allow Notifications, then reload.');
+      return;
+    }
+    enablePushNotifications();
+  }
+
+  // Guest tapped the X on the banner instead of Enable — no permission was ever requested
+  // (so there's nothing "denied" to remember), just collapse to the persistent Home pill
+  // so re-enabling later is still one tap away instead of gone for good.
   function dismissNotifyBanner() {
     try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
     hideNotifyBanner();
     const toggle = document.getElementById('mute-toggle');
     if (toggle) toggle.checked = true;
+    updateNotifyPill();
   }
 
   // Called from the banner's own "Enable" button — this click IS the user gesture, so the
@@ -1679,6 +1740,7 @@
     const toggle = document.getElementById('mute-toggle');
     if (!pushSupported() || !db) {
       if (toggle) toggle.checked = true;
+      updateNotifyPill();
       if (!silent) alert('Notifications are not supported on this browser/device.');
       return;
     }
@@ -1690,6 +1752,7 @@
         // firing this same permission request on every single reload, which browsers
         // just silently re-deny once a guest has said no once anyway.
         try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
+        updateNotifyPill();
         return;
       }
       let reg;
@@ -1716,6 +1779,7 @@
           localStorage.setItem('sf_notify_token_' + EVENT.id, token);
         } catch (err) {}
         if (toggle) toggle.checked = false;
+        updateNotifyPill();
         initForegroundPush();
       }).catch(function (err) {
         console.error('enablePushNotifications failed', err);
@@ -1724,6 +1788,7 @@
         // enable in initNotifyMuteToggle() doesn't keep retrying — and failing — silently
         // on every single reload. The guest can still retry manually via the toggle anytime.
         try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err2) {}
+        updateNotifyPill();
         // Same fix as uploadStudioCover()'s error handling in the dashboard — a bare
         // "please try again" hides the actual reason (wrong VAPID key, missing
         // gcm_sender_id, service worker registration failure, etc.) and makes this
