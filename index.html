@@ -4900,6 +4900,13 @@
   // Resolves once the priming play() call below has settled (success or blocked) — set
   // by primeReelAudio(), read later in renderReelVideo() once photo loading has finished.
   let reelAudioPlayPromise = null;
+  // Web Audio graph used so the studio's music can be captured into the recording at
+  // full volume WITHOUT ever playing out loud through the guest's own speakers — see
+  // primeReelAudio() below. Created once and reused (createMediaElementSource() throws
+  // if called twice on the same <audio> element), so these stay module-level.
+  let reelAudioCtx = null;
+  let reelAudioSourceNode = null;
+  let reelAudioDestNode = null;
   // 'classic' = single photo, no text. 'caption' = single photo + event-name caption
   // (matches the bottom-name-overlay style in the reference reel examples). 'collage' =
   // two photos stacked per frame (matches the reference montage-style example). Picked
@@ -4913,6 +4920,14 @@
   }
 
   function closeMyReel() {
+    // Stop everything immediately here rather than only relying on the render loop's
+    // own reelRenderCancelled check — that check only runs on the next
+    // requestAnimationFrame tick, which may be far off (or may never come again, if
+    // rendering has genuinely stalled). That gap is exactly why music kept playing
+    // after tapping back before.
+    reelRenderCancelled = true;
+    const audioEl = document.getElementById('reel-audio');
+    if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
     popScreen();
   }
 
@@ -4929,6 +4944,7 @@
   }
 
   function resetReelScreen() {
+    reelRenderCancelled = true;
     if (reelObjectUrl) { try { URL.revokeObjectURL(reelObjectUrl); } catch (err) {} reelObjectUrl = null; }
     reelBlob = null;
     reelAudioPlayPromise = null;
@@ -5186,6 +5202,28 @@
     audioEl.src = studioReelMusicUrl;
     audioEl.loop = true;
     audioEl.load();
+    // Route the element through a Web Audio graph so its output feeds a
+    // MediaStreamDestination (captured into the recording, below) but is deliberately
+    // NOT connected to the AudioContext's speaker destination. That's what keeps this
+    // silent for the guest — without this, audioEl.play() has to actually play (and
+    // audibly play, since captureStream() needs it unmuted to carry real audio data)
+    // for the whole ~18-22s render, which is what guests were hearing blast out of
+    // their phone with no warning. createMediaElementSource() can only ever be called
+    // once per <audio> element, so the graph is built once and reused.
+    try {
+      if (!reelAudioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        reelAudioCtx = new AC();
+        reelAudioSourceNode = reelAudioCtx.createMediaElementSource(audioEl);
+        reelAudioDestNode = reelAudioCtx.createMediaStreamDestination();
+        reelAudioSourceNode.connect(reelAudioDestNode);
+      }
+      if (reelAudioCtx.state === 'suspended') reelAudioCtx.resume().catch(function () {});
+    } catch (err) {
+      console.error('Web Audio graph setup failed, will fall back to a muted direct capture', err);
+      reelAudioCtx = null;
+      reelAudioDestNode = null;
+    }
     reelAudioPlayPromise = audioEl.play().catch(function (err) {
       console.error('Reel background music failed to start', err);
       return null;
@@ -5195,10 +5233,14 @@
   // Checked once per animation frame inside renderReelVideo() below — flipped by the
   // progress screen's "Cancel" link, the real escape hatch for a render that seems stuck
   // (previously there was no way out of that screen at all besides force-closing the
-  // app/browser tab).
+  // app/browser tab). Also flipped directly by closeMyReel() (back button).
   let reelRenderCancelled = false;
   function cancelReelGeneration() {
     reelRenderCancelled = true;
+    // Stop right away instead of waiting for the render loop's own next tick to notice
+    // — same reasoning as closeMyReel() below.
+    const audioEl = document.getElementById('reel-audio');
+    if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
   }
 
   function generateReel() {
@@ -5276,11 +5318,19 @@
       let musicFailed = !!studioReelMusicUrl;
       // primeReelAudio() (called back in generateReel(), right as the guest tapped) has
       // had the whole photo-loading phase to either succeed or get blocked by now — just
-      // read the outcome here rather than calling play() a second time.
+      // read the outcome here rather than calling play() a second time. Prefer the
+      // Web Audio destination (silent locally, full audio in the recording) — only fall
+      // back to capturing the <audio> element directly (and muting it, so it at least
+      // doesn't play out loud) if the Web Audio graph didn't set up for some reason.
       const audioReady = (studioReelMusicUrl && audioEl && reelAudioPlayPromise)
         ? reelAudioPlayPromise.then(function () {
-            if (!audioEl.paused && audioEl.captureStream) {
+            if (!audioEl.paused && reelAudioDestNode) {
               audioEl.currentTime = 0; // re-sync so the track starts exactly when recording does
+              reelAudioDestNode.stream.getAudioTracks().forEach(function (t) { tracks.push(t); });
+              musicFailed = false;
+            } else if (!audioEl.paused && audioEl.captureStream) {
+              audioEl.muted = true;
+              audioEl.currentTime = 0;
               audioEl.captureStream().getAudioTracks().forEach(function (t) { tracks.push(t); });
               musicFailed = false;
             } else {
@@ -5291,69 +5341,47 @@
 
       reelRenderCancelled = false;
 
-      // Real-time recording means an ~18-22s reel genuinely takes ~18-22 real seconds to
-      // render — long enough that a guest locking their phone or switching apps mid-way
-      // is likely, not an edge case. Browsers pause requestAnimationFrame almost
-      // entirely while the tab is hidden, so time spent backgrounded doesn't advance the
-      // recording (no bug there) — but it WAS silently missing from the render clock
-      // below, which used raw wall-clock elapsed time. Without this tracking, `elapsed`
-      // would already read as "done" (or close to it) the instant the guest came back,
-      // producing a truncated/broken video instead of the stall this was reported as —
-      // either way, this is what "kuch photos ke baad atak jaata hai" was actually
-      // hitting. Subtracting the tracked hidden time keeps the render clock honest.
-      let hiddenAccumMs = 0;
-      let hiddenSince = document.hidden ? performance.now() : null;
-      function onReelVisibilityChange() {
-        if (document.hidden) {
-          hiddenSince = performance.now();
-        } else if (hiddenSince !== null) {
-          hiddenAccumMs += performance.now() - hiddenSince;
-          hiddenSince = null;
-        }
-      }
-      document.addEventListener('visibilitychange', onReelVisibilityChange);
-      function cleanupReelListeners() {
-        document.removeEventListener('visibilitychange', onReelVisibilityChange);
-      }
-
       audioReady.then(function () {
         let recorder;
         try {
           recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: mimeType, videoBitsPerSecond: 4000000 });
         } catch (err) {
-          cleanupReelListeners();
           reject(err);
           return;
         }
         const chunks = [];
         recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
         recorder.onstop = function () {
-          cleanupReelListeners();
           if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
           resolve({ blob: new Blob(chunks, { type: 'video/webm' }), musicFailed: musicFailed });
         };
         recorder.onerror = function (e) {
-          cleanupReelListeners();
           reject(e.error || new Error('Recording failed'));
         };
 
+        // Paced off how many frames have actually been drawn, not wall-clock time. A
+        // wall-clock + visibilitychange version of this used to live here, but it
+        // depended on document.hidden firing accurately — some installed-PWA/standalone
+        // browsers report that unreliably, and getting it wrong could stall the render
+        // clock outright (exactly the "atak jaati hai" symptom) rather than just
+        // mistiming a transition. Frame-counting sidesteps that entirely:
+        // requestAnimationFrame simply stops firing while the tab is hidden/screen is
+        // locked, so frameCount naturally pauses right along with it and resumes
+        // exactly where it left off, with no bookkeeping that can go wrong.
+        let frameCount = 0;
+        const msPerFrame = 1000 / 30; // matches captureStream(30) above
         const startedAt = performance.now();
         function frame() {
-          const rawElapsed = performance.now() - startedAt;
-
           if (reelRenderCancelled) {
-            cleanupReelListeners();
             try { recorder.stop(); } catch (err) {}
             reject(new Error('__cancelled__'));
             return;
           }
-          // Generous safety valve — real wall-clock time (including any hidden gaps)
-          // running away to more than 3x the intended length plus a couple minutes'
-          // grace means something is genuinely wrong, not just a normal screen-lock
-          // pause. Ends the render with a clear, actionable error instead of leaving the
-          // guest stuck on the progress screen forever with only Cancel as a way out.
-          if (rawElapsed > totalMs * 3 + 120000) {
-            cleanupReelListeners();
+          // Generous safety valve on real wall-clock time — catches the case where
+          // frames are still coming, just absurdly slowly, which frame-counting alone
+          // wouldn't. Ends the render with a clear, actionable error instead of leaving
+          // the guest stuck on the progress screen forever with only Cancel as a way out.
+          if (performance.now() - startedAt > totalMs * 3 + 120000) {
             try { recorder.stop(); } catch (err) {}
             reject(new Error('Rendering is taking much longer than expected — please try again with this tab open and your screen on.'));
             return;
@@ -5365,7 +5393,7 @@
           // screen just sat there forever with no error and no way to tell what
           // happened. Now it's logged and skipped instead of taking the whole render down.
           try {
-            const elapsed = rawElapsed - hiddenAccumMs - (hiddenSince !== null ? (performance.now() - hiddenSince) : 0);
+            const elapsed = frameCount * msPerFrame;
             if (elapsed >= totalMs) {
               drawReelOutroCard(ctx);
               setReelProgress(100, 'Finishing up...');
@@ -5412,12 +5440,12 @@
           } catch (err) {
             console.error('Reel frame render error, skipping this frame', err);
           }
+          frameCount++;
           requestAnimationFrame(frame);
         }
         recorder.start();
         requestAnimationFrame(frame);
       }).catch(function (err) {
-        cleanupReelListeners();
         reject(err);
       });
     });
