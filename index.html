@@ -1250,7 +1250,23 @@
         </p>
       </div>
       <div id="reel-result" style="display:none;">
-        <video id="reel-video" playsinline controls loop style="width:100%;max-width:320px;display:block;margin:0 auto 16px;background:#000;border-radius:0;"></video>
+        <!-- Autoplay is muted+silent by design (guaranteed to actually start playing on
+             every browser, unlike unmuted autoplay which is often blocked) — but that
+             alone left guests looking at what seemed like a plain still photo with no
+             obvious way to know it was a playable, moving video, which is very likely
+             what "photo stuck" reports were actually describing (confirmed against a
+             video the studio sent: the result screen just sat there completely static
+             for 6+ seconds with no visible play affordance). This big center Play/Pause
+             button is a guaranteed-visible tap target on top of the native controls, so
+             there's never any ambiguity about whether this is a video. -->
+        <div id="reel-video-wrap" style="position:relative;max-width:320px;margin:0 auto 16px;">
+          <video id="reel-video" playsinline controls loop autoplay muted style="width:100%;display:block;background:#000;border-radius:0;"></video>
+          <button type="button" id="reel-video-playbtn" onclick="toggleReelVideoPlayback()" aria-label="Play" style="position:absolute;inset:0;width:100%;height:100%;background:rgba(0,0,0,.28);border:none;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;">
+            <span style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;">
+              <span id="reel-video-playicon" style="width:0;height:0;border-top:12px solid transparent;border-bottom:12px solid transparent;border-left:20px solid #141410;margin-left:4px;"></span>
+            </span>
+          </button>
+        </div>
         <!-- Shown only when the studio has a track configured but it couldn't actually be
              captured into this specific reel (autoplay block, network hiccup, etc.) — so a
              silent-when-music-was-expected reel is visible instead of an unexplained gap. -->
@@ -5337,7 +5353,14 @@
         const downloadBtn = document.getElementById('reel-download-btn');
         const shareBtn = document.getElementById('reel-share-btn');
         const musicNote = document.getElementById('reel-music-note');
-        if (video) video.src = reelObjectUrl;
+        if (video) {
+          video.src = reelObjectUrl;
+          // The `autoplay muted` attributes on this element handle most browsers, but
+          // this covers any that need play() called explicitly too — either way, the
+          // overlay button (wired below) is what actually makes it obvious to the guest
+          // that this is a video at all, not a still photo.
+          video.play().catch(function () {});
+        }
         if (downloadBtn) downloadBtn.href = reelObjectUrl;
         if (shareBtn) shareBtn.style.display = (navigator.canShare && navigator.share) ? 'block' : 'none';
         // Surfaced instead of silently swallowed — a guest (or us, checking their report)
@@ -5346,6 +5369,7 @@
         if (musicNote) musicNote.style.display = out.musicFailed ? 'block' : 'none';
         if (progress) progress.style.display = 'none';
         if (result) result.style.display = 'block';
+        initReelVideoPlayButton();
       })
       .catch(function (err) {
         if (progress) progress.style.display = 'none';
@@ -5514,6 +5538,36 @@
         reject(err);
       });
     });
+  }
+
+  // A screen recording the studio sent showed the finished reel result screen sitting
+  // completely static for 6+ real seconds with no visible change — the video WAS there
+  // and playable, but nothing on screen made that obvious (this is very likely what
+  // repeated "photo stuck" reports were actually describing, since generation itself
+  // was confirmed completing fine in that same recording). Native <video controls> vary
+  // a lot in how visible their play button is across devices/browsers, so this overlay
+  // is a guaranteed, unmistakable tap target layered on top, shown whenever the video
+  // is paused and hidden the instant it's playing.
+  function initReelVideoPlayButton() {
+    const video = document.getElementById('reel-video');
+    const btn = document.getElementById('reel-video-playbtn');
+    if (!video || !btn) return;
+    function sync() { btn.style.display = video.paused ? 'flex' : 'none'; }
+    video.onplay = sync;
+    video.onpause = sync;
+    video.onplaying = sync;
+    sync();
+  }
+
+  function toggleReelVideoPlayback() {
+    const video = document.getElementById('reel-video');
+    if (!video) return;
+    if (video.paused) {
+      video.muted = false; // guest just tapped it directly — a real gesture, safe to unmute
+      video.play().catch(function () {});
+    } else {
+      video.pause();
+    }
   }
 
   function shareMyReel() {
