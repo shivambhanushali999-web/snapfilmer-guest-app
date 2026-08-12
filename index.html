@@ -1231,6 +1231,10 @@
       </div>
       <div id="reel-result" style="display:none;">
         <video id="reel-video" playsinline controls loop style="width:100%;max-width:320px;display:block;margin:0 auto 16px;background:#000;border-radius:0;"></video>
+        <!-- Shown only when the studio has a track configured but it couldn't actually be
+             captured into this specific reel (autoplay block, network hiccup, etc.) — so a
+             silent-when-music-was-expected reel is visible instead of an unexplained gap. -->
+        <p id="reel-music-note" style="display:none;max-width:320px;margin:0 auto 12px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.5;">Background music couldn't be added this time — your reel saved without it. Tap "Make Another" to try again.</p>
         <div style="display:flex;gap:10px;max-width:320px;margin:0 auto;">
           <a class="btn-outline" id="reel-download-btn" download="my-reel.webm" style="flex:1;justify-content:center;text-align:center;text-decoration:none;">Download</a>
           <button class="btn-outline" id="reel-share-btn" onclick="shareMyReel()" style="flex:1;justify-content:center;display:none;">Share</button>
@@ -4865,12 +4869,17 @@
   // generative AI model — matches what this actually does under the hood.
   const REEL_MAX_PHOTOS = 12;
   const REEL_MIN_PHOTOS = 3;
-  const REEL_SLIDE_MS = 1800;
+  const REEL_SLIDE_MS = 1600;
   const REEL_TRANSITION_MS = 500;
+  const REEL_INTRO_MS = 1100;
+  const REEL_OUTRO_MS = 1500;
   const REEL_WIDTH = 720;
   const REEL_HEIGHT = 1280;
   let reelObjectUrl = null;
   let reelBlob = null;
+  // Resolves once the priming play() call below has settled (success or blocked) — set
+  // by primeReelAudio(), read later in renderReelVideo() once photo loading has finished.
+  let reelAudioPlayPromise = null;
 
   function openMyReel() {
     resetReelScreen();
@@ -4896,13 +4905,18 @@
   function resetReelScreen() {
     if (reelObjectUrl) { try { URL.revokeObjectURL(reelObjectUrl); } catch (err) {} reelObjectUrl = null; }
     reelBlob = null;
+    reelAudioPlayPromise = null;
+    const audioEl = document.getElementById('reel-audio');
+    if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
     const empty = document.getElementById('reel-empty-state');
     const intro = document.getElementById('reel-intro');
     const progress = document.getElementById('reel-progress');
     const result = document.getElementById('reel-result');
+    const musicNote = document.getElementById('reel-music-note');
     const countLabel = document.getElementById('reel-intro-count');
     const video = document.getElementById('reel-video');
     if (video) { video.pause(); video.src = ''; }
+    if (musicNote) musicNote.style.display = 'none';
     const photos = myReelSourcePhotos();
     if (photos.length < REEL_MIN_PHOTOS) {
       if (empty) empty.style.display = 'block';
@@ -4944,11 +4958,14 @@
     });
   }
 
-  // "Cover" fit (like CSS object-fit:cover) into a fixed portrait canvas, plus a slow
+  // "Cover" fit (like CSS object-fit:cover) into a fixed portrait canvas, plus a bolder
   // Ken Burns zoom/pan driven by `progress` (0→1 across this slide's own on-screen
   // time) — recomputed fresh every frame rather than baked in, so the motion stays
-  // smooth regardless of device frame rate.
-  function drawReelFrame(ctx, img, progress, alpha) {
+  // smooth regardless of device frame rate. `seed` (the slide's own index) alternates
+  // the pan direction between consecutive slides — the original version always drifted
+  // the same way on every photo, which is exactly what made the reel read as a plain,
+  // static slideshow instead of something that had actually been "edited".
+  function drawReelFrame(ctx, img, progress, alpha, seed) {
     const cw = REEL_WIDTH, ch = REEL_HEIGHT;
     const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
     if (!iw || !ih) return;
@@ -4957,13 +4974,51 @@
     let baseW, baseH;
     if (imgRatio > canvasRatio) { baseH = ih; baseW = ih * canvasRatio; } else { baseW = iw; baseH = iw / canvasRatio; }
     const baseX = (iw - baseW) / 2, baseY = (ih - baseH) / 2;
-    const zoom = 1 + 0.12 * progress; // 1.0x -> 1.12x over the slide
+    const zoom = 1 + 0.28 * progress; // 1.0x -> 1.28x over the slide (was a barely-visible 1.12x)
     const cropW = baseW / zoom, cropH = baseH / zoom;
-    const panX = (baseW - cropW) * 0.5; // stay horizontally centered
-    const panY = (baseH - cropH) * 0.35 * (1 - progress); // drift toward the top as it zooms in
+    const rangeX = baseW - cropW, rangeY = baseH - cropH;
+    const dirX = (seed % 2 === 0) ? progress : (1 - progress);
+    const dirY = (seed % 4 < 2) ? (1 - progress) : progress;
+    const panX = rangeX * dirX;
+    const panY = rangeY * (0.3 + dirY * 0.4); // stays in the upper 2/3, where faces usually are
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, baseX + panX, baseY + panY, cropW, cropH, 0, 0, cw, ch);
     ctx.globalAlpha = 1;
+  }
+
+  // Subtle bottom vignette on every photo slide (not the title cards) — gives the video
+  // a bit of the "edited reel" depth competitors' auto-generated reels have, instead of
+  // flat, uncomposited photos.
+  function applyReelVignette(ctx) {
+    const grad = ctx.createLinearGradient(0, REEL_HEIGHT * 0.62, 0, REEL_HEIGHT);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,.42)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, REEL_HEIGHT * 0.62, REEL_WIDTH, REEL_HEIGHT * 0.38);
+  }
+
+  // Opening title card — bookends the reel with the outro card below instead of just
+  // dropping straight into photos, so it reads as a produced short rather than a
+  // slideshow that happens to have music under it.
+  function drawReelIntroCard(ctx) {
+    ctx.fillStyle = '#141410';
+    ctx.fillRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
+    ctx.textAlign = 'center';
+    const nameEl = document.getElementById('studio-name');
+    const name = (nameEl && nameEl.textContent) || 'SnapFilmer';
+    const eventNameEl = document.getElementById('home-event-name');
+    const eventName = (eventNameEl && eventNameEl.textContent) || '';
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.font = '700 14px -apple-system, sans-serif';
+    ctx.fillText('M Y   R E E L', REEL_WIDTH / 2, REEL_HEIGHT / 2 - 34);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 28px -apple-system, sans-serif';
+    ctx.fillText(eventName || name, REEL_WIDTH / 2, REEL_HEIGHT / 2 + 6);
+    if (eventName) {
+      ctx.font = '400 15px -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.fillText(name, REEL_WIDTH / 2, REEL_HEIGHT / 2 + 36);
+    }
   }
 
   // Simple branded closing card (studio name, drawn as text — no extra image asset
@@ -4991,9 +5046,31 @@
     return '';
   }
 
+  // Starts the studio's background track playing IMMEDIATELY, synchronously inside the
+  // same call stack as the guest's tap on "Create My Reel" — not later, once photo
+  // loading/rendering has finished. Browsers only allow audio autoplay when it's tied to
+  // a real, recent user gesture; the previous version called play() from deep inside an
+  // async chain (after Promise.all() finished loading every photo), by which point the
+  // gesture had often "expired" and play() was silently blocked. This is the actual fix
+  // for "music nahi aaya" — priming here keeps play() close enough to the tap to count.
+  function primeReelAudio() {
+    const audioEl = document.getElementById('reel-audio');
+    reelAudioPlayPromise = null;
+    if (!studioReelMusicUrl || !audioEl) return;
+    audioEl.crossOrigin = 'anonymous';
+    audioEl.src = studioReelMusicUrl;
+    audioEl.loop = true;
+    audioEl.load();
+    reelAudioPlayPromise = audioEl.play().catch(function (err) {
+      console.error('Reel background music failed to start', err);
+      return null;
+    });
+  }
+
   function generateReel() {
     const photos = myReelSourcePhotos();
     if (photos.length < REEL_MIN_PHOTOS) return;
+    primeReelAudio();
     const intro = document.getElementById('reel-intro');
     const progress = document.getElementById('reel-progress');
     const result = document.getElementById('reel-result');
@@ -5007,15 +5084,20 @@
         setReelProgress(15, 'Rendering your reel...');
         return renderReelVideo(images);
       })
-      .then(function (blob) {
-        reelBlob = blob;
-        reelObjectUrl = URL.createObjectURL(blob);
+      .then(function (out) {
+        reelBlob = out.blob;
+        reelObjectUrl = URL.createObjectURL(out.blob);
         const video = document.getElementById('reel-video');
         const downloadBtn = document.getElementById('reel-download-btn');
         const shareBtn = document.getElementById('reel-share-btn');
+        const musicNote = document.getElementById('reel-music-note');
         if (video) video.src = reelObjectUrl;
         if (downloadBtn) downloadBtn.href = reelObjectUrl;
         if (shareBtn) shareBtn.style.display = (navigator.canShare && navigator.share) ? 'block' : 'none';
+        // Surfaced instead of silently swallowed — a guest (or us, checking their report)
+        // now actually sees when music didn't make it into the video, rather than a
+        // reel that's quietly missing it with no visible signal anywhere.
+        if (musicNote) musicNote.style.display = out.musicFailed ? 'block' : 'none';
         if (progress) progress.style.display = 'none';
         if (result) result.style.display = 'block';
       })
@@ -5042,28 +5124,26 @@
       canvas.width = REEL_WIDTH; canvas.height = REEL_HEIGHT;
       const ctx = canvas.getContext('2d');
       const n = images.length;
-      const totalMs = n * REEL_SLIDE_MS + 1500; // + a short branded outro card
+      const totalMs = REEL_INTRO_MS + n * REEL_SLIDE_MS + REEL_OUTRO_MS;
       const canvasStream = canvas.captureStream(30);
       const tracks = canvasStream.getVideoTracks().slice();
 
-      // Optional studio background music (Profile → Guest Reels in the dashboard) —
-      // mixed in only if the studio has uploaded a track; a silent, valid reel otherwise.
       const audioEl = document.getElementById('reel-audio');
-      let audioReady = Promise.resolve();
-      if (studioReelMusicUrl && audioEl) {
-        audioEl.crossOrigin = 'anonymous';
-        audioEl.src = studioReelMusicUrl;
-        audioEl.loop = true;
-        audioEl.currentTime = 0;
-        audioReady = audioEl.play().then(function () {
-          if (audioEl.captureStream) {
-            audioEl.captureStream().getAudioTracks().forEach(function (t) { tracks.push(t); });
-          }
-        }).catch(function () {
-          // Autoplay block, missing CORS headers, or unsupported captureStream() on this
-          // browser — fall back to a silent reel instead of failing the whole render.
-        });
-      }
+      let musicFailed = !!studioReelMusicUrl;
+      // primeReelAudio() (called back in generateReel(), right as the guest tapped) has
+      // had the whole photo-loading phase to either succeed or get blocked by now — just
+      // read the outcome here rather than calling play() a second time.
+      const audioReady = (studioReelMusicUrl && audioEl && reelAudioPlayPromise)
+        ? reelAudioPlayPromise.then(function () {
+            if (!audioEl.paused && audioEl.captureStream) {
+              audioEl.currentTime = 0; // re-sync so the track starts exactly when recording does
+              audioEl.captureStream().getAudioTracks().forEach(function (t) { tracks.push(t); });
+              musicFailed = false;
+            } else {
+              console.error('Reel background music could not be captured (blocked, or captureStream() unsupported on this browser)');
+            }
+          })
+        : Promise.resolve();
 
       audioReady.then(function () {
         let recorder;
@@ -5077,7 +5157,7 @@
         recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
         recorder.onstop = function () {
           if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
-          resolve(new Blob(chunks, { type: 'video/webm' }));
+          resolve({ blob: new Blob(chunks, { type: 'video/webm' }), musicFailed: musicFailed });
         };
         recorder.onerror = function (e) { reject(e.error || new Error('Recording failed')); };
 
@@ -5090,21 +5170,25 @@
             recorder.stop();
             return;
           }
-          setReelProgress(15 + (elapsed / totalMs) * 80, 'Rendering your reel...');
-          if (elapsed >= n * REEL_SLIDE_MS) {
+          setReelProgress(10 + (elapsed / totalMs) * 85, 'Rendering your reel...');
+          if (elapsed < REEL_INTRO_MS) {
+            drawReelIntroCard(ctx);
+          } else if (elapsed >= REEL_INTRO_MS + n * REEL_SLIDE_MS) {
             drawReelOutroCard(ctx);
           } else {
-            const idx = Math.min(n - 1, Math.floor(elapsed / REEL_SLIDE_MS));
-            const slideElapsed = elapsed - idx * REEL_SLIDE_MS;
+            const slideElapsedTotal = elapsed - REEL_INTRO_MS;
+            const idx = Math.min(n - 1, Math.floor(slideElapsedTotal / REEL_SLIDE_MS));
+            const slideElapsed = slideElapsedTotal - idx * REEL_SLIDE_MS;
             const slideProgress = Math.min(1, slideElapsed / REEL_SLIDE_MS);
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
-            drawReelFrame(ctx, images[idx], slideProgress, 1);
+            drawReelFrame(ctx, images[idx], slideProgress, 1, idx);
             // Crossfade the next slide in over the closing REEL_TRANSITION_MS of this one.
             if (idx < n - 1 && slideElapsed > REEL_SLIDE_MS - REEL_TRANSITION_MS) {
               const fadeAlpha = (slideElapsed - (REEL_SLIDE_MS - REEL_TRANSITION_MS)) / REEL_TRANSITION_MS;
-              drawReelFrame(ctx, images[idx + 1], 0, fadeAlpha);
+              drawReelFrame(ctx, images[idx + 1], 0, fadeAlpha, idx + 1);
             }
+            applyReelVignette(ctx);
           }
           requestAnimationFrame(frame);
         }
