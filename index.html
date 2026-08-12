@@ -5019,6 +5019,30 @@
     });
   }
 
+  // Phone camera photos are commonly 4000px+ on their long side, but the reel canvas is
+  // only 720x1280 — drawReelFrame() used to run ctx.drawImage() straight off the
+  // full-resolution original on EVERY animation frame (up to ~60/sec), which is real
+  // scaling work the main thread has to redo every single frame for every photo. On a
+  // slower phone that can stall the frame loop for a stretch, and since captureStream()
+  // just re-samples whatever's on the canvas on its own timer, a stall like that shows
+  // up in the exported video as that one photo appearing to freeze/not transition
+  // (frame-count still advances once the stall clears, so the reel doesn't hang
+  // forever — but that particular photo's slide can look stuck). Downscaling each photo
+  // once, up front, to a size the canvas can actually use removes that per-frame cost
+  // entirely. 1600px on the long side is comfortably more detail than a 720x1280 canvas
+  // with up to 1.28x Ken Burns zoom ever needs.
+  function prescaleImageForReel(img) {
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const MAX_DIM = 1600;
+    if (!iw || !ih || Math.max(iw, ih) <= MAX_DIM) return img;
+    const scale = MAX_DIM / Math.max(iw, ih);
+    const c = document.createElement('canvas');
+    c.width = Math.round(iw * scale);
+    c.height = Math.round(ih * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c; // a canvas works as a drawImage() source exactly like an <img>
+  }
+
   // "Cover" fit (like CSS object-fit:cover) into an arbitrary target rect (tx,ty,tw,th —
   // defaults to the full canvas, but the 'collage' template passes a half-height rect so
   // two photos can share one frame), plus a bolder Ken Burns zoom/pan driven by
@@ -5295,10 +5319,12 @@
       });
     }))
       .then(function (loaded) {
-        const images = loaded.filter(function (img) { return img !== null; });
-        if (images.length < REEL_MIN_PHOTOS) {
+        const rawImages = loaded.filter(function (img) { return img !== null; });
+        if (rawImages.length < REEL_MIN_PHOTOS) {
           throw new Error('Not enough photos loaded — please check your connection and try again.');
         }
+        setReelProgress(14, 'Preparing photos...');
+        const images = rawImages.map(prescaleImageForReel);
         setReelProgress(15, 'Rendering your reel...');
         const photoIndices = images.map(function (_, i) { return i; });
         const slides = buildReelSlides(photoIndices, template);
