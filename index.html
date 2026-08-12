@@ -1221,18 +1221,33 @@
         <i data-icon="REEL" style="color:var(--accent);"></i>
         <p style="font-size:13px;color:var(--ink);font-weight:700;margin:10px 0 4px;">Turn your photos into a reel</p>
         <p id="reel-intro-count" style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">We'll use your matched photos to build a short video you can save or share — made right here on your device.</p>
-        <div id="reel-template-row" style="display:flex;gap:8px;justify-content:center;margin:0 0 18px;flex-wrap:wrap;">
+        <div id="reel-template-row" style="display:flex;gap:8px;justify-content:center;margin:0 0 14px;flex-wrap:wrap;">
           <button type="button" class="btn-outline reel-tpl-btn" data-tpl="classic" onclick="selectReelTemplate('classic')" style="padding:7px 14px;font-size:11.5px;">Classic</button>
           <button type="button" class="btn-outline reel-tpl-btn" data-tpl="caption" onclick="selectReelTemplate('caption')" style="padding:7px 14px;font-size:11.5px;">Captions</button>
           <button type="button" class="btn-outline reel-tpl-btn" data-tpl="collage" onclick="selectReelTemplate('collage')" style="padding:7px 14px;font-size:11.5px;">Collage</button>
+        </div>
+        <!-- Only shown for the 'caption'/'collage' templates (toggled by
+             selectReelTemplate()) — prefilled with the event name so there's a sensible
+             default, but genuinely editable: a guest can type "Priya's Wedding", a
+             couple's names, or anything else instead of only ever getting the event name
+             baked in with no way to change it. -->
+        <div id="reel-caption-row" style="display:none;margin:0 0 18px;">
+          <input type="text" id="reel-caption-input" maxlength="40" placeholder="Text for your reel" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:0;padding:9px 12px;font-size:13px;text-align:center;">
         </div>
         <button class="btn-solid-sm" onclick="generateReel()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:12px 22px;font-size:13px;font-weight:700;cursor:pointer;">Create My Reel</button>
       </div>
       <div id="reel-progress" style="display:none;text-align:center;padding:40px 16px;">
         <p style="font-size:13px;color:var(--ink);font-weight:700;margin:0 0 14px;" id="reel-progress-label">Rendering your reel...</p>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 14px;">Keep this tab open and your screen on until it finishes — this renders in real time, so locking your phone or switching apps will pause it.</p>
         <div style="height:8px;max-width:260px;margin:0 auto;background:var(--border);border-radius:8px;overflow:hidden;">
           <div id="reel-progress-fill" style="height:100%;width:0%;background:var(--accent);transition:width .2s;"></div>
         </div>
+        <!-- Real escape hatch for if this ever genuinely stalls (e.g. the render clock
+             getting confused by a very long screen-lock gap) — no more getting stuck on
+             this screen with nothing to tap. See cancelReelGeneration() below. -->
+        <p style="margin-top:16px;">
+          <span style="color:var(--muted);font-weight:700;cursor:pointer;font-size:12px;" onclick="cancelReelGeneration()">Cancel</span>
+        </p>
       </div>
       <div id="reel-result" style="display:none;">
         <video id="reel-video" playsinline controls loop style="width:100%;max-width:320px;display:block;margin:0 auto 16px;background:#000;border-radius:0;"></video>
@@ -5011,14 +5026,12 @@
     ctx.fillRect(0, REEL_HEIGHT * 0.62, REEL_WIDTH, REEL_HEIGHT * 0.38);
   }
 
-  // Bottom-left caption (event name, falling back to studio name) — the 'caption' and
-  // 'collage' templates use this to match the bottom-name-overlay look from the
-  // reference reel examples ("Shantanu weds Swati"-style text baked into the video),
-  // instead of a bare, uncaptioned photo.
-  function drawReelCaption(ctx) {
-    const eventNameEl = document.getElementById('home-event-name');
-    const nameEl = document.getElementById('studio-name');
-    const text = (eventNameEl && eventNameEl.textContent) || (nameEl && nameEl.textContent) || '';
+  // Bottom-left caption — the 'caption' and 'collage' templates use this to match the
+  // bottom-name-overlay look from the reference reel examples ("Shantanu weds
+  // Swati"-style text baked into the video). `text` comes from the guest's own
+  // #reel-caption-input (prefilled with the event name, but genuinely editable —
+  // this used to always be the auto-detected event name with no way to change it).
+  function drawReelCaption(ctx, text) {
     if (!text) return;
     ctx.textAlign = 'left';
     ctx.font = '700 26px -apple-system, sans-serif';
@@ -5126,8 +5139,10 @@
     return { sequence: sequence, slideMs: slideMs };
   }
 
-  // Called from the intro screen's template buttons (before generating) — just updates
-  // which button looks selected and remembers the choice for generateReel() to read.
+  // Called from the intro screen's template buttons (before generating) — updates which
+  // button looks selected, remembers the choice for generateReel() to read, and shows/
+  // hides the actual editable caption text field for templates that use one. Only
+  // 'classic' has no caption; 'caption' and 'collage' both use whatever's typed there.
   function selectReelTemplate(tpl) {
     reelTemplate = tpl;
     document.querySelectorAll('.reel-tpl-btn').forEach(function (btn) {
@@ -5136,6 +5151,18 @@
       btn.style.color = active ? '#fff' : 'var(--ink)';
       btn.style.borderColor = active ? 'var(--ink)' : '';
     });
+    const captionRow = document.getElementById('reel-caption-row');
+    const captionInput = document.getElementById('reel-caption-input');
+    if (captionRow) captionRow.style.display = (tpl === 'classic') ? 'none' : 'block';
+    // Prefill with the event (or studio) name only the first time this field appears —
+    // never overwrite text the guest has already typed just because they clicked between
+    // templates while deciding.
+    if (captionInput && !captionInput.dataset.prefilled) {
+      const eventNameEl = document.getElementById('home-event-name');
+      const nameEl = document.getElementById('studio-name');
+      captionInput.value = (eventNameEl && eventNameEl.textContent) || (nameEl && nameEl.textContent) || '';
+      captionInput.dataset.prefilled = '1';
+    }
   }
 
   // Starts the studio's background track playing IMMEDIATELY, synchronously inside the
@@ -5165,6 +5192,15 @@
     });
   }
 
+  // Checked once per animation frame inside renderReelVideo() below — flipped by the
+  // progress screen's "Cancel" link, the real escape hatch for a render that seems stuck
+  // (previously there was no way out of that screen at all besides force-closing the
+  // app/browser tab).
+  let reelRenderCancelled = false;
+  function cancelReelGeneration() {
+    reelRenderCancelled = true;
+  }
+
   function generateReel() {
     const photos = myReelSourcePhotos();
     if (photos.length < REEL_MIN_PHOTOS) return;
@@ -5178,12 +5214,14 @@
     setReelProgress(3, 'Loading your photos...');
 
     const template = reelTemplate;
+    const captionInput = document.getElementById('reel-caption-input');
+    const captionText = (template !== 'classic' && captionInput) ? captionInput.value.trim() : '';
     Promise.all(photos.map(function (p) { return loadImageForReel(p.dataUrl); }))
       .then(function (images) {
         setReelProgress(15, 'Rendering your reel...');
         const photoIndices = images.map(function (_, i) { return i; });
         const slides = buildReelSlides(photoIndices, template);
-        return renderReelVideo(images, computeReelPlan(slides), template);
+        return renderReelVideo(images, computeReelPlan(slides), template, captionText);
       })
       .then(function (out) {
         reelBlob = out.blob;
@@ -5203,14 +5241,17 @@
         if (result) result.style.display = 'block';
       })
       .catch(function (err) {
-        console.error('generateReel failed', err);
         if (progress) progress.style.display = 'none';
         if (intro) intro.style.display = 'block';
+        // A deliberate tap on "Cancel" isn't a failure — no error, no alert, just back
+        // to the intro screen quietly.
+        if (err && err.message === '__cancelled__') return;
+        console.error('generateReel failed', err);
         alert('Could not create your reel — please try again.' + (err && err.message ? ' (' + err.message + ')' : ''));
       });
   }
 
-  function renderReelVideo(images, plan, template) {
+  function renderReelVideo(images, plan, template, captionText) {
     return new Promise(function (resolve, reject) {
       const canvas = document.getElementById('reel-canvas');
       if (!window.MediaRecorder || !canvas || !canvas.captureStream) {
@@ -5248,73 +5289,137 @@
           })
         : Promise.resolve();
 
+      reelRenderCancelled = false;
+
+      // Real-time recording means an ~18-22s reel genuinely takes ~18-22 real seconds to
+      // render — long enough that a guest locking their phone or switching apps mid-way
+      // is likely, not an edge case. Browsers pause requestAnimationFrame almost
+      // entirely while the tab is hidden, so time spent backgrounded doesn't advance the
+      // recording (no bug there) — but it WAS silently missing from the render clock
+      // below, which used raw wall-clock elapsed time. Without this tracking, `elapsed`
+      // would already read as "done" (or close to it) the instant the guest came back,
+      // producing a truncated/broken video instead of the stall this was reported as —
+      // either way, this is what "kuch photos ke baad atak jaata hai" was actually
+      // hitting. Subtracting the tracked hidden time keeps the render clock honest.
+      let hiddenAccumMs = 0;
+      let hiddenSince = document.hidden ? performance.now() : null;
+      function onReelVisibilityChange() {
+        if (document.hidden) {
+          hiddenSince = performance.now();
+        } else if (hiddenSince !== null) {
+          hiddenAccumMs += performance.now() - hiddenSince;
+          hiddenSince = null;
+        }
+      }
+      document.addEventListener('visibilitychange', onReelVisibilityChange);
+      function cleanupReelListeners() {
+        document.removeEventListener('visibilitychange', onReelVisibilityChange);
+      }
+
       audioReady.then(function () {
         let recorder;
         try {
           recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: mimeType, videoBitsPerSecond: 4000000 });
         } catch (err) {
+          cleanupReelListeners();
           reject(err);
           return;
         }
         const chunks = [];
         recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
         recorder.onstop = function () {
+          cleanupReelListeners();
           if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
           resolve({ blob: new Blob(chunks, { type: 'video/webm' }), musicFailed: musicFailed });
         };
-        recorder.onerror = function (e) { reject(e.error || new Error('Recording failed')); };
+        recorder.onerror = function (e) {
+          cleanupReelListeners();
+          reject(e.error || new Error('Recording failed'));
+        };
 
         const startedAt = performance.now();
         function frame() {
-          const elapsed = performance.now() - startedAt;
-          if (elapsed >= totalMs) {
-            drawReelOutroCard(ctx);
-            setReelProgress(100, 'Finishing up...');
-            recorder.stop();
+          const rawElapsed = performance.now() - startedAt;
+
+          if (reelRenderCancelled) {
+            cleanupReelListeners();
+            try { recorder.stop(); } catch (err) {}
+            reject(new Error('__cancelled__'));
             return;
           }
-          setReelProgress(10 + (elapsed / totalMs) * 85, 'Rendering your reel...');
-          if (elapsed < REEL_INTRO_MS) {
-            drawReelIntroCard(ctx);
-          } else if (elapsed >= REEL_INTRO_MS + n * slideMs) {
-            drawReelOutroCard(ctx);
-          } else {
-            const slideElapsedTotal = elapsed - REEL_INTRO_MS;
-            const slot = Math.min(n - 1, Math.floor(slideElapsedTotal / slideMs));
-            const slideElapsed = slideElapsedTotal - slot * slideMs;
-            const slideProgress = Math.min(1, slideElapsed / slideMs);
-            const photoIdxs = sequence[slot];
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
-            if (photoIdxs.length === 2) {
-              // Collage: two photos stacked, each cover-fit into its own half — matches
-              // the reference montage-style example. No cross-slide crossfade for this
-              // template (keeps the compositing simple); the alternating pan per photo
-              // still gives it motion.
-              drawReelFrame(ctx, images[photoIdxs[0]], slideProgress, 1, slot, 0, 0, REEL_WIDTH, REEL_HEIGHT / 2);
-              drawReelFrame(ctx, images[photoIdxs[1]], slideProgress, 1, slot + 1, 0, REEL_HEIGHT / 2, REEL_WIDTH, REEL_HEIGHT / 2);
-              ctx.fillStyle = '#141410';
-              ctx.fillRect(0, REEL_HEIGHT / 2 - 2, REEL_WIDTH, 4);
-            } else {
-              drawReelFrame(ctx, images[photoIdxs[0]], slideProgress, 1, slot);
-              // Crossfade the next slide in over the closing REEL_TRANSITION_MS of this
-              // one (falls back to a plain cut if slideMs ever gets small enough that a
-              // full transition wouldn't fit — can't happen at the current
-              // REEL_SLIDE_MIN_MS, but keeps this safe if that constant ever changes).
-              const transitionMs = Math.min(REEL_TRANSITION_MS, slideMs * 0.4);
-              if (slot < n - 1 && slideElapsed > slideMs - transitionMs && sequence[slot + 1].length === 1) {
-                const fadeAlpha = (slideElapsed - (slideMs - transitionMs)) / transitionMs;
-                drawReelFrame(ctx, images[sequence[slot + 1][0]], 0, fadeAlpha, slot + 1);
-              }
+          // Generous safety valve — real wall-clock time (including any hidden gaps)
+          // running away to more than 3x the intended length plus a couple minutes'
+          // grace means something is genuinely wrong, not just a normal screen-lock
+          // pause. Ends the render with a clear, actionable error instead of leaving the
+          // guest stuck on the progress screen forever with only Cancel as a way out.
+          if (rawElapsed > totalMs * 3 + 120000) {
+            cleanupReelListeners();
+            try { recorder.stop(); } catch (err) {}
+            reject(new Error('Rendering is taking much longer than expected — please try again with this tab open and your screen on.'));
+            return;
+          }
+
+          // A single bad frame (a corrupt image, a canvas edge case, etc.) used to kill
+          // the entire requestAnimationFrame chain silently — nothing else would ever
+          // schedule again, so the recorder never got stop() called and the progress
+          // screen just sat there forever with no error and no way to tell what
+          // happened. Now it's logged and skipped instead of taking the whole render down.
+          try {
+            const elapsed = rawElapsed - hiddenAccumMs - (hiddenSince !== null ? (performance.now() - hiddenSince) : 0);
+            if (elapsed >= totalMs) {
+              drawReelOutroCard(ctx);
+              setReelProgress(100, 'Finishing up...');
+              recorder.stop();
+              return;
             }
-            applyReelVignette(ctx);
-            if (template !== 'classic') drawReelCaption(ctx);
+            setReelProgress(10 + (elapsed / totalMs) * 85, 'Rendering your reel...');
+            if (elapsed < REEL_INTRO_MS) {
+              drawReelIntroCard(ctx);
+            } else if (elapsed >= REEL_INTRO_MS + n * slideMs) {
+              drawReelOutroCard(ctx);
+            } else {
+              const slideElapsedTotal = elapsed - REEL_INTRO_MS;
+              const slot = Math.min(n - 1, Math.floor(slideElapsedTotal / slideMs));
+              const slideElapsed = slideElapsedTotal - slot * slideMs;
+              const slideProgress = Math.min(1, slideElapsed / slideMs);
+              const photoIdxs = sequence[slot];
+              ctx.fillStyle = '#000';
+              ctx.fillRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
+              if (photoIdxs.length === 2) {
+                // Collage: two photos stacked, each cover-fit into its own half —
+                // matches the reference montage-style example. No cross-slide crossfade
+                // for this template (keeps the compositing simple); the alternating pan
+                // per photo still gives it motion.
+                drawReelFrame(ctx, images[photoIdxs[0]], slideProgress, 1, slot, 0, 0, REEL_WIDTH, REEL_HEIGHT / 2);
+                drawReelFrame(ctx, images[photoIdxs[1]], slideProgress, 1, slot + 1, 0, REEL_HEIGHT / 2, REEL_WIDTH, REEL_HEIGHT / 2);
+                ctx.fillStyle = '#141410';
+                ctx.fillRect(0, REEL_HEIGHT / 2 - 2, REEL_WIDTH, 4);
+              } else {
+                drawReelFrame(ctx, images[photoIdxs[0]], slideProgress, 1, slot);
+                // Crossfade the next slide in over the closing REEL_TRANSITION_MS of
+                // this one (falls back to a plain cut if slideMs ever gets small enough
+                // that a full transition wouldn't fit — can't happen at the current
+                // REEL_SLIDE_MIN_MS, but keeps this safe if that constant ever changes).
+                const transitionMs = Math.min(REEL_TRANSITION_MS, slideMs * 0.4);
+                if (slot < n - 1 && slideElapsed > slideMs - transitionMs && sequence[slot + 1].length === 1) {
+                  const fadeAlpha = (slideElapsed - (slideMs - transitionMs)) / transitionMs;
+                  drawReelFrame(ctx, images[sequence[slot + 1][0]], 0, fadeAlpha, slot + 1);
+                }
+              }
+              applyReelVignette(ctx);
+              if (template !== 'classic') drawReelCaption(ctx, captionText);
+            }
+          } catch (err) {
+            console.error('Reel frame render error, skipping this frame', err);
           }
           requestAnimationFrame(frame);
         }
         recorder.start();
         requestAnimationFrame(frame);
-      }).catch(reject);
+      }).catch(function (err) {
+        cleanupReelListeners();
+        reject(err);
+      });
     });
   }
 
