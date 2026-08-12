@@ -1220,7 +1220,12 @@
       <div id="reel-intro" style="display:none;text-align:center;padding:30px 16px;">
         <i data-icon="REEL" style="color:var(--accent);"></i>
         <p style="font-size:13px;color:var(--ink);font-weight:700;margin:10px 0 4px;">Turn your photos into a reel</p>
-        <p id="reel-intro-count" style="font-size:12px;color:var(--muted);margin:0 0 18px;line-height:1.5;">We'll use your matched photos to build a short video you can save or share — made right here on your device.</p>
+        <p id="reel-intro-count" style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">We'll use your matched photos to build a short video you can save or share — made right here on your device.</p>
+        <div id="reel-template-row" style="display:flex;gap:8px;justify-content:center;margin:0 0 18px;flex-wrap:wrap;">
+          <button type="button" class="btn-outline reel-tpl-btn" data-tpl="classic" onclick="selectReelTemplate('classic')" style="padding:7px 14px;font-size:11.5px;">Classic</button>
+          <button type="button" class="btn-outline reel-tpl-btn" data-tpl="caption" onclick="selectReelTemplate('caption')" style="padding:7px 14px;font-size:11.5px;">Captions</button>
+          <button type="button" class="btn-outline reel-tpl-btn" data-tpl="collage" onclick="selectReelTemplate('collage')" style="padding:7px 14px;font-size:11.5px;">Collage</button>
+        </div>
         <button class="btn-solid-sm" onclick="generateReel()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:12px 22px;font-size:13px;font-weight:700;cursor:pointer;">Create My Reel</button>
       </div>
       <div id="reel-progress" style="display:none;text-align:center;padding:40px 16px;">
@@ -4880,6 +4885,12 @@
   // Resolves once the priming play() call below has settled (success or blocked) — set
   // by primeReelAudio(), read later in renderReelVideo() once photo loading has finished.
   let reelAudioPlayPromise = null;
+  // 'classic' = single photo, no text. 'caption' = single photo + event-name caption
+  // (matches the bottom-name-overlay style in the reference reel examples). 'collage' =
+  // two photos stacked per frame (matches the reference montage-style example). Picked
+  // on the intro screen via selectReelTemplate() below, defaults to 'caption' since a
+  // plain uncaptioned slideshow was the specific "simple" complaint being fixed.
+  let reelTemplate = 'caption';
 
   function openMyReel() {
     resetReelScreen();
@@ -4928,6 +4939,7 @@
     }
     if (progress) progress.style.display = 'none';
     if (result) result.style.display = 'none';
+    selectReelTemplate(reelTemplate);
     fillIcons();
   }
 
@@ -4958,21 +4970,23 @@
     });
   }
 
-  // "Cover" fit (like CSS object-fit:cover) into a fixed portrait canvas, plus a bolder
-  // Ken Burns zoom/pan driven by `progress` (0→1 across this slide's own on-screen
-  // time) — recomputed fresh every frame rather than baked in, so the motion stays
-  // smooth regardless of device frame rate. `seed` (the slide's own index) alternates
-  // the pan direction between consecutive slides — the original version always drifted
-  // the same way on every photo, which is exactly what made the reel read as a plain,
-  // static slideshow instead of something that had actually been "edited".
-  function drawReelFrame(ctx, img, progress, alpha, seed) {
-    const cw = REEL_WIDTH, ch = REEL_HEIGHT;
+  // "Cover" fit (like CSS object-fit:cover) into an arbitrary target rect (tx,ty,tw,th —
+  // defaults to the full canvas, but the 'collage' template passes a half-height rect so
+  // two photos can share one frame), plus a bolder Ken Burns zoom/pan driven by
+  // `progress` (0→1 across this slide's own on-screen time) — recomputed fresh every
+  // frame rather than baked in, so the motion stays smooth regardless of device frame
+  // rate. `seed` (the slide's own index) alternates the pan direction between
+  // consecutive slides — the original version always drifted the same way on every
+  // photo, which is exactly what made the reel read as a plain, static slideshow instead
+  // of something that had actually been "edited".
+  function drawReelFrame(ctx, img, progress, alpha, seed, tx, ty, tw, th) {
+    if (tx === undefined) { tx = 0; ty = 0; tw = REEL_WIDTH; th = REEL_HEIGHT; }
     const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
     if (!iw || !ih) return;
-    const canvasRatio = cw / ch, imgRatio = iw / ih;
-    // Largest crop of the source image, at the canvas's aspect ratio, that fits inside it.
+    const targetRatio = tw / th, imgRatio = iw / ih;
+    // Largest crop of the source image, at the target rect's aspect ratio, that fits inside it.
     let baseW, baseH;
-    if (imgRatio > canvasRatio) { baseH = ih; baseW = ih * canvasRatio; } else { baseW = iw; baseH = iw / canvasRatio; }
+    if (imgRatio > targetRatio) { baseH = ih; baseW = ih * targetRatio; } else { baseW = iw; baseH = iw / targetRatio; }
     const baseX = (iw - baseW) / 2, baseY = (ih - baseH) / 2;
     const zoom = 1 + 0.28 * progress; // 1.0x -> 1.28x over the slide (was a barely-visible 1.12x)
     const cropW = baseW / zoom, cropH = baseH / zoom;
@@ -4982,7 +4996,7 @@
     const panX = rangeX * dirX;
     const panY = rangeY * (0.3 + dirY * 0.4); // stays in the upper 2/3, where faces usually are
     ctx.globalAlpha = alpha;
-    ctx.drawImage(img, baseX + panX, baseY + panY, cropW, cropH, 0, 0, cw, ch);
+    ctx.drawImage(img, baseX + panX, baseY + panY, cropW, cropH, tx, ty, tw, th);
     ctx.globalAlpha = 1;
   }
 
@@ -4995,6 +5009,24 @@
     grad.addColorStop(1, 'rgba(0,0,0,.42)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, REEL_HEIGHT * 0.62, REEL_WIDTH, REEL_HEIGHT * 0.38);
+  }
+
+  // Bottom-left caption (event name, falling back to studio name) — the 'caption' and
+  // 'collage' templates use this to match the bottom-name-overlay look from the
+  // reference reel examples ("Shantanu weds Swati"-style text baked into the video),
+  // instead of a bare, uncaptioned photo.
+  function drawReelCaption(ctx) {
+    const eventNameEl = document.getElementById('home-event-name');
+    const nameEl = document.getElementById('studio-name');
+    const text = (eventNameEl && eventNameEl.textContent) || (nameEl && nameEl.textContent) || '';
+    if (!text) return;
+    ctx.textAlign = 'left';
+    ctx.font = '700 26px -apple-system, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,.5)';
+    ctx.shadowBlur = 10;
+    ctx.fillText(text, 24, REEL_HEIGHT - 34);
+    ctx.shadowBlur = 0;
   }
 
   // Opening title card — bookends the reel with the outro card below instead of just
@@ -5046,18 +5078,84 @@
     return '';
   }
 
+  // A fixed REEL_SLIDE_MS made total length purely a function of how many photos a
+  // guest happened to match — someone with only 3-4 matched photos got a ~7-8 second
+  // reel, well under the intended 15-22s range. This instead targets ~18s directly: it
+  // picks a per-slide duration to fit whatever photo count exists, then (for guests with
+  // very few matches) loops back through the same photos — with a different pan/zoom
+  // seed each pass via drawReelFrame's `seed` param, so a repeat doesn't look identical
+  // to its first showing — rather than shipping a short reel.
+  const REEL_TARGET_MS = 18000;
+  const REEL_SLIDE_MIN_MS = 1100;
+  const REEL_SLIDE_MAX_MS = 2800;
+
+  // Turns a flat list of photo indices into the actual slide sequence for a given
+  // template. 'classic'/'caption' show one photo per slide; 'collage' pairs consecutive
+  // photos two-to-a-frame (matching the reference montage-style example) — an odd photo
+  // out at the end just shows on its own rather than being dropped.
+  function buildReelSlides(photoIndices, template) {
+    if (template !== 'collage') {
+      return photoIndices.map(function (i) { return [i]; });
+    }
+    const slides = [];
+    for (let i = 0; i < photoIndices.length; i += 2) {
+      if (i + 1 < photoIndices.length) slides.push([photoIndices[i], photoIndices[i + 1]]);
+      else slides.push([photoIndices[i]]);
+    }
+    return slides;
+  }
+
+  // A fixed per-slide duration made total length purely a function of how many slides
+  // exist — someone with only 3-4 matched photos (or any 'collage' reel, since pairing
+  // photos roughly halves the slide count) got a well-under-target reel. This instead
+  // targets ~18s directly: it picks a per-slide duration to fit whatever slide count
+  // exists, then (for short slide lists) loops back through them — with a different
+  // pan/zoom seed each pass via drawReelFrame's `seed` param, so a repeat doesn't look
+  // identical to its first showing — rather than shipping a short reel.
+  function computeReelPlan(slides) {
+    const introOutro = REEL_INTRO_MS + REEL_OUTRO_MS;
+    const available = Math.max(REEL_SLIDE_MIN_MS, REEL_TARGET_MS - introOutro);
+    let slideMs = Math.round(available / slides.length);
+    slideMs = Math.max(REEL_SLIDE_MIN_MS, Math.min(REEL_SLIDE_MAX_MS, slideMs));
+    let sequence = slides.slice();
+    let guard = 0;
+    while (introOutro + sequence.length * slideMs < 15000 && guard < 20) {
+      sequence = sequence.concat(slides);
+      guard++;
+    }
+    return { sequence: sequence, slideMs: slideMs };
+  }
+
+  // Called from the intro screen's template buttons (before generating) — just updates
+  // which button looks selected and remembers the choice for generateReel() to read.
+  function selectReelTemplate(tpl) {
+    reelTemplate = tpl;
+    document.querySelectorAll('.reel-tpl-btn').forEach(function (btn) {
+      const active = btn.getAttribute('data-tpl') === tpl;
+      btn.style.background = active ? 'var(--ink)' : 'none';
+      btn.style.color = active ? '#fff' : 'var(--ink)';
+      btn.style.borderColor = active ? 'var(--ink)' : '';
+    });
+  }
+
   // Starts the studio's background track playing IMMEDIATELY, synchronously inside the
   // same call stack as the guest's tap on "Create My Reel" — not later, once photo
   // loading/rendering has finished. Browsers only allow audio autoplay when it's tied to
-  // a real, recent user gesture; the previous version called play() from deep inside an
-  // async chain (after Promise.all() finished loading every photo), by which point the
-  // gesture had often "expired" and play() was silently blocked. This is the actual fix
-  // for "music nahi aaya" — priming here keeps play() close enough to the tap to count.
+  // a real, recent user gesture, and calling play() from deep inside an async chain
+  // (after Promise.all() finished loading every photo) risks that gesture having
+  // "expired" by the time it fires. NOTE: studioReelMusicUrl is a data: URL (the
+  // dashboard stores it inline on studio/profile, not as a Firebase Storage link) —
+  // that, not this timing, was the actual fix for music never making it into the
+  // recording. A Storage URL is cross-origin from this app's own domain, and
+  // HTMLMediaElement.captureStream() (used below) silently produces a SILENT track for
+  // any cross-origin source the browser can't verify via CORS — audio would visibly
+  // play right here for the studio testing it, yet come out mute in every guest's
+  // recorded reel, with no error anywhere. A data: URL has no origin at all, so it can
+  // never be tainted that way.
   function primeReelAudio() {
     const audioEl = document.getElementById('reel-audio');
     reelAudioPlayPromise = null;
     if (!studioReelMusicUrl || !audioEl) return;
-    audioEl.crossOrigin = 'anonymous';
     audioEl.src = studioReelMusicUrl;
     audioEl.loop = true;
     audioEl.load();
@@ -5079,10 +5177,13 @@
     if (progress) progress.style.display = 'block';
     setReelProgress(3, 'Loading your photos...');
 
+    const template = reelTemplate;
     Promise.all(photos.map(function (p) { return loadImageForReel(p.dataUrl); }))
       .then(function (images) {
         setReelProgress(15, 'Rendering your reel...');
-        return renderReelVideo(images);
+        const photoIndices = images.map(function (_, i) { return i; });
+        const slides = buildReelSlides(photoIndices, template);
+        return renderReelVideo(images, computeReelPlan(slides), template);
       })
       .then(function (out) {
         reelBlob = out.blob;
@@ -5109,7 +5210,7 @@
       });
   }
 
-  function renderReelVideo(images) {
+  function renderReelVideo(images, plan, template) {
     return new Promise(function (resolve, reject) {
       const canvas = document.getElementById('reel-canvas');
       if (!window.MediaRecorder || !canvas || !canvas.captureStream) {
@@ -5123,8 +5224,10 @@
       }
       canvas.width = REEL_WIDTH; canvas.height = REEL_HEIGHT;
       const ctx = canvas.getContext('2d');
-      const n = images.length;
-      const totalMs = REEL_INTRO_MS + n * REEL_SLIDE_MS + REEL_OUTRO_MS;
+      const sequence = plan.sequence; // slide slots — each a [photoIdx] or [photoIdx1, photoIdx2] (collage) — may repeat to fill the target duration
+      const n = sequence.length;
+      const slideMs = plan.slideMs;
+      const totalMs = REEL_INTRO_MS + n * slideMs + REEL_OUTRO_MS;
       const canvasStream = canvas.captureStream(30);
       const tracks = canvasStream.getVideoTracks().slice();
 
@@ -5173,22 +5276,39 @@
           setReelProgress(10 + (elapsed / totalMs) * 85, 'Rendering your reel...');
           if (elapsed < REEL_INTRO_MS) {
             drawReelIntroCard(ctx);
-          } else if (elapsed >= REEL_INTRO_MS + n * REEL_SLIDE_MS) {
+          } else if (elapsed >= REEL_INTRO_MS + n * slideMs) {
             drawReelOutroCard(ctx);
           } else {
             const slideElapsedTotal = elapsed - REEL_INTRO_MS;
-            const idx = Math.min(n - 1, Math.floor(slideElapsedTotal / REEL_SLIDE_MS));
-            const slideElapsed = slideElapsedTotal - idx * REEL_SLIDE_MS;
-            const slideProgress = Math.min(1, slideElapsed / REEL_SLIDE_MS);
+            const slot = Math.min(n - 1, Math.floor(slideElapsedTotal / slideMs));
+            const slideElapsed = slideElapsedTotal - slot * slideMs;
+            const slideProgress = Math.min(1, slideElapsed / slideMs);
+            const photoIdxs = sequence[slot];
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, REEL_WIDTH, REEL_HEIGHT);
-            drawReelFrame(ctx, images[idx], slideProgress, 1, idx);
-            // Crossfade the next slide in over the closing REEL_TRANSITION_MS of this one.
-            if (idx < n - 1 && slideElapsed > REEL_SLIDE_MS - REEL_TRANSITION_MS) {
-              const fadeAlpha = (slideElapsed - (REEL_SLIDE_MS - REEL_TRANSITION_MS)) / REEL_TRANSITION_MS;
-              drawReelFrame(ctx, images[idx + 1], 0, fadeAlpha, idx + 1);
+            if (photoIdxs.length === 2) {
+              // Collage: two photos stacked, each cover-fit into its own half — matches
+              // the reference montage-style example. No cross-slide crossfade for this
+              // template (keeps the compositing simple); the alternating pan per photo
+              // still gives it motion.
+              drawReelFrame(ctx, images[photoIdxs[0]], slideProgress, 1, slot, 0, 0, REEL_WIDTH, REEL_HEIGHT / 2);
+              drawReelFrame(ctx, images[photoIdxs[1]], slideProgress, 1, slot + 1, 0, REEL_HEIGHT / 2, REEL_WIDTH, REEL_HEIGHT / 2);
+              ctx.fillStyle = '#141410';
+              ctx.fillRect(0, REEL_HEIGHT / 2 - 2, REEL_WIDTH, 4);
+            } else {
+              drawReelFrame(ctx, images[photoIdxs[0]], slideProgress, 1, slot);
+              // Crossfade the next slide in over the closing REEL_TRANSITION_MS of this
+              // one (falls back to a plain cut if slideMs ever gets small enough that a
+              // full transition wouldn't fit — can't happen at the current
+              // REEL_SLIDE_MIN_MS, but keeps this safe if that constant ever changes).
+              const transitionMs = Math.min(REEL_TRANSITION_MS, slideMs * 0.4);
+              if (slot < n - 1 && slideElapsed > slideMs - transitionMs && sequence[slot + 1].length === 1) {
+                const fadeAlpha = (slideElapsed - (slideMs - transitionMs)) / transitionMs;
+                drawReelFrame(ctx, images[sequence[slot + 1][0]], 0, fadeAlpha, slot + 1);
+              }
             }
             applyReelVignette(ctx);
+            if (template !== 'classic') drawReelCaption(ctx);
           }
           requestAnimationFrame(frame);
         }
