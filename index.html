@@ -39,7 +39,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <!-- Real push notifications (Firebase Cloud Messaging) — lets a guest get notified about
      new photos/videos even when this tab/app isn't open, via sw.js's background handler.
-     See initNotifyMuteToggle()/enablePushNotifications() below and the Cloud Functions that
+     Permission is only ever requested from a real tap (the notify-banner's Enable button,
+     or the Mute Event toggle) — never automatically on page load — since browsers quietly
+     suppress/auto-block ungestured permission requests. See initNotifyMuteToggle()/
+     showNotifyBanner()/enablePushNotifications() below and the Cloud Functions that
      actually send these (functions/index.js, deployed separately). -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <!-- EmailJS: lets this static, backend-less app send a real email (no server needed) —
@@ -880,6 +883,27 @@
         <div id="install-banner-body"></div>
       </div>
 
+      <!-- "Enable Notifications" nudge — replaces the old silent, automatic first-visit
+           Notification.requestPermission() call. Chrome (and other modern browsers) treat
+           a permission request that isn't triggered by a real tap/click as low-trust: the
+           prompt collapses to a small, easy-to-miss address-bar icon instead of a real
+           dialog, and if the guest doesn't notice it in time it auto-resolves to "blocked"
+           — so guests were silently ending up muted without ever consciously saying no.
+           This banner requires an actual tap on the button below, so the resulting
+           requestPermission() call is gesture-triggered and gets the real, non-quiet
+           permission dialog. See showNotifyBanner()/enableNotificationsFromBanner() below. -->
+      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:0;padding:14px 16px;position:relative;">
+        <button onclick="dismissNotifyBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
+        <div style="display:flex;gap:12px;align-items:center;padding-right:22px;">
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;">Get notified</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.4;">Know the moment new photos or videos are uploaded — no need to keep checking back.</div>
+          </div>
+          <button class="btn-solid-sm" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;" onclick="enableNotificationsFromBanner()">Enable</button>
+        </div>
+      </div>
+
       <!-- Moved to right under the event cover (was below the chips/folder cards) —
            the studio's own identity/contact card should be the first thing a guest
            sees, not something they have to scroll past everything else to find. -->
@@ -1036,9 +1060,10 @@
              "Mute Event" switch, but both answered the exact same question from a guest's
              point of view ("do I get notified for this event?"), which just read as
              confusing/redundant. Unchecked = actively receiving notifications for this
-             event; checked = muted/paused. First-visit auto opt-in (asks for permission
-             right away) and the actual browser/FCM registration still happen behind this
-             one control — see initNotifyMuteToggle()/enablePushNotifications() below. -->
+             event; checked = muted/paused. First-visit opt-in now happens via the tappable
+             notify-banner on Home (not an automatic on-load request) so the permission
+             prompt is gesture-triggered — see initNotifyMuteToggle()/showNotifyBanner()/
+             enablePushNotifications() below. -->
         <div class="list-row">
           <div>
             <div class="lt">Mute Event</div>
@@ -1555,18 +1580,23 @@
       toggle.disabled = true;
       const desc = document.getElementById('notify-desc');
       if (desc) desc.textContent = 'Notifications are not supported on this browser — try installing the app or using Chrome on Android.';
+      hideNotifyBanner();
       return;
     }
     let notifyStored = null;
     try { notifyStored = localStorage.getItem('sf_notify_' + EVENT.id); } catch (err) {}
-    // First time this guest has ever opened this event (no stored decision either way) —
-    // default to unmuted and ask for permission right away, instead of leaving it muted
-    // until they happen to find this toggle buried in More. If they say no, or mute
-    // later, that choice is remembered and never overridden again.
+    // First time this guest has ever opened this event (no stored decision either way).
+    // Used to auto-call enablePushNotifications(true) here immediately on page load — but
+    // that requestPermission() call had no real user gesture behind it, and Chrome quietly
+    // suppresses/auto-blocks exactly that pattern (see the notify-banner HTML comment
+    // above), so guests ended up muted without ever having consciously said no. Now this
+    // just shows a real, tappable banner instead; the toggle reads as "not receiving" until
+    // the guest actually taps Enable (or the toggle) and the request becomes gesture-driven.
     if (notifyStored === null) {
-      toggle.checked = false;
-      enablePushNotifications(true);
+      toggle.checked = true;
+      showNotifyBanner();
     } else {
+      hideNotifyBanner();
       let muted = false;
       try { muted = localStorage.getItem('sf_muted_' + EVENT.id) === '1'; } catch (err) {}
       // No working subscription (permission denied, or granted but revoked since) reads
@@ -1578,6 +1608,11 @@
       if (notifyStored === '1') initForegroundPush();
     }
     toggle.addEventListener('change', function () {
+      // A real tap on the toggle itself is just as much a user gesture as the banner
+      // button, so a guest who dismissed/ignored the banner and later flips this switch on
+      // their own still gets the real (non-quiet) permission dialog — that path already
+      // falls through to enablePushNotifications() below, unchanged.
+      hideNotifyBanner();
       if (toggle.checked) {
         // Muting: keep the underlying subscription/token alive (so unmuting later is
         // instant, no re-asking for permission) — just pause delivery for this event.
@@ -1605,10 +1640,41 @@
     });
   }
 
-  // silent: true when called automatically on first boot (initNotifyMuteToggle) rather
-  // than from the guest actually tapping the toggle — an alert() popping up unprompted
-  // before the guest has done anything would just be confusing, so failures there are
-  // logged and remembered (sf_notify_=0) instead of surfaced with a popup.
+  function showNotifyBanner() {
+    const banner = document.getElementById('notify-banner');
+    if (!banner) return;
+    banner.style.display = 'block';
+    fillIcons();
+  }
+
+  function hideNotifyBanner() {
+    const banner = document.getElementById('notify-banner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  // Guest tapped the X on the banner instead of Enable — treat that the same as a denied
+  // permission (a real, considered "no") so it's remembered and the banner doesn't keep
+  // reappearing on every visit, without ever actually calling requestPermission().
+  function dismissNotifyBanner() {
+    try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
+    hideNotifyBanner();
+    const toggle = document.getElementById('mute-toggle');
+    if (toggle) toggle.checked = true;
+  }
+
+  // Called from the banner's own "Enable" button — this click IS the user gesture, so the
+  // Notification.requestPermission() call inside enablePushNotifications() below fires
+  // synchronously off a real tap and gets the browser's actual permission dialog instead
+  // of the quiet, auto-collapsing one Chrome shows for ungestured requests.
+  function enableNotificationsFromBanner() {
+    hideNotifyBanner();
+    enablePushNotifications();
+  }
+
+  // silent: true is no longer used for the first-boot path (that now goes through the
+  // notify-banner's Enable button instead, which is never silent) — kept as a parameter
+  // only so a guest re-enabling from the toggle after a previous decision still suppresses
+  // an alert() in the (rare) case that resolves without needing the full permission flow.
   function enablePushNotifications(silent) {
     const toggle = document.getElementById('mute-toggle');
     if (!pushSupported() || !db) {
