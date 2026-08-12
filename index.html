@@ -897,10 +897,10 @@
         <div style="display:flex;gap:12px;align-items:center;padding-right:22px;">
           <div style="width:38px;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
           <div style="flex:1;">
-            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;">Get notified</div>
+            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;">Turn on notifications</div>
             <div style="font-size:12px;color:var(--muted);line-height:1.4;">Know the moment new photos or videos are uploaded — no need to keep checking back.</div>
           </div>
-          <button class="btn-solid-sm" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;" onclick="enableNotificationsFromBanner()">Enable</button>
+          <button class="btn-solid-sm" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;" onclick="enableNotificationsFromBanner()">Turn On</button>
         </div>
       </div>
 
@@ -913,7 +913,7 @@
       <div id="notify-pill" onclick="handleNotifyPillTap()" style="display:none;margin:0 16px 18px;cursor:pointer;">
         <div style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent-ink);border-radius:20px;padding:8px 14px 8px 10px;font-size:12.5px;font-weight:700;">
           <i data-icon="BELL" style="width:15px;height:15px;"></i>
-          <span id="notify-pill-text">Enable notifications</span>
+          <span id="notify-pill-text">Turn on notifications</span>
         </div>
       </div>
 
@@ -1069,17 +1069,20 @@
           <button class="btn-outline" id="admin-permission-btn" style="padding:6px 14px;font-size:11.5px;" onclick="requestAdminPermission()">Send</button>
         </div>
         <!-- Real push notifications (Firebase Cloud Messaging) — one toggle now, not two.
-             It used to be split into a separate "Notifications" on/off switch plus this
+             It used to be split into a separate "Notifications" on/off switch plus a
              "Mute Event" switch, but both answered the exact same question from a guest's
              point of view ("do I get notified for this event?"), which just read as
              confusing/redundant. Unchecked = actively receiving notifications for this
-             event; checked = muted/paused. First-visit opt-in now happens via the tappable
-             notify-banner on Home (not an automatic on-load request) so the permission
-             prompt is gesture-triggered — see initNotifyMuteToggle()/showNotifyBanner()/
-             enablePushNotifications() below. -->
+             event; checked = muted/paused. Relabeled from "Mute Event" to just
+             "Notifications" (with a description that states the CURRENT status, updated by
+             updateNotifyDesc() below) so it reads the same way as the Home banner/pill
+             instead of using different words ("Enable" vs "Mute") for the same on/off
+             switch. First-visit opt-in happens via the tappable notify-banner on Home (not
+             an automatic on-load request) so the permission prompt is gesture-triggered —
+             see initNotifyMuteToggle()/showNotifyBanner()/enablePushNotifications() below. -->
         <div class="list-row">
           <div>
-            <div class="lt">Mute Event</div>
+            <div class="lt">Notifications</div>
             <div class="ld" id="notify-desc">Pause notifications for this event only, without turning them off everywhere.</div>
           </div>
           <label class="switch"><input type="checkbox" id="mute-toggle"><span class="slider"></span></label>
@@ -1609,6 +1612,7 @@
       toggle.checked = true;
       showNotifyBanner();
       hideNotifyPill();
+      updateNotifyDesc();
     } else {
       hideNotifyBanner();
       let muted = false;
@@ -1621,6 +1625,7 @@
       // already-enabled guest doesn't have to retoggle anything.
       if (notifyStored === '1') initForegroundPush();
       updateNotifyPill();
+      updateNotifyDesc();
     }
     toggle.addEventListener('change', function () {
       // A real tap on the toggle itself is just as much a user gesture as the banner
@@ -1642,6 +1647,7 @@
         // (already subscribed, just paused) rather than re-appearing and implying they
         // need to do something again.
         hideNotifyPill();
+        updateNotifyDesc();
       } else {
         // Unmuting: if a subscription already exists, just flip muted back off; otherwise
         // (first time, or permission was previously denied) actually (re)request it.
@@ -1654,11 +1660,25 @@
         if (token && db && notifyOk) {
           db.collection('pushTokens').doc(token).set({ muted: false }, { merge: true }).catch(function () {});
           hideNotifyPill();
+          updateNotifyDesc();
         } else {
           enablePushNotifications();
         }
       }
     });
+  }
+
+  // Keeps the More tab's Notifications row description honest about the CURRENT state
+  // instead of a static sentence that never told a guest whether they were on or off —
+  // called every time the toggle's checked state could have changed, from either this
+  // toggle's own boot/change logic or enablePushNotifications()'s async outcomes below.
+  function updateNotifyDesc() {
+    const toggle = document.getElementById('mute-toggle');
+    const desc = document.getElementById('notify-desc');
+    if (!toggle || !desc || toggle.disabled) return;
+    desc.textContent = toggle.checked
+      ? 'Notifications are currently paused for this event — turn this off to start receiving them again.'
+      : "You're currently getting notified about new photos & videos for this event — turn this on to pause.";
   }
 
   function showNotifyBanner() {
@@ -1692,8 +1712,11 @@
     if (notifyStored === '1') { pill.style.display = 'none'; return; }
     let blocked = false;
     try { blocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'; } catch (err) {}
+    // Same "turn on/off" wording as the banner and the More tab's Notifications row below
+    // — used to say "Enable" here but "Mute Event" there, which read as two different
+    // features to a guest instead of one on/off switch.
     const label = document.getElementById('notify-pill-text');
-    if (label) label.textContent = blocked ? 'Notifications blocked — tap for help' : 'Enable notifications';
+    if (label) label.textContent = blocked ? 'Notifications are off — tap to fix' : 'Turn on notifications';
     pill.style.display = 'block';
     fillIcons();
   }
@@ -1706,7 +1729,7 @@
     let blocked = false;
     try { blocked = typeof Notification !== 'undefined' && Notification.permission === 'denied'; } catch (err) {}
     if (blocked) {
-      alert('Notifications are blocked for this site in your browser settings. To turn them back on, open your browser\'s site settings for this page and allow Notifications, then reload.');
+      alert('Notifications are turned off for this site in your browser/phone settings. To turn them back on: open your browser settings for this page, allow Notifications, then reload this page.');
       return;
     }
     enablePushNotifications();
@@ -1721,6 +1744,7 @@
     const toggle = document.getElementById('mute-toggle');
     if (toggle) toggle.checked = true;
     updateNotifyPill();
+    updateNotifyDesc();
   }
 
   // Called from the banner's own "Enable" button — this click IS the user gesture, so the
@@ -1741,6 +1765,7 @@
     if (!pushSupported() || !db) {
       if (toggle) toggle.checked = true;
       updateNotifyPill();
+      updateNotifyDesc();
       if (!silent) alert('Notifications are not supported on this browser/device.');
       return;
     }
@@ -1753,6 +1778,7 @@
         // just silently re-deny once a guest has said no once anyway.
         try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
         updateNotifyPill();
+        updateNotifyDesc();
         return;
       }
       let reg;
@@ -1780,6 +1806,7 @@
         } catch (err) {}
         if (toggle) toggle.checked = false;
         updateNotifyPill();
+        updateNotifyDesc();
         initForegroundPush();
       }).catch(function (err) {
         console.error('enablePushNotifications failed', err);
@@ -1789,6 +1816,7 @@
         // on every single reload. The guest can still retry manually via the toggle anytime.
         try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err2) {}
         updateNotifyPill();
+        updateNotifyDesc();
         // Same fix as uploadStudioCover()'s error handling in the dashboard — a bare
         // "please try again" hides the actual reason (wrong VAPID key, missing
         // gcm_sender_id, service worker registration failure, etc.) and makes this
