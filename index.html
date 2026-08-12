@@ -4988,13 +4988,31 @@
   // toDataURL), which this never does.
   function loadImageForReel(url) {
     return new Promise(function (resolve, reject) {
+      // Flaky venue wifi/mobile data can leave an <img> request just hanging — neither
+      // load nor error ever fires. Previously that meant this promise (and the
+      // Promise.all() in generateReel() waiting on every photo) would sit stuck
+      // forever, with the progress bar frozen right at "Loading your photos..." — this
+      // is what "reels ke photos atak jate h" was actually hitting. A timeout
+      // guarantees this always settles one way or another within a bounded time.
+      let settled = false;
+      const timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        reject(new Error('Photo took too long to load'));
+      }, 12000);
+      function finish(fn, arg) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn(arg);
+      }
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = function () { resolve(img); };
+      img.onload = function () { finish(resolve, img); };
       img.onerror = function () {
         const img2 = new Image();
-        img2.onload = function () { resolve(img2); };
-        img2.onerror = function () { reject(new Error('A photo failed to load')); };
+        img2.onload = function () { finish(resolve, img2); };
+        img2.onerror = function () { finish(reject, new Error('A photo failed to load')); };
         img2.src = url;
       };
       img.src = url;
@@ -5258,8 +5276,29 @@
     const template = reelTemplate;
     const captionInput = document.getElementById('reel-caption-input');
     const captionText = (template !== 'classic' && captionInput) ? captionInput.value.trim() : '';
-    Promise.all(photos.map(function (p) { return loadImageForReel(p.dataUrl); }))
-      .then(function (images) {
+    // Each photo's load is caught individually — a single slow/broken photo (weak venue
+    // wifi drops these often) no longer takes the whole Promise.all() down with it, and
+    // the visible progress moves as each one actually finishes loading instead of
+    // sitting frozen at 3% for however long the slowest photo takes (which reads as
+    // "stuck" even when it's really still working).
+    let loadedCount = 0;
+    const totalPhotos = photos.length;
+    Promise.all(photos.map(function (p) {
+      return loadImageForReel(p.dataUrl).then(function (img) {
+        loadedCount++;
+        setReelProgress(3 + (loadedCount / totalPhotos) * 10, 'Loading your photos... (' + loadedCount + '/' + totalPhotos + ')');
+        return img;
+      }, function (err) {
+        loadedCount++;
+        console.error('Skipping a photo that failed to load for the reel', err);
+        return null;
+      });
+    }))
+      .then(function (loaded) {
+        const images = loaded.filter(function (img) { return img !== null; });
+        if (images.length < REEL_MIN_PHOTOS) {
+          throw new Error('Not enough photos loaded — please check your connection and try again.');
+        }
         setReelProgress(15, 'Rendering your reel...');
         const photoIndices = images.map(function (_, i) { return i; });
         const slides = buildReelSlides(photoIndices, template);
