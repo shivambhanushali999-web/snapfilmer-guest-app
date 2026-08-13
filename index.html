@@ -264,6 +264,15 @@
   .chip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius:10px; padding: 11px 18px; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
   .chip .dot { width: 26px; height: 26px; border-radius:10px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; }
 
+  /* Home's 3-up "My Photos / Videos / Highlights" cards — replaces the old chip-row
+     pills with a card that carries a real one-line description each, per the approved
+     reference. */
+  .home-card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 18px; }
+  .home-card { background: var(--surface); border: 1px solid var(--border); padding: 12px 10px; cursor: pointer; text-align: left; }
+  .home-card .dot { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .home-card .ttl { font-size: 12px; font-weight: 800; color: var(--ink); margin-bottom: 2px; }
+  .home-card .dsc { font-size: 10px; color: var(--muted); line-height: 1.35; }
+
   /* ---- Album/folder chips (Gallery) ---- */
   .album-chip-row { display: flex; gap: 8px; padding: 0 0 14px; overflow-x: auto; }
   .album-chip { flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius:10px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; color: var(--ink); cursor: pointer; white-space: nowrap; }
@@ -342,12 +351,28 @@
   .event-tile { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius:10px; padding: 10px; margin-bottom: 10px; cursor: pointer; }
   .event-tile img { width: 54px; height: 54px; border-radius:10px; object-fit: cover; flex-shrink: 0; }
   .event-tile .name { font-weight: 700; color: var(--ink); font-size: 14px; }
+
+  /* Richer per-event card (replaces the old flat .event-tile row) — real thumbnail,
+     Current badge, live Photos/Videos/Albums counts (loadEventStatsFor), event date. */
+  .event-card { background: var(--surface); border: 1px solid var(--border); padding: 12px; margin-bottom: 12px; cursor: pointer; }
+  .event-card-top { display: flex; align-items: center; gap: 12px; }
+  .event-card-thumb-wrap { position: relative; flex-shrink: 0; }
+  .event-card-thumb-wrap img { width: 64px; height: 64px; object-fit: cover; display: block; }
+  .event-card-current { position: absolute; top: -6px; left: -6px; background: var(--accent-gold); color: #fff; font-size: 8.5px; font-weight: 800; padding: 2px 7px; text-transform: uppercase; letter-spacing: .3px; }
+  .event-card-info { flex: 1; min-width: 0; }
+  .event-card-info .nm { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; color: var(--ink); font-size: 15px; }
+  .event-card-info .tg { font-size: 11px; color: var(--accent); margin-top: 1px; }
+  .event-card-info .stats { font-size: 10.5px; color: var(--muted); margin-top: 5px; }
+  .event-card-chevron { color: var(--muted); flex-shrink: 0; }
+  .event-card-date { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .event-card-date i { width: 12px; height: 12px; }
   .event-tile .tag { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
   /* ---- Posts ---- */
   .posts-body { padding: 0 16px; }
-  .post-card { background: var(--surface); border: 1px solid var(--border); border-radius:0; padding: 16px; margin-bottom: 14px; position: relative; }
-  .post-card::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; background: var(--accent); border-radius:0; }
+  .post-card { background: var(--surface); border: 1px solid var(--border); border-radius:0; padding: 16px; margin-bottom: 14px; position: relative; --post-accent: var(--accent); }
+  .post-card::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; background: var(--post-accent); border-radius:0; }
+  .post-type-badge { display: inline-flex; align-items: center; gap: 5px; margin: 8px 0 0 12px; padding: 3px 9px; border-radius: 10px; color: #fff; font-size: 10px; font-weight: 700; }
   .post-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding-left: 12px; }
   .post-title { font-weight: 800; color: var(--ink); font-size: 14.5px; margin: 0; line-height: 1.35; }
   .post-date { font-size: 10.5px; color: var(--muted); white-space: nowrap; text-align: right; }
@@ -356,11 +381,19 @@
 
   /* ---- More ---- */
   .more-body { padding: 0 16px; }
-  .profile-block { display: flex; align-items: center; gap: 14px; background: var(--ink); border-radius:0; padding: 18px; margin-bottom: 18px; }
-  .profile-block .av { width: 52px; height: 52px; border-radius:10px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; flex-shrink: 0; }
+  .profile-block { display: flex; align-items: center; gap: 14px; background: var(--ink); border-radius:0; padding: 18px; margin-bottom: 18px; position: relative; overflow: hidden; }
+  .profile-block .av { width: 52px; height: 52px; border-radius:50%; background: transparent; border: 1.5px solid var(--accent-gold); color: var(--accent-gold); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; flex-shrink: 0; }
   .profile-block .nm { color: #fff; font-weight: 800; font-size: 15px; }
   .profile-block .em { color: rgba(255,255,255,.6); font-size: 12px; margin-top: 3px; }
-  .profile-block .vp { margin-top: 8px; background: rgba(255,255,255,.14); color: #fff; border: none; border-radius:10px; padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .profile-block .vp { margin-top: 8px; background: var(--accent-gold); color: #fff; border: none; border-radius:20px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  /* Studio identity strip on the right of the profile card — hidden on narrow phones
+     (< 360px) rather than squeezing illegibly small, same breakpoint the rest of this
+     file already uses for cramped-width cases. */
+  .profile-block-studio { text-align: right; flex-shrink: 0; }
+  .profile-block-studio .lg { width: 34px; height: 34px; border: 1px solid rgba(255,255,255,.25); border-radius: 8px; color: var(--accent-gold); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; margin: 0 0 4px auto; }
+  .profile-block-studio .nm2 { color: #fff; font-size: 14px; font-weight: 600; }
+  .profile-block-studio .kk { color: var(--accent-gold); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; margin-top: 2px; }
+  @media (max-width: 359px) { .profile-block-studio { display: none; } }
   .list-card { background: var(--surface); border: 1px solid var(--border); border-radius:0; overflow: hidden; margin-bottom: 16px; }
   .list-row { padding: 15px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); cursor: pointer; }
   .list-row:last-child { border-bottom: none; }
@@ -987,7 +1020,7 @@
       <div class="hero">
         <img id="home-cover" src="" alt="cover">
         <div class="hero-top"><button class="glass-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button></div>
-        <div class="hero-info">
+        <div class="hero-info" onclick="openEventInfo()" style="cursor:pointer;" title="Event Info">
           <span class="date-pill" id="home-date">14 Aug 2026</span>
           <h2 id="home-event-name">Vaibhav &amp; Komal</h2>
           <div class="hero-stats" id="home-stats">
@@ -1020,15 +1053,15 @@
            This banner requires an actual tap on the button below, so the resulting
            requestPermission() call is gesture-triggered and gets the real, non-quiet
            permission dialog. See showNotifyBanner()/enableNotificationsFromBanner() below. -->
-      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:0;padding:14px 16px;position:relative;">
-        <button onclick="dismissNotifyBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
+      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--ink);border:none;border-radius:0;padding:14px 16px;position:relative;">
+        <button onclick="dismissNotifyBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
         <div style="display:flex;gap:12px;align-items:center;padding-right:22px;">
-          <div style="width:38px;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
+          <div style="width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
           <div style="flex:1;">
-            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;">Turn on notifications</div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.4;">Know the moment new photos or videos are uploaded — no need to keep checking back.</div>
+            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;color:#fff;">Turn on notifications</div>
+            <div style="font-size:11.5px;color:rgba(255,255,255,.65);line-height:1.4;">Stay updated with new photos, videos &amp; announcements.</div>
           </div>
-          <button class="btn-solid-sm" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;" onclick="enableNotificationsFromBanner()">Turn On</button>
+          <button onclick="enableNotificationsFromBanner()" style="background:var(--accent-gold);color:#fff;border:none;border-radius:8px;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="CHEVRON"></i></button>
         </div>
       </div>
 
@@ -1049,14 +1082,22 @@
            the studio's own identity/contact card should be the first thing a guest
            sees, not something they have to scroll past everything else to find. -->
       <div class="studio-block">
-        <div class="studio-top">
-          <div class="studio-avatar" id="studio-avatar">SF</div>
-          <div class="studio-meta">
-            <h3 class="gate-serif" onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
-            <p>Wedding &amp; Portrait Studio</p>
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <div class="studio-top">
+              <div class="studio-avatar" id="studio-avatar">SF</div>
+              <div class="studio-meta">
+                <h3 class="gate-serif" onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
+                <p>Wedding &amp; Portrait Studio</p>
+              </div>
+            </div>
+            <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
           </div>
+          <!-- Same real event cover already used in the Home hero — just a small preview
+               thumbnail here, not a separate upload. Hidden if the event has no cover yet
+               (openEventAndBoot always sets a picsum fallback, so in practice this shows). -->
+          <img id="studio-block-photo" src="" alt="" style="width:96px;height:96px;object-fit:cover;flex-shrink:0;border-radius:0;">
         </div>
-        <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
         <!-- Call/mail/website ghost-buttons now share this same row as the Instagram/
              WhatsApp/etc icons instead of sitting up top next to the studio name. -->
         <div class="social-row">
@@ -1078,15 +1119,14 @@
         </div>
       </div>
 
-      <div class="chip-row">
-        <!-- My Photos (find yourself via selfie) is the single most important thing a
-             guest does here — moved first so it's always visible without needing to
-             scroll the chip row, instead of being the last chip (previously partly
-             cut off at the screen edge, easy to miss entirely). -->
-        <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
-        <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
-        <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
-        <div class="chip" onclick="openEventInfo()"><span class="dot"><i data-icon="INFO"></i></span>Event Info</div>
+      <!-- Upgraded from a plain pill chip-row to a 3-card row with a real one-line
+           description each, matching the approved reference. Event Info (added earlier)
+           didn't have room here anymore — it's still reachable by tapping the event
+           name/date on the hero above (see the onclick added there). -->
+      <div class="home-card-row">
+        <div class="home-card" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span><div class="ttl">My Photos</div><div class="dsc">Find all your photos here</div></div>
+        <div class="home-card" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div></div>
+        <div class="home-card" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div></div>
       </div>
 
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
@@ -1157,8 +1197,17 @@
   <!-- ========== POSTS ========== -->
   <div id="screen-posts" class="tab-screen">
     <div class="plainbar">
-      <h1>Posts</h1>
+      <div>
+        <h1 style="text-align:left;">Posts</h1>
+        <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted);">Announcements &amp; updates from your studio.</p>
+      </div>
       <button class="ghost-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button>
+    </div>
+    <div class="album-chip-row" id="posts-filter-row" style="padding:0 16px 14px;">
+      <div class="album-chip active" data-post-filter="all" onclick="setPostsFilter('all')">All Posts</div>
+      <div class="album-chip" data-post-filter="announcement" onclick="setPostsFilter('announcement')">Announcements</div>
+      <div class="album-chip" data-post-filter="update" onclick="setPostsFilter('update')">Updates</div>
+      <div class="album-chip" data-post-filter="event" onclick="setPostsFilter('event')">Events</div>
     </div>
     <div class="scroll posts-body" id="posts-list"></div>
   </div>
@@ -1172,10 +1221,17 @@
     <div class="scroll more-body">
       <div class="profile-block">
         <div class="av" id="profile-avatar">SF</div>
-        <div style="flex:1;">
+        <div style="flex:1;min-width:0;">
           <div class="nm" id="profile-name">Shivam Bhanushali</div>
           <div class="em" id="profile-email">snapfilmergallery6@gmail.com</div>
-          <button class="vp" onclick="handleViewProfile()">View Profile &#8594;</button>
+          <button class="vp" onclick="handleViewProfile()"><i data-icon="USER" style="width:12px;height:12px;"></i>View Profile</button>
+        </div>
+        <!-- Same studio identity shown everywhere else (Home, Gate) — real name/logo via
+             applyStudioProfile(), not separate hardcoded copy. -->
+        <div class="profile-block-studio">
+          <div class="lg" id="profile-studio-avatar">SF</div>
+          <div class="nm2 gate-serif" id="profile-studio-name">SnapFilmer</div>
+          <div class="kk">Wedding &amp; Portrait Studio</div>
         </div>
       </div>
 
@@ -1801,7 +1857,7 @@
 
   function addOrUpdateFollowedEvent(ev) {
     const idx = EVENTS_LIST.findIndex(function (x) { return x.tag === ev.id; });
-    const entry = { name: ev.name, tag: ev.id, cover: ev.cover };
+    const entry = { name: ev.name, tag: ev.id, cover: ev.cover, date: ev.date || '' };
     if (idx === -1) EVENTS_LIST.unshift(entry); else EVENTS_LIST[idx] = entry;
     saveFollowedEvents(EVENTS_LIST);
   }
@@ -3177,27 +3233,90 @@
       el.innerHTML = '<p style="text-align:center;color:var(--muted);font-size:12.5px;padding:24px 0;">You\'re not following any events yet. Enter an Event ID above to follow one.</p>';
       return;
     }
-    EVENTS_LIST.forEach(function (e) {
-      const row = document.createElement('div');
-      row.className = 'event-tile' + (e.tag === EVENT.id ? ' active-event' : '');
-      row.style.cssText = e.tag === EVENT.id ? 'outline:2px solid var(--accent);' : '';
-      row.innerHTML = '<img src="' + e.cover + '"><div><div class="name">' + e.name + (e.tag === EVENT.id ? ' <span style="color:var(--accent);font-weight:800;">(current)</span>' : '') + '</div><div class="tag">' + e.tag + '</div></div>';
+    const header = document.createElement('div');
+    header.className = 'stories-label';
+    header.style.padding = '0 0 10px';
+    header.textContent = 'Your Events';
+    el.appendChild(header);
+
+    EVENTS_LIST.forEach(function (e, i) {
+      const isCurrent = e.tag === EVENT.id;
+      const card = document.createElement('div');
+      card.className = 'event-card';
+      card.innerHTML =
+        '<div class="event-card-top">' +
+          '<div class="event-card-thumb-wrap">' +
+            '<img src="' + e.cover + '">' +
+            (isCurrent ? '<span class="event-card-current">Current</span>' : '') +
+          '</div>' +
+          '<div class="event-card-info">' +
+            '<div class="nm">' + e.name + '</div>' +
+            '<div class="tg">' + e.tag + '</div>' +
+            '<div class="stats" id="ev-stats-' + i + '">&nbsp;</div>' +
+          '</div>' +
+          '<span class="event-card-chevron"><i data-icon="CHEVRON"></i></span>' +
+        '</div>' +
+        (e.date ? '<div class="event-card-date"><i data-icon="EVENTS"></i>Event Date: ' + e.date + '</div>' : '');
       // Tapping a followed event switches the whole app to it — see switchToEvent()
       // for why that's a full reload instead of an in-place swap.
-      row.addEventListener('click', function () { switchToEvent(e.tag); });
-      el.appendChild(row);
+      card.addEventListener('click', function () { switchToEvent(e.tag); });
+      el.appendChild(card);
+      loadEventStatsFor(e.tag, i);
     });
+    fillIcons();
   }
 
+  // Real per-event Photos/Videos/Albums counts for the Events list — fetched lazily per
+  // card (not stored in the local followed-events cache, which only ever had name/cover)
+  // so this never shows an invented number. Only the currently-open event already has
+  // this in memory (eventPhotos/eventVideos/eventAlbums); every other followed event
+  // needs its own small Firestore read, same idea as the Portfolio strip's lazy load.
+  function loadEventStatsFor(eventId, index) {
+    if (!db) return;
+    Promise.all([
+      db.collection('events').doc(eventId).get(),
+      db.collection('photos').where('eventId', '==', eventId).get(),
+    ]).then(function (results) {
+      const evDoc = results[0];
+      const photosSnap = results[1];
+      const d = evDoc.exists ? evDoc.data() : {};
+      const albums = Array.isArray(d.albums) ? d.albums.length : 0;
+      const videos = Array.isArray(d.videos) ? d.videos.length : 0;
+      const photos = photosSnap.size;
+      const target = document.getElementById('ev-stats-' + index);
+      if (target) target.innerHTML = photos + ' Photos &middot; ' + videos + ' Videos &middot; ' + albums + ' Albums';
+    }).catch(function () {});
+  }
+
+  // Type badges — real field on the post doc (set from the dashboard's Post composer's
+  // new "Type" dropdown), defaulting to 'update' for any older post created before that
+  // field existed, so nothing silently disappears from the feed.
+  const POST_TYPE_META = {
+    announcement: { label: 'Announcement', icon: 'BELL', color: 'var(--accent-gold)' },
+    update: { label: 'Update', icon: 'POSTS', color: 'var(--accent)' },
+    event: { label: 'Event', icon: 'EVENTS', color: '#7C7A6C' },
+  };
+  let postsFilter = 'all';
+  function setPostsFilter(type) {
+    postsFilter = type;
+    document.querySelectorAll('#posts-filter-row .album-chip').forEach(function (chip) {
+      chip.classList.toggle('active', chip.dataset.postFilter === type);
+    });
+    renderPosts();
+  }
   function renderPosts() {
-    document.getElementById('posts-list').innerHTML = POSTS_LIVE.map(function (p) {
-      return '<div class="post-card"><div class="post-top">' +
+    const filtered = postsFilter === 'all' ? POSTS_LIVE : POSTS_LIVE.filter(function (p) { return (p.type || 'update') === postsFilter; });
+    document.getElementById('posts-list').innerHTML = filtered.map(function (p) {
+      const meta = POST_TYPE_META[p.type || 'update'];
+      return '<div class="post-card" style="--post-accent:' + meta.color + ';"><div class="post-top">' +
         '<p class="post-title">' + p.title + '</p>' +
         '<span class="post-date">' + p.date + '<br>' + p.time + '</span></div>' +
+        '<span class="post-type-badge" style="background:' + meta.color + ';"><i data-icon="' + meta.icon + '" style="width:11px;height:11px;"></i>' + meta.label + '</span>' +
         '<p class="post-body">' + p.body + '</p>' +
         (p.checkout ? '<div class="post-checkout">Checkout &rarr;</div>' : '') +
         '</div>';
     }).join('');
+    fillIcons();
   }
 
   // Posts are studio-authored from the dashboard's Posts page, each targeted either
@@ -4299,9 +4418,9 @@
     // The exact same profile now renders in two places — the Home tab's studio card and
     // the Event Gate's studio card (shown even before any event ID is known) — so every
     // lookup below updates both copies instead of just the Home tab's original IDs.
-    const nameEls = [document.getElementById('studio-name'), document.getElementById('gate-studio-name'), document.getElementById('gate-welcome-studio-name'), document.getElementById('gate-foot-name')];
+    const nameEls = [document.getElementById('studio-name'), document.getElementById('gate-studio-name'), document.getElementById('gate-welcome-studio-name'), document.getElementById('gate-foot-name'), document.getElementById('profile-studio-name')];
     const bioEls = [document.getElementById('studio-bio-text'), document.getElementById('gate-studio-bio-text')];
-    const avatarEls = [document.getElementById('studio-avatar'), document.getElementById('gate-studio-avatar')];
+    const avatarEls = [document.getElementById('studio-avatar'), document.getElementById('gate-studio-avatar'), document.getElementById('profile-studio-avatar')];
     const portfolioTitleEl = document.getElementById('portfolio-title');
     if (profile.name) {
       nameEls.forEach(function (el) { if (el) el.textContent = profile.name; });
@@ -4601,7 +4720,10 @@
       return;
     }
     const highlighted = getHighlightedPhotos();
-    let html = '<div class="stories-label" style="padding:4px 0 12px;">Folders</div>';
+    let html = '<div style="display:flex;align-items:baseline;justify-content:space-between;padding:4px 0 12px;">' +
+      '<div class="stories-label" style="padding:0;">Folders</div>' +
+      '<span style="font-size:11.5px;font-weight:700;color:var(--accent);cursor:pointer;" onclick="openGallery()">View All &#8594;</span>' +
+    '</div>';
     // Highlights goes first, same as the dashboard's own Albums sidebar shows it
     // prominently above every other folder (gold-highlighted row) — this is a guest's
     // most direct way to reach the studio's curated picks, not just a small story
@@ -6707,6 +6829,8 @@
     document.getElementById('home-cover').src = EVENT.cover;
     document.getElementById('home-event-name').textContent = EVENT.name;
     document.getElementById('home-date').textContent = EVENT.date;
+    const studioBlockPhoto = document.getElementById('studio-block-photo');
+    if (studioBlockPhoto) studioBlockPhoto.src = EVENT.cover;
     renderStories();
     renderEvents();
     renderPosts();
