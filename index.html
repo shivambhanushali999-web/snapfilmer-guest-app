@@ -164,26 +164,6 @@
   .gate-footer .gate-icon-btn { background: rgba(255,255,255,.1); color: #fff; }
   .gate-footer .ft-copy { font-size: 10.5px; color: rgba(255,255,255,.45); border-top: 1px solid rgba(255,255,255,.12); padding-top: 14px; }
 
-  /* ===== Phase 2 dark theme — My Photos, Gallery, Videos, Viewer, Video Player =====
-     Every existing rule in this file already reads colors through --bg/--surface/
-     --border/--ink/--muted/--accent-soft/--accent-ink custom properties (never a
-     hardcoded hex for card/text/border colors), so re-declaring just those properties
-     on .dark-screen makes the whole screen — and everything already built inside it —
-     repaint dark automatically, with zero risk to any existing layout or JS. Photo/
-     video content is the whole point of these screens, so a dark backdrop makes the
-     actual photos/videos pop the way a light cream background never could. --accent/
-     --accent-gold are deliberately left as the global values: the olive/gold brand
-     colors already read fine against a dark backdrop. */
-  .dark-screen {
-    --bg: #14140F;
-    --surface: #1D1D16;
-    --ink: #F5F1E7;
-    --muted: rgba(245,241,231,.6);
-    --border: rgba(245,241,231,.14);
-    --accent-soft: rgba(176,138,74,.22);
-    --accent-ink: #E4C58C;
-  }
-
   .phone {
     width: 390px; max-width: 100vw; height: 844px; max-height: 100vh;
     background: var(--bg); border-radius:0; border: 8px solid #000;
@@ -1304,7 +1284,7 @@
 
   <!-- ========== SUB SCREENS ========== -->
 
-  <div id="screen-videos" class="sub-screen dark-screen">
+  <div id="screen-videos" class="sub-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1>Videos</h1>
@@ -1312,7 +1292,7 @@
     <div class="videos-body"><div class="video-grid" id="videos-list"></div></div>
   </div>
 
-  <div id="screen-myphotos" class="sub-screen dark-screen">
+  <div id="screen-myphotos" class="sub-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <div style="flex:1;">
@@ -1477,7 +1457,7 @@
   </div>
 
   <!-- ========== GALLERY (all event photos) ========== -->
-  <div id="screen-gallery" class="sub-screen dark-screen">
+  <div id="screen-gallery" class="sub-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1 id="gallery-title">Gallery</h1>
@@ -1603,7 +1583,7 @@
     <div class="notif-body" id="notif-list"></div>
   </div>
 
-  <div id="screen-viewer" class="sub-screen dark-screen">
+  <div id="screen-viewer" class="sub-screen">
     <div class="viewer-top">
       <button class="glass-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <div class="viewer-count" id="viewer-count">1 / 1</div>
@@ -1653,7 +1633,7 @@
     </div>
   </div>
 
-  <div id="screen-video-player" class="sub-screen video-player-screen dark-screen">
+  <div id="screen-video-player" class="sub-screen video-player-screen">
     <div class="video-player-top">
       <button class="glass-btn" onclick="closeVideoPlayer()"><i data-icon="BACK"></i></button>
       <h1 class="video-player-title" id="video-player-title">Video</h1>
