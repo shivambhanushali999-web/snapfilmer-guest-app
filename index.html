@@ -128,6 +128,42 @@
      circles in the story-strip illustration, just bigger and static here. */
   .gate-wave-corner { position: absolute; bottom: -34px; right: -34px; width: 130px; height: 130px; border-radius:0; background: var(--accent-soft); opacity: .6; pointer-events: none; }
 
+  /* ===== Event Gate redesign (Phase 1) — hero, quick-contact icons, marketing
+     sections. Additive only; nothing above this reused a class name from here. ===== */
+  .gate-topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 18px 20px 0; }
+  .gate-topbar-icons { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .gate-icon-btn { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: none; align-items: center; justify-content: center; text-decoration: none; flex-shrink: 0; }
+  .gate-icon-btn svg { width: 15px; height: 15px; }
+  .gate-hero-wrap { position: relative; margin: 16px 0 0; display: none; }
+  .gate-hero-wrap img { width: 100%; height: 260px; object-fit: cover; display: block; }
+  .gate-hero-wrap::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(20,16,20,.8) 0%, rgba(20,16,20,.18) 55%, rgba(20,16,20,0) 78%); }
+  .gate-hero-content { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 2; }
+  .gate-hero-content h1 { color: #fff; margin: 0 0 6px; font-size: 24px; line-height: 1.28; font-weight: 600; }
+  .gate-hero-content h1 em { font-style: italic; color: var(--accent-gold); }
+  .gate-hero-content p { color: rgba(255,255,255,.86); font-size: 12px; margin: 0; line-height: 1.5; max-width: 300px; }
+  .gate-section { padding: 22px 20px; position: relative; }
+  .gate-section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .gate-section-head h2 { margin: 0; font-size: 17px; font-weight: 600; color: var(--ink); }
+  .gate-section-head .view-all { font-size: 11.5px; font-weight: 700; color: var(--accent); cursor: pointer; white-space: nowrap; }
+  .gate-section p.sub { font-size: 12px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+  .gate-promo-card { display: flex; align-items: center; gap: 14px; background: var(--accent-soft); padding: 16px; }
+  .gate-promo-card .icon { width: 46px; height: 46px; border-radius: 12px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .gate-cat-strip { display: flex; gap: 10px; overflow-x: auto; }
+  .gate-why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gate-why-card { border: 1px solid var(--border); padding: 14px 12px; }
+  .gate-why-card .icon { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+  .gate-why-card .ttl { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+  .gate-why-card .dsc { font-size: 11px; color: var(--muted); line-height: 1.45; }
+  .gate-cta-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .gate-cta-row .btn-solid-sm, .gate-cta-row .btn-outline-sm { flex: 1; min-width: 120px; }
+  .btn-outline-sm { background: transparent; color: var(--ink); border: 1px solid var(--border); border-radius: 0; padding: 10px 14px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .gate-footer { background: var(--ink); color: rgba(255,255,255,.7); padding: 26px 20px calc(22px + env(safe-area-inset-bottom)); text-align: left; }
+  .gate-footer .ft-name { color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+  .gate-footer .ft-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--accent-gold); margin: 0 0 16px; }
+  .gate-footer .ft-icons { display: flex; gap: 8px; margin-bottom: 16px; }
+  .gate-footer .gate-icon-btn { background: rgba(255,255,255,.1); color: #fff; }
+  .gate-footer .ft-copy { font-size: 10.5px; color: rgba(255,255,255,.45); border-top: 1px solid rgba(255,255,255,.12); padding-top: 14px; }
+
   .phone {
     width: 390px; max-width: 100vw; height: 844px; max-height: 100vh;
     background: var(--bg); border-radius:0; border: 8px solid #000;
@@ -555,71 +591,47 @@
          here too, otherwise a visible line would sit right on the screen's true edge. -->
     <div class="gate-card" id="event-gate-panel" style="border-radius:0;padding:0;border-left:none;border-right:none;box-shadow:none;">
 
-      <!-- Section 1: studio profile — same data as the Home tab (name, avatar, bio,
-           socials), populated by applyStudioProfile(). The camera-and-leaves sketch is
-           original line-art (this app's own CAMERA icon stroke, scaled up, plus a few
-           hand-drawn leaf paths) — not traced from any reference. -->
-      <div id="event-gate-studio" style="padding:24px 20px 22px;position:relative;">
-        <div class="gate-corner-lines tr"></div>
-        <!-- Shrunk and given the studio-top row its own reserved right-side padding below
-           — on a real (wider) phone the "WEDDING & PORTRAIT STUDIO" kicker text was
-           running underneath this illustration and visually "mixing" with it. -->
-        <svg viewBox="0 0 140 120" width="91" height="78" style="position:absolute;top:0;right:0;pointer-events:none;" aria-hidden="true">
-          <defs>
-            <filter id="gateWashBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
-          </defs>
-          <ellipse cx="78" cy="58" rx="42" ry="36" fill="var(--accent-soft)" opacity=".8" filter="url(#gateWashBlur)"/>
-          <circle cx="24" cy="18" r="1.5" fill="var(--accent-gold)" opacity=".6"/>
-          <circle cx="36" cy="10" r="1.5" fill="var(--accent-gold)" opacity=".6"/>
-          <circle cx="50" cy="6" r="1.5" fill="var(--accent-gold)" opacity=".55"/>
-          <circle cx="65" cy="4" r="1.5" fill="var(--accent-gold)" opacity=".5"/>
-          <circle cx="16" cy="30" r="1.3" fill="var(--accent-gold)" opacity=".5"/>
-          <g stroke="var(--accent)" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8">
-            <path d="M100 8c-7 6-11 15-9 27"/>
-            <path d="M96 14c4-3 9-2 11 3-5 3-10 1-11-3z"/>
-            <path d="M92 27c4-3 9-2 11 3-5 3-10 1-11-3z"/>
-            <path d="M90 41c3-2 8-1 10 3-4 2-9 0-10-3z"/>
-          </g>
-          <g transform="translate(38,44) scale(2.8)" stroke="var(--ink)" stroke-width="0.62" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
-            <path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/>
-            <circle cx="12" cy="14" r="3.5"/>
-          </g>
-        </svg>
-
-        <div class="studio-top" style="position:relative;">
-          <div class="studio-avatar" id="gate-studio-avatar" style="width:56px;height:56px;border-radius:10px;font-size:17px;">SF</div>
+      <!-- ============ Phase 1 redesign: Header ============
+           Slim header row — studio identity + compact quick-contact icons (Call/
+           WhatsApp/Website). Real tel:/wa.me/https: links, wired by wireGateQuickLinks()
+           in applyStudioProfile(); hidden individually until the studio fills that field
+           in, same "no dead link" rule the rest of the app already follows. Notifications
+           deliberately isn't one of these icons — there's no event resolved yet on this
+           screen for a notification toggle to mean anything. -->
+      <div class="gate-topbar">
+        <div class="studio-top" style="margin:0;">
+          <div class="studio-avatar" id="gate-studio-avatar" style="width:42px;height:42px;border-radius:10px;font-size:14px;">SF</div>
           <div class="studio-meta">
-            <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:21px;">SnapFilmer</h3>
-            <p class="gate-kicker">Wedding &amp; Portrait Studio</p>
+            <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:16px;">SnapFilmer</h3>
+            <p class="gate-kicker" style="font-size:9px;">Wedding &amp; Portrait Studio</p>
           </div>
         </div>
-
-        <h2 class="gate-serif" style="margin:16px 0 8px;font-size:22px;line-height:1.32;color:var(--ink);font-weight:600;position:relative;">Every moment,<br><em style="font-style:italic;color:var(--accent-gold);">beautifully told.</em></h2>
-
-        <p class="studio-bio" id="gate-studio-bio-p" style="position:relative;"><span id="gate-studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="gate-bio-toggle-link" onclick="toggleBio('gate-')">Read more</span></p>
-        <!-- Call/mail/website ghost-buttons now share this same row as the Instagram/
-             WhatsApp/etc icons instead of sitting up top next to the studio name, where on
-             this screen they used to collide with the decorative camera sketch. -->
-        <div class="social-row" style="position:relative;">
-          <div class="studio-cta" id="gate-studio-contact-row">
-            <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="PHONE"></i></a>
-            <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="MAIL"></i></a>
-            <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="GLOBE"></i></a>
-          </div>
-          <div class="social-strip" id="gate-social-strip">
-            <div class="social-ghost" style="border-radius:10px;"><i data-icon="INSTA_O"></i></div>
-            <div class="social-ghost" style="border-radius:10px;"><i data-icon="VIMEO_O"></i></div>
-            <div class="social-ghost" style="border-radius:10px;"><i data-icon="WHATSAPP_O"></i></div>
-            <div class="social-ghost" style="border-radius:10px;"><i data-icon="YOUTUBE_O"></i></div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px;position:relative;">
-          <button class="btn-outline" onclick="openPortfolioFromGate()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:0;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
-          <button class="ghost-btn" onclick="shareStudioProfile()" title="Share" style="border-radius:10px;"><i data-icon="SHARE"></i></button>
+        <div class="gate-topbar-icons">
+          <a class="gate-icon-btn" id="gate-top-call-btn" href="#" title="Call"><i data-icon="PHONE"></i></a>
+          <a class="gate-icon-btn" id="gate-top-wa-btn" href="#" target="_blank" rel="noopener" title="WhatsApp"><i data-icon="WHATSAPP_O"></i></a>
+          <a class="gate-icon-btn" id="gate-top-web-btn" href="#" target="_blank" rel="noopener" title="Website"><i data-icon="GLOBE"></i></a>
         </div>
       </div>
 
-      <div style="height:1px;background:var(--border);margin:0 20px;"></div>
+      <!-- ============ Hero ============
+           Real studio cover photo (Profile → Photos) — no stock image ever substituted;
+           renderGateHero() keeps this whole block hidden until one's actually uploaded,
+           so the headline below just stands on its own cream background until then. -->
+      <div class="gate-hero-wrap" id="gate-hero-wrap">
+        <img id="gate-hero-img" src="" alt="">
+        <div class="gate-hero-content">
+          <h1 class="gate-serif">Every moment,<br><em>beautifully told.</em></h1>
+          <p>Your event photos, videos and memories — beautifully delivered in one place.</p>
+        </div>
+      </div>
+      <!-- Same headline, shown instead of the hero overlay above whenever there's no
+           cover photo yet, so the copy is never lost entirely. -->
+      <div id="gate-hero-fallback-heading" style="padding:20px 20px 0;text-align:left;">
+        <h2 class="gate-serif" style="margin:0 0 6px;font-size:22px;line-height:1.32;color:var(--ink);font-weight:600;">Every moment,<br><em style="font-style:italic;color:var(--accent-gold);">beautifully told.</em></h2>
+        <p style="font-size:12px;color:var(--muted);margin:0;line-height:1.5;">Your event photos, videos and memories — beautifully delivered in one place.</p>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:20px 20px 0;"></div>
 
       <!-- Section 2: enter event id (or the loading spinner, before that resolves). Big
            square button and the small QR icon inside the input both open the same real
@@ -646,6 +658,90 @@
           <i data-icon="CHEVRON"></i>
         </button>
         <p style="display:flex;align-items:center;justify-content:center;gap:6px;margin:12px 0 0;font-size:11.5px;color:var(--muted);"><i data-icon="LOCK" style="opacity:.7;"></i>Your privacy is 100% safe with us.</p>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:0 20px;"></div>
+
+      <!-- ============ AI Photo Finder promo ============
+           Marketing/feature-intro only — the CTA scrolls up to the Event ID field rather
+           than pretending to search, since real face-matching (already built, AWS
+           Rekognition) only ever runs scoped to one specific event, and no event is known
+           yet on this screen. See focusEventIdInput(). -->
+      <div class="gate-section" style="padding-top:22px;">
+        <div class="gate-promo-card">
+          <div class="icon"><i data-icon="SPARKLE"></i></div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:13.5px;color:var(--ink);margin-bottom:3px;">Find Your Photos with AI</div>
+            <div style="font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:10px;">Don't scroll through hundreds of photos. Enter your Event ID, then let AI find the moments you're in.</div>
+            <button class="btn-solid-sm" onclick="focusEventIdInput()" style="background:var(--ink);color:#fff;border:none;border-radius:0;padding:9px 16px;font-size:11.5px;font-weight:700;cursor:pointer;">Find My Photos</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ See Moments We've Captured ============
+           Real data only — the studio's chosen Portfolio Event's actual albums/photos
+           (same source as the full Portfolio screen), rendered as a horizontal strip.
+           Hidden entirely (renderGateCategoryStrip) until there's real photos to show —
+           no placeholder "230+ Events" style counts, since nothing in the data model
+           tracks that. -->
+      <div class="gate-section" id="gate-cat-section" style="display:none;padding-top:4px;">
+        <div class="gate-section-head">
+          <h2 class="gate-serif">See Moments We've Captured</h2>
+          <span class="view-all" onclick="openPortfolioFromGate()">View All</span>
+        </div>
+        <div class="gate-cat-strip" id="gate-cat-strip"></div>
+      </div>
+
+      <!-- ============ SnapFilmer marketing ============
+           Studio bio + the same real contact/social row as before (gate-studio-bio-text,
+           gate-studio-contact-row, gate-social-strip — identical ids, just relocated here
+           from the old combined header block, so applyStudioProfile()'s existing wiring
+           needs zero changes). "Book Your Date"/"WhatsApp Us" open a real WhatsApp chat
+           (wireGateQuickLinks) rather than the per-event Enquiry form, since that form is
+           tied to one specific event and none is known yet here. -->
+      <div class="gate-section" style="padding-top:22px;">
+        <h2 class="gate-serif" style="margin:0 0 4px;font-size:19px;">More than photography.<br>We tell your story.</h2>
+        <p class="studio-bio" id="gate-studio-bio-p" style="margin:10px 0 14px;"><span id="gate-studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="gate-bio-toggle-link" onclick="toggleBio('gate-')">Read more</span></p>
+        <div class="social-row" style="position:relative;margin-bottom:14px;">
+          <div class="studio-cta" id="gate-studio-contact-row">
+            <a class="ghost-btn" id="gate-studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="PHONE"></i></a>
+            <a class="ghost-btn" id="gate-studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="MAIL"></i></a>
+            <a class="ghost-btn" id="gate-studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;border-radius:10px;"><i data-icon="GLOBE"></i></a>
+          </div>
+          <div class="social-strip" id="gate-social-strip">
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="INSTA_O"></i></div>
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="VIMEO_O"></i></div>
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="WHATSAPP_O"></i></div>
+            <div class="social-ghost" style="border-radius:10px;"><i data-icon="YOUTUBE_O"></i></div>
+          </div>
+        </div>
+        <div class="gate-cta-row">
+          <button class="btn-solid-sm" onclick="openPortfolioFromGate()" style="background:var(--ink);color:#fff;border:none;border-radius:0;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;">View Our Work</button>
+          <a class="btn-outline-sm" id="gate-mkt-book-btn" href="#" target="_blank" rel="noopener" style="display:none;">Book Your Date</a>
+          <a class="btn-outline-sm" id="gate-mkt-wa-btn" href="#" target="_blank" rel="noopener" style="display:none;"><i data-icon="WHATSAPP_O"></i>WhatsApp Us</a>
+        </div>
+      </div>
+
+      <!-- ============ Why SnapFilmer ============
+           Static marketing copy, no data dependency — safe, honest (no invented stats). -->
+      <div class="gate-section" style="padding-top:4px;">
+        <h2 class="gate-serif" style="margin:0 0 14px;font-size:18px;">Why Couples Choose SnapFilmer</h2>
+        <div class="gate-why-grid">
+          <div class="gate-why-card"><div class="icon"><i data-icon="SPARKLE"></i></div><div class="ttl">AI-Powered Sharing</div><div class="dsc">Find your moments instantly, no endless scrolling.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="LOCK"></i></div><div class="ttl">Private &amp; Secure</div><div class="dsc">Your event memories stay protected.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="REEL"></i></div><div class="ttl">Cinematic Storytelling</div><div class="dsc">Photography and films crafted with intention.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="DOWNLOAD"></i></div><div class="ttl">Fast Digital Delivery</div><div class="dsc">Access your memories in one place.</div></div>
+        </div>
+      </div>
+
+      <!-- ============ Final CTA ============ -->
+      <div class="gate-section" style="padding-top:6px;text-align:center;">
+        <h2 class="gate-serif" style="margin:0 0 4px;font-size:19px;">Love what you see?</h2>
+        <p class="sub" style="margin:0 0 14px;">Let SnapFilmer capture your story.</p>
+        <div class="gate-cta-row">
+          <a class="btn-outline-sm" id="gate-cta-book-btn" href="#" target="_blank" rel="noopener" style="display:none;">Book Your Date</a>
+          <button class="btn-solid-sm" onclick="openPortfolioFromGate()" style="background:var(--ink);color:#fff;border:none;border-radius:0;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;">View Our Work</button>
+        </div>
       </div>
 
       <div style="height:1px;background:var(--border);margin:0 20px;"></div>
@@ -735,6 +831,21 @@
           <i data-icon="HEART" style="color:var(--accent-gold);opacity:.7;"></i>
           <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
         </div>
+      </div>
+
+      <!-- ============ Footer ============
+           Real contact icons only (call/whatsapp/website, same wireGateQuickLinks
+           wiring as the header) — no Privacy/Terms links, since those pages don't
+           exist yet and a dead link is worse than no link. -->
+      <div class="gate-footer">
+        <p class="ft-name gate-serif" id="gate-foot-name">SnapFilmer</p>
+        <p class="ft-kicker">Wedding &amp; Portrait Studio</p>
+        <div class="ft-icons">
+          <a class="gate-icon-btn" id="gate-foot-call-btn" href="#" title="Call"><i data-icon="PHONE"></i></a>
+          <a class="gate-icon-btn" id="gate-foot-wa-btn" href="#" target="_blank" rel="noopener" title="WhatsApp"><i data-icon="WHATSAPP_O"></i></a>
+          <a class="gate-icon-btn" id="gate-foot-web-btn" href="#" target="_blank" rel="noopener" title="Website"><i data-icon="GLOBE"></i></a>
+        </div>
+        <p class="ft-copy" id="gate-foot-copy">&copy; SnapFilmer. Capturing Moments, Cherishing Memories.</p>
       </div>
     </div>
   </div>
@@ -1619,6 +1730,12 @@
   // Fallback contact shown in the app-info alert until the studio's real profile
   // (with its own email) syncs in from Firestore — see applyStudioProfile().
   let studioContactEmail = 'snapfilmergallery6@gmail.com';
+  // Phone + raw social links, cached the same way studioContactEmail is — used by the
+  // Event Gate redesign's header/footer quick-contact icons and the "Book Your Date"/
+  // "WhatsApp Us" marketing buttons (wireGateQuickLinks below), all of which need the
+  // real values outside applyStudioProfile()'s own local scope.
+  let studioContactPhone = '';
+  let studioSocial = {};
 
   // Real multi-event "follow" list — every event this guest has actually opened on this
   // device, persisted locally (name/cover cached so the Events tab has something to show
@@ -4063,7 +4180,7 @@
       renderMyPhotosResults();
     }
 
-    if (profile.coverUrl !== undefined) studioCoverUrl = profile.coverUrl || '';
+    if (profile.coverUrl !== undefined) { studioCoverUrl = profile.coverUrl || ''; renderGateHero(); }
     if (profile.reelMusicUrl !== undefined) studioReelMusicUrl = profile.reelMusicUrl || '';
 
     // Portfolio used to be 2 hardcoded categories full of picsum.photos filler — this
@@ -4076,12 +4193,13 @@
       portfolioLoaded = false;
       portfolioEvent = null;
       portfolioPhotosByAlbum = {};
+      loadPortfolioEventData().then(renderGateCategoryStrip);
     }
 
     // The exact same profile now renders in two places — the Home tab's studio card and
     // the Event Gate's studio card (shown even before any event ID is known) — so every
     // lookup below updates both copies instead of just the Home tab's original IDs.
-    const nameEls = [document.getElementById('studio-name'), document.getElementById('gate-studio-name'), document.getElementById('gate-welcome-studio-name')];
+    const nameEls = [document.getElementById('studio-name'), document.getElementById('gate-studio-name'), document.getElementById('gate-welcome-studio-name'), document.getElementById('gate-foot-name')];
     const bioEls = [document.getElementById('studio-bio-text'), document.getElementById('gate-studio-bio-text')];
     const avatarEls = [document.getElementById('studio-avatar'), document.getElementById('gate-studio-avatar')];
     const portfolioTitleEl = document.getElementById('portfolio-title');
@@ -4091,6 +4209,8 @@
     }
     if (profile.about) bioEls.forEach(function (el) { if (el) el.textContent = profile.about; });
     if (profile.email) studioContactEmail = profile.email;
+    if (profile.phone) studioContactPhone = profile.phone;
+    if (profile.social) studioSocial = profile.social;
     if (profile.name) {
       const initials = profile.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
       avatarEls.forEach(function (el) { if (el) el.textContent = initials; });
@@ -4148,6 +4268,8 @@
         });
       });
     }
+
+    wireGateQuickLinks(profile);
   }
 
   // The Profile wizard's WhatsApp field just says "Link or number" — most studios type
@@ -4162,6 +4284,112 @@
       return digits ? 'https://wa.me/' + digits : '';
     }
     return value;
+  }
+
+  // ================= Event Gate redesign helpers =================
+  // Everything below supports the Phase 1 Home/Event Gate redesign — a real hero photo,
+  // header/footer quick-contact icons, and a "Book Your Date" WhatsApp CTA. All of it is
+  // additive (new element ids, own functions) so none of the existing Event ID/QR/
+  // Portfolio/registration wiring above is touched.
+
+  // Header + footer quick-contact icons (Call / WhatsApp / Website) on the Event Gate —
+  // separate from the existing gate-studio-contact-row (call/mail/website ghost buttons
+  // further down the page, left exactly as-is) since the brief specifically wants a
+  // compact icon row up top and echoed in the footer too. Real tel:/wa.me/https: links,
+  // hidden individually when the studio hasn't filled that field in — never a dead link.
+  function wireGateQuickLinks(profile) {
+    const tel = profile.phone ? 'tel:' + profile.phone.replace(/\s+/g, '') : '';
+    const web = profile.website ? (/^https?:\/\//i.test(profile.website) ? profile.website : ('https://' + profile.website)) : '';
+    const wa = resolveSocialUrl('whatsapp', (profile.social || {}).whatsapp);
+    [
+      { call: 'gate-top-call-btn', web: 'gate-top-web-btn', wa: 'gate-top-wa-btn' },
+      { call: 'gate-foot-call-btn', web: 'gate-foot-web-btn', wa: 'gate-foot-wa-btn' },
+    ].forEach(function (ids) {
+      const c = document.getElementById(ids.call);
+      const w = document.getElementById(ids.web);
+      const a = document.getElementById(ids.wa);
+      if (c) { if (tel) { c.href = tel; c.style.display = 'flex'; } else c.style.display = 'none'; }
+      if (w) { if (web) { w.href = web; w.style.display = 'flex'; } else w.style.display = 'none'; }
+      if (a) { if (wa) { a.href = wa; a.style.display = 'flex'; } else a.style.display = 'none'; }
+    });
+    // "WhatsApp Us" (plain chat) in the marketing section below.
+    const mktWa = document.getElementById('gate-mkt-wa-btn');
+    if (mktWa) { if (wa) { mktWa.href = wa; mktWa.style.display = 'flex'; } else mktWa.style.display = 'none'; }
+    // "Book Your Date" — same WhatsApp number, but with a pre-filled enquiry message
+    // instead of a blank chat, and NOT wired to the per-event Enquiry form/Firestore
+    // collection: that form is deliberately event-scoped (submitEnquiry() writes
+    // eventId: EVENT.id), and this button can be tapped before any event is even
+    // resolved, so there's no valid eventId yet to attach it to. Two copies of this
+    // button exist (marketing section + final CTA), both wired identically here.
+    ['gate-mkt-book-btn', 'gate-cta-book-btn'].forEach(function (id) {
+      const bookBtn = document.getElementById(id);
+      if (!bookBtn) return;
+      if (wa) {
+        bookBtn.href = wa + (wa.indexOf('?') === -1 ? '?' : '&') + 'text=' + encodeURIComponent("Hi! I'd love to enquire about booking SnapFilmer for my wedding date.");
+        bookBtn.style.display = 'flex';
+      } else if (tel) {
+        bookBtn.href = tel;
+        bookBtn.style.display = 'flex';
+      } else {
+        bookBtn.style.display = 'none';
+      }
+    });
+  }
+
+  // Real studio cover photo (Profile → Photos) as the Gate's hero banner — no stock/
+  // placeholder image is ever substituted; the whole hero block just stays hidden
+  // (headline still shows on its own) until the studio actually uploads one.
+  function renderGateHero() {
+    const wrap = document.getElementById('gate-hero-wrap');
+    const img = document.getElementById('gate-hero-img');
+    const fallback = document.getElementById('gate-hero-fallback-heading');
+    if (!wrap || !img) return;
+    if (studioCoverUrl) {
+      img.src = studioCoverUrl;
+      wrap.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+    } else {
+      wrap.style.display = 'none';
+      if (fallback) fallback.style.display = 'block';
+    }
+  }
+
+  // "See Moments We've Captured" strip on the Gate — reuses the exact same real data
+  // as the full Portfolio screen (loadPortfolioEventData/portfolioEvent/
+  // portfolioPhotosByAlbum: the studio's chosen Portfolio Event's real albums/photos),
+  // just rendered as a compact horizontal strip instead of a full grid. Deliberately
+  // does NOT invent per-category counts like "230+ Events" — there's no such rollup
+  // anywhere in the data model, so this only ever shows a real photo count per album.
+  function renderGateCategoryStrip() {
+    const section = document.getElementById('gate-cat-section');
+    const strip = document.getElementById('gate-cat-strip');
+    if (!section || !strip) return;
+    const cats = (portfolioEvent && portfolioEvent.albums) || [];
+    if (!portfolioLoaded || !cats.length) { section.style.display = 'none'; return; }
+    strip.innerHTML = '';
+    cats.forEach(function (c) {
+      const photos = portfolioPhotosByAlbum[c.name] || [];
+      const cover = c.cover || (photos[0] && photos[0].dataUrl) || '';
+      if (!cover) return; // nothing real to show for this category yet — skip, don't fake it
+      const card = document.createElement('div');
+      card.className = 'cat-card';
+      card.style.cssText = 'flex:0 0 130px;';
+      card.innerHTML = '<img src="' + cover + '" style="height:130px;"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + photos.length + (photos.length === 1 ? ' photo' : ' photos') + '</div></div>';
+      card.addEventListener('click', function () { openPortfolioFromGate(); });
+      strip.appendChild(card);
+    });
+    section.style.display = strip.children.length ? 'block' : 'none';
+  }
+
+  // "Find Your Photos with AI" promo CTA — this is marketing/feature introduction only.
+  // Real face-scanning always happens scoped to one specific event (see applySelfie/
+  // handleSelfieFile below), and there's no event known yet on this screen, so the CTA
+  // just guides the guest to the Event ID field above instead of pretending to search.
+  function focusEventIdInput() {
+    const input = document.getElementById('event-gate-input');
+    if (!input) return;
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function () { input.focus(); }, 300);
   }
 
   function startStudioProfileSync() {
