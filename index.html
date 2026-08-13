@@ -1179,21 +1179,6 @@
         </div>
       </div>
 
-      <!-- Events and Posts used to be their own bottom-nav buttons — moved here (Phase 2
-           nav redesign) once Photos/Videos took those two slots for one-tap gallery
-           access. Both are real, working screens (showTab still renders them exactly as
-           before), just reached from More now instead of the bottom bar. -->
-      <div class="list-card">
-        <div class="list-row" onclick="showTab('events')" style="cursor:pointer;">
-          <div><div class="lt">Events</div><div class="ld">Every event you've followed on this device.</div></div>
-          <span class="arrow"><i data-icon="CHEVRON"></i></span>
-        </div>
-        <div class="list-row" onclick="showTab('posts')" style="cursor:pointer;">
-          <div><div class="lt">Posts</div><div class="ld">Announcements and updates from your studio.</div></div>
-          <span class="arrow"><i data-icon="CHEVRON"></i></span>
-        </div>
-      </div>
-
       <div class="list-card">
         <!-- Hidden once the app is actually running installed/standalone (nothing left to
              install) — see updateInstallUI(). Always available here even if the guest
@@ -1271,14 +1256,8 @@
   <!-- ========== BOTTOM NAV ========== -->
   <div class="bottom-nav" id="bottom-nav">
     <button class="nav-item active" data-tab="home" onclick="showTab('home')"><span class="nav-dot"><i data-icon="HOME"></i></span><span>Home</span></button>
-    <!-- Photos/Videos replace the old Events/Posts nav buttons (per the Phase 2 design
-         pass) — they open the same real screens the Home chip row already links to
-         (openMyPhotos()/pushScreen('videos')), just promoted to the bottom nav for
-         one-tap access. Events and Posts still exist (real features — Events lists every
-         event this guest follows, Posts is the studio's announcements) — moved into the
-         More screen as list rows instead of losing them; see screen-more below. -->
-    <button class="nav-item" onclick="openMyPhotos()"><span class="nav-dot"><i data-icon="SPARKLE"></i></span><span>Photos</span></button>
-    <button class="nav-item" onclick="pushScreen('videos')"><span class="nav-dot"><i data-icon="PLAY_SM"></i></span><span>Videos</span></button>
+    <button class="nav-item" data-tab="events" onclick="showTab('events')"><span class="nav-dot"><i data-icon="EVENTS"></i></span><span>Events</span></button>
+    <button class="nav-item" data-tab="posts" onclick="showTab('posts')"><span class="nav-dot"><i data-icon="POSTS"></i></span><span>Posts</span></button>
     <button class="nav-item" data-tab="more" onclick="showTab('more')"><span class="nav-dot"><i data-icon="MORE"></i></span><span>More</span></button>
   </div>
 
