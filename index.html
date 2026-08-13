@@ -62,7 +62,7 @@
      normal sans-serif system font stack. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     /* Earthy sage-green / warm cream palette, swapped in from the coral default —
@@ -114,6 +114,7 @@
      Real-phone override (position:fixed) lives in the @media (max-width:600px) block. */
   .gate-overlay { position: absolute; inset: 0; }
   .gate-serif { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; }
+  .gate-script { font-family: 'Dancing Script', cursive; }
   /* Qualified with the parent tag/class (not just .gate-kicker alone) so it beats the
      existing ".studio-meta p" rule's specificity instead of being silently overridden by
      it — otherwise the color/size below would have no visible effect. */
@@ -237,27 +238,54 @@
   .nav-item.active span { color: var(--accent); }
 
   /* ---- Home hero ---- */
-  .hero { position: relative; margin: 0 0 16px; }
-  .hero img { width: 100%; height: 220px; object-fit: cover; display: block; }
+  .hero { position: relative; margin: 0 0 0; }
+  .hero img { width: 100%; height: 460px; object-fit: cover; display: block; }
   /* Two gradients: the original bottom-up one (for the date/title text), plus a new
      top-down one so the bell button in .hero-top always has a dark backdrop to sit on.
      Without the top gradient, a bright/light-colored cover photo (e.g. a light-colored
      outfit near the top of frame) could wash out the translucent-white glass-btn to the
      point of being invisible against it — happened with this event's actual cover photo. */
-  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.75), rgba(10,8,6,0) 55%), linear-gradient(to bottom, rgba(10,8,6,.45), rgba(10,8,6,0) 32%); }
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.85) 0%, rgba(10,8,6,.35) 38%, rgba(10,8,6,.25) 60%, rgba(10,8,6,0) 78%), linear-gradient(to bottom, rgba(10,8,6,.55), rgba(10,8,6,0) 26%); }
   .hero-top { position: absolute; top: 20px; left: 16px; right: 16px; display: flex; justify-content: flex-end; z-index: 2; }
   .glass-btn { width: 40px; height: 40px; border-radius:10px; background: rgba(255,255,255,.3); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.4); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .notif-badge { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius:6px; background: #FF4747; border: 1.5px solid var(--bg); }
-  .hero-info { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 2; }
-  .hero-info .date-pill { display: inline-block; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius:10px; margin-bottom: 8px; letter-spacing: .3px; }
-  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 25px; font-weight: 600; margin: 0; }
+  .date-pill-corner { position: absolute; top: 20px; left: 16px; z-index: 2; background: rgba(10,8,6,.55); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.25); color: var(--accent-gold); font-weight: 700; font-size: 11px; letter-spacing: .3px; padding: 7px 12px; }
+  /* Studio wordmark centered near the top of the hero — real name/kicker (applyStudioProfile),
+     tap-through to Portfolio same as everywhere else this wordmark appears. */
+  .hero-brand { position: absolute; top: 96px; left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
+  .hero-brand .crown { color: var(--accent-gold); margin-bottom: 2px; }
+  .hero-brand .crown svg { width: 20px; height: 20px; }
+  .hero-brand .wordmark { font-size: 26px; font-weight: 700; color: #fff; }
+  .hero-brand .wordmark em { font-style: normal; color: var(--accent-gold); }
+  .hero-brand .kicker { color: var(--accent-gold); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
+  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 2; text-align: center; }
+  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 600; margin: 0; }
+  .hero-info .cat { display: block; }
+  .hero-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; }
+  .hero-divider span { width: 34px; height: 1px; background: rgba(255,255,255,.3); }
   /* Real Photos/Videos/Albums counts (renderHomeStats) — mirrors the "Event Dashboard"
      stat row from the approved Phase 1 mockup, but only ever shows real numbers pulled
      from eventPhotos/eventVideos/eventAlbums, never a placeholder figure. */
-  .hero-stats { display: flex; gap: 18px; margin-top: 10px; }
-  .hero-stats .stat { display: flex; flex-direction: column; }
-  .hero-stats .stat b { color: #fff; font-size: 15px; font-weight: 800; line-height: 1.2; }
-  .hero-stats .stat span { color: rgba(255,255,255,.75); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+  .hero-stats { display: flex; align-items: center; justify-content: center; gap: 30px; margin-top: 4px; }
+  .hero-stats .stat { display: flex; flex-direction: column; align-items: center; }
+  .hero-stats .stat i { color: var(--accent-gold); margin-bottom: 3px; width: 16px; height: 16px; }
+  .hero-stats .stat b { color: #fff; font-size: 16px; font-weight: 800; line-height: 1.2; }
+  .hero-stats .stat span { color: rgba(255,255,255,.75); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* Home cards below the hero (notify banner / promo / 3-up / love-card) — all share
+     .home-sec spacing so they line up with each other and with FOLDERS below. */
+  .home-sec { margin: 0 16px 14px; }
+  .home-promo-card { background: var(--ink); padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .home-promo-card .kicker { color: var(--accent-gold); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+  .home-promo-card h2 { color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 21px; font-weight: 600; margin: 0 0 6px; }
+  .home-promo-card p { color: rgba(255,255,255,.7); font-size: 12px; margin: 0; line-height: 1.5; }
+  .home-promo-card .sig { color: var(--accent-gold); font-size: 26px; flex-shrink: 0; text-align: center; }
+  .home-love-card { background: var(--accent-soft); padding: 16px; display: flex; align-items: center; gap: 14px; }
+  .home-love-card .ico { color: var(--accent-gold); flex-shrink: 0; }
+  .home-love-card .txt { flex: 1; min-width: 0; }
+  .home-love-card .txt h3 { margin: 0 0 2px; font-family: 'Playfair Display', Georgia, serif; font-size: 16px; font-weight: 600; color: var(--ink); }
+  .home-love-card .txt p { margin: 0; font-size: 11.5px; color: var(--muted); }
+  .home-love-card .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
   /* ---- Quick action chips ---- */
   .chip-row { display: flex; gap: 10px; padding: 0 16px 18px; overflow-x: auto; }
@@ -272,6 +300,8 @@
   .home-card .dot { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
   .home-card .ttl { font-size: 12px; font-weight: 800; color: var(--ink); margin-bottom: 2px; }
   .home-card .dsc { font-size: 10px; color: var(--muted); line-height: 1.35; }
+  .home-card .arr { display: flex; align-items: center; gap: 1px; margin-top: 9px; font-size: 10px; font-weight: 800; color: var(--accent); }
+  .home-card .arr svg { width: 12px; height: 12px; }
 
   /* ---- Album/folder chips (Gallery) ---- */
   .album-chip-row { display: flex; gap: 8px; padding: 0 0 14px; overflow-x: auto; }
@@ -1020,13 +1050,36 @@
       <div class="hero">
         <img id="home-cover" src="" alt="cover">
         <div class="hero-top"><button class="glass-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button></div>
-        <div class="hero-info" onclick="openEventInfo()" style="cursor:pointer;" title="Event Info">
-          <span class="date-pill" id="home-date">14 Aug 2026</span>
-          <h2 id="home-event-name">Vaibhav &amp; Komal</h2>
+        <span class="date-pill-corner" id="home-date">14 Aug 2026</span>
+        <!-- Studio wordmark + crown, centered over the top of the hero photo — tappable
+             straight through to the real Portfolio (same destination as the studio name
+             everywhere else), so removing the old studio-block card below doesn't lose
+             that entry point. Name/initials come from applyStudioProfile like every other
+             copy of the studio name in this file. -->
+        <div class="hero-brand" onclick="openPortfolio()" title="View Our Portfolio">
+          <div class="crown"><i data-icon="CROWN"></i></div>
+          <!-- Keeps id="studio-name" (moved here from the removed studio-block card) since
+               several other places — Event Info's Studio row, share text, and the Reel
+               intro/outro cards — read this element's real textContent directly. Once
+               applyStudioProfile fills in the real name it becomes plain text (loses the
+               hardcoded two-tone "Snap"/"Filmer" split below), which is expected: that
+               split was only ever a default-brand visual, never meant to survive a
+               different real studio name. -->
+          <div class="wordmark" id="studio-name">Snap<em>Filmer</em></div>
+          <div class="kicker">Wedding &amp; Portrait Studio</div>
+        </div>
+        <div class="hero-info" title="Event Info">
+          <h2 id="home-event-name" onclick="openEventInfo()" style="cursor:pointer;">Vaibhav &amp; Komal</h2>
+          <!-- Cursive event-type line — only ever the event's real category (Wedding,
+               Pre-Wedding, etc. as picked in the dashboard's Create Event wizard); the
+               whole line + divider stays hidden if the event has no category set, rather
+               than showing a fake "Wedding" label. See renderHomeStats() below. -->
+          <span class="gate-script cat" id="home-event-cat" style="display:none;color:var(--accent-gold);font-size:19px;"></span>
+          <div class="hero-divider"><span></span><i data-icon="HEART" style="width:12px;height:12px;color:var(--accent-gold);"></i><span></span></div>
           <div class="hero-stats" id="home-stats">
-            <div class="stat"><b id="home-stat-photos">0</b><span>Photos</span></div>
-            <div class="stat"><b id="home-stat-videos">0</b><span>Videos</span></div>
-            <div class="stat"><b id="home-stat-albums">0</b><span>Albums</span></div>
+            <div class="stat"><i data-icon="SPARKLE"></i><b id="home-stat-photos">0</b><span>Photos</span></div>
+            <div class="stat"><i data-icon="PLAY_SM"></i><b id="home-stat-videos">0</b><span>Videos</span></div>
+            <div class="stat"><i data-icon="IMAGE"></i><b id="home-stat-albums">0</b><span>Albums</span></div>
           </div>
         </div>
       </div>
@@ -1053,15 +1106,21 @@
            This banner requires an actual tap on the button below, so the resulting
            requestPermission() call is gesture-triggered and gets the real, non-quiet
            permission dialog. See showNotifyBanner()/enableNotificationsFromBanner() below. -->
-      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--ink);border:none;border-radius:0;padding:14px 16px;position:relative;">
-        <button onclick="dismissNotifyBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
+      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:0;padding:14px 16px;position:relative;">
+        <button onclick="dismissNotifyBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
         <div style="display:flex;gap:12px;align-items:center;padding-right:22px;">
-          <div style="width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
+          <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
           <div style="flex:1;">
-            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;color:#fff;">Turn on notifications</div>
-            <div style="font-size:11.5px;color:rgba(255,255,255,.65);line-height:1.4;">Stay updated with new photos, videos &amp; announcements.</div>
+            <div style="font-weight:800;font-size:13.5px;margin-bottom:3px;color:var(--ink);">Turn on notifications</div>
+            <div style="font-size:11.5px;color:var(--muted);line-height:1.4;">Stay updated with new photos, videos &amp; announcements.</div>
           </div>
-          <button onclick="enableNotificationsFromBanner()" style="background:var(--accent-gold);color:#fff;border:none;border-radius:8px;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="CHEVRON"></i></button>
+          <!-- Styled like an off-state iOS toggle switch — tapping it is the same "start
+               the real, gesture-triggered permission request" action as the old chevron
+               button (enableNotificationsFromBanner), just restyled to match the newest
+               reference instead of a solid button. -->
+          <button onclick="enableNotificationsFromBanner()" title="Turn on" style="flex-shrink:0;width:42px;height:24px;border-radius:12px;background:var(--border);border:none;padding:2px;cursor:pointer;display:flex;align-items:center;">
+            <span style="width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);display:block;"></span>
+          </button>
         </div>
       </div>
 
@@ -1078,55 +1137,55 @@
         </div>
       </div>
 
-      <!-- Moved to right under the event cover (was below the chips/folder cards) —
-           the studio's own identity/contact card should be the first thing a guest
-           sees, not something they have to scroll past everything else to find. -->
-      <div class="studio-block">
-        <div style="display:flex;gap:14px;align-items:flex-start;">
-          <div style="flex:1;min-width:0;">
-            <div class="studio-top">
-              <div class="studio-avatar" id="studio-avatar">SF</div>
-              <div class="studio-meta">
-                <h3 class="gate-serif" onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
-                <p>Wedding &amp; Portrait Studio</p>
-              </div>
-            </div>
-            <p class="studio-bio" id="studio-bio-p"><span id="studio-bio-text">At SnapFilmer, we don't just take photos, we tell stories. From magical weddings to dreamy pre-wedding shoots, every frame is crafted with heart.</span> <span class="more-link" id="bio-toggle-link" onclick="toggleBio()">Read more</span></p>
-          </div>
-          <!-- Same real event cover already used in the Home hero — just a small preview
-               thumbnail here, not a separate upload. Hidden if the event has no cover yet
-               (openEventAndBoot always sets a picsum fallback, so in practice this shows). -->
-          <img id="studio-block-photo" src="" alt="" style="width:96px;height:96px;object-fit:cover;flex-shrink:0;border-radius:0;">
+      <!-- Dark "Your Moments, Beautifully Delivered" promo card — matches the newest
+           reference. Purely marketing copy (no per-studio data to fake), branded with
+           the same cursive signature style used for the studio name elsewhere. -->
+      <div class="home-sec home-promo-card">
+        <div>
+          <div class="kicker">SnapFilmer Moments</div>
+          <h2>Your Moments,<br>Beautifully Delivered</h2>
+          <p>Relive every emotion, every smile, every tear of joy — delivered with the same love we captured it with.</p>
         </div>
-        <!-- Call/mail/website ghost-buttons now share this same row as the Instagram/
-             WhatsApp/etc icons instead of sitting up top next to the studio name. -->
-        <div class="social-row">
-          <div class="studio-cta" id="studio-contact-row">
-            <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
-            <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
-            <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
-          </div>
-          <div class="social-strip" id="social-strip">
-            <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
-            <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
-            <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
-            <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn-outline" onclick="openPortfolio()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-icon="IMAGE"></i>View Our Portfolio</button>
-          <button class="ghost-btn" onclick="shareStudioProfile()" title="Share"><i data-icon="SHARE"></i></button>
-        </div>
+        <div class="sig"><i data-icon="HEART"></i><div class="gate-script" style="font-size:22px;margin-top:4px;">SnapFilmer</div></div>
       </div>
 
       <!-- Upgraded from a plain pill chip-row to a 3-card row with a real one-line
            description each, matching the approved reference. Event Info (added earlier)
            didn't have room here anymore — it's still reachable by tapping the event
-           name/date on the hero above (see the onclick added there). -->
+           name/date on the hero above (see the onclick added there). Each card now also
+           carries an explicit "View X →" link matching the newest reference. -->
       <div class="home-card-row">
-        <div class="home-card" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span><div class="ttl">My Photos</div><div class="dsc">Find all your photos here</div></div>
-        <div class="home-card" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div></div>
-        <div class="home-card" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div></div>
+        <div class="home-card" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span><div class="ttl">My Photos</div><div class="dsc">Find all your photos here</div><span class="arr">View Photos <i data-icon="CHEVRON"></i></span></div>
+        <div class="home-card" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div><span class="arr">Watch Videos <i data-icon="CHEVRON"></i></span></div>
+        <div class="home-card" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div><span class="arr">View Highlights <i data-icon="CHEVRON"></i></span></div>
+      </div>
+
+      <!-- Replaces the old studio bio/contact card (.studio-block) — the newest reference
+           has no separate bio card, so the studio's real identity/contact functionality
+           moved: the wordmark tap in the hero above now opens the Portfolio, and this
+           "Love what you see?" card keeps the real call/whatsapp/website/social icons
+           (same ids, same wireGateQuickLinks-style wiring, nothing silently dropped) plus
+           a working Book Your Date button. -->
+      <div class="home-sec home-love-card">
+        <div class="ico"><i data-icon="CAMERA" style="width:32px;height:32px;"></i></div>
+        <div class="txt">
+          <h3>Love what you see?</h3>
+          <p>Let's capture your next big moment together.</p>
+          <div class="quick">
+            <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+            <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+            <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+            <div class="social-strip" id="social-strip">
+              <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+              <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+              <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+              <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="home-sec" style="margin-top:-6px;">
+        <a class="btn-solid-sm" id="home-love-book-btn" href="#" target="_blank" rel="noopener" style="display:none;background:var(--accent-gold);color:#fff;text-decoration:none;align-items:center;justify-content:center;gap:6px;padding:12px 18px;font-size:12.5px;font-weight:700;width:100%;box-sizing:border-box;"><i data-icon="HEART"></i>Book Your Date</a>
       </div>
 
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
@@ -1728,6 +1787,8 @@
     CHECK_SQ: icon('<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12l3 3 5-6"/>'),
     PLUS: icon('<path d="M12 5v14M5 12h14"/>'),
     HEART: icon('<path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/>'),
+    // Small decorative crown above the Home hero wordmark (Phase 3 redesign reference).
+    CROWN: icon('<path d="M3 18h18l-1.5-8-4.5 3-3-6-3 6-4.5-3z"/><path d="M5 20h14"/>'),
     CAMERA: icon('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="14" r="3.5"/>'),
     LOCK: icon('<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/>'),
     IMAGE: icon('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'),
@@ -4540,7 +4601,10 @@
     // eventId: EVENT.id), and this button can be tapped before any event is even
     // resolved, so there's no valid eventId yet to attach it to. Two copies of this
     // button exist (marketing section + final CTA), both wired identically here.
-    ['gate-mkt-book-btn', 'gate-cta-book-btn'].forEach(function (id) {
+    // 'home-love-book-btn' is the Phase 3 Home-tab "Book Your Date" button (inside the
+    // new "Love what you see?" card, replacing the old studio-block's contact CTA) —
+    // wired identically to the two Event Gate copies of this same button.
+    ['gate-mkt-book-btn', 'gate-cta-book-btn', 'home-love-book-btn'].forEach(function (id) {
       const bookBtn = document.getElementById(id);
       if (!bookBtn) return;
       if (wa) {
@@ -4709,6 +4773,22 @@
     if (p) p.textContent = eventPhotos.length;
     if (v) v.textContent = eventVideos.length;
     if (a) a.textContent = eventAlbums.length;
+    renderHomeEventCat();
+  }
+
+  // Cursive event-type line under the event name on the Home hero (Phase 3 redesign) —
+  // only ever the event's real category as picked in the dashboard's Create Event
+  // wizard (EVENT.category). Hides itself (and the divider above the stats) entirely
+  // when the event has no category set, rather than showing a fake "Wedding" label.
+  function renderHomeEventCat() {
+    const el = document.getElementById('home-event-cat');
+    if (!el) return;
+    if (EVENT.category) {
+      el.textContent = EVENT.category;
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
   }
 
   function renderHomeAlbums() {
@@ -6829,8 +6909,6 @@
     document.getElementById('home-cover').src = EVENT.cover;
     document.getElementById('home-event-name').textContent = EVENT.name;
     document.getElementById('home-date').textContent = EVENT.date;
-    const studioBlockPhoto = document.getElementById('studio-block-photo');
-    if (studioBlockPhoto) studioBlockPhoto.src = EVENT.cover;
     renderStories();
     renderEvents();
     renderPosts();
