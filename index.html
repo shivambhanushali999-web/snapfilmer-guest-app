@@ -250,7 +250,14 @@
   .notif-badge { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius:6px; background: #FF4747; border: 1.5px solid var(--bg); }
   .hero-info { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 2; }
   .hero-info .date-pill { display: inline-block; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius:10px; margin-bottom: 8px; letter-spacing: .3px; }
-  .hero-info h2 { color: #fff; font-size: 26px; font-weight: 800; margin: 0; letter-spacing: -.5px; }
+  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 25px; font-weight: 600; margin: 0; }
+  /* Real Photos/Videos/Albums counts (renderHomeStats) — mirrors the "Event Dashboard"
+     stat row from the approved Phase 1 mockup, but only ever shows real numbers pulled
+     from eventPhotos/eventVideos/eventAlbums, never a placeholder figure. */
+  .hero-stats { display: flex; gap: 18px; margin-top: 10px; }
+  .hero-stats .stat { display: flex; flex-direction: column; }
+  .hero-stats .stat b { color: #fff; font-size: 15px; font-weight: 800; line-height: 1.2; }
+  .hero-stats .stat span { color: rgba(255,255,255,.75); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
 
   /* ---- Quick action chips ---- */
   .chip-row { display: flex; gap: 10px; padding: 0 16px 18px; overflow-x: auto; }
@@ -983,6 +990,11 @@
         <div class="hero-info">
           <span class="date-pill" id="home-date">14 Aug 2026</span>
           <h2 id="home-event-name">Vaibhav &amp; Komal</h2>
+          <div class="hero-stats" id="home-stats">
+            <div class="stat"><b id="home-stat-photos">0</b><span>Photos</span></div>
+            <div class="stat"><b id="home-stat-videos">0</b><span>Videos</span></div>
+            <div class="stat"><b id="home-stat-albums">0</b><span>Albums</span></div>
+          </div>
         </div>
       </div>
 
@@ -1040,7 +1052,7 @@
         <div class="studio-top">
           <div class="studio-avatar" id="studio-avatar">SF</div>
           <div class="studio-meta">
-            <h3 onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
+            <h3 class="gate-serif" onclick="openPortfolio()" id="studio-name">SnapFilmer</h3>
             <p>Wedding &amp; Portrait Studio</p>
           </div>
         </div>
@@ -4433,6 +4445,7 @@
       eventAlbums = Array.isArray(d.albums) ? d.albums : [];
       eventVideos = Array.isArray(d.videos) ? d.videos : [];
       renderVideos();
+      renderHomeStats();
       // ?video=<name> deep link (from a video's own Share button, see vpShare) — jump
       // straight into that video's player instead of just opening the event. Only fires
       // once (deepLinkVideoOpened guard) since this listener re-fires on every Firestore
@@ -4479,6 +4492,18 @@
   // it and filed photos into it, same as Kamero; a photo with no album simply isn't
   // shown as its own folder here (the fix for that is uploading straight into a real
   // album on the dashboard, not surfacing an "Unsorted" bucket to guests).
+  // Real Photos/Videos/Albums counts on the Home hero — see the .hero-stats CSS comment.
+  // Called from startEventPhotosSync() (photos count) and startEventSettingsSync()
+  // (videos/albums count) so all three stay live as the studio uploads/organizes.
+  function renderHomeStats() {
+    const p = document.getElementById('home-stat-photos');
+    const v = document.getElementById('home-stat-videos');
+    const a = document.getElementById('home-stat-albums');
+    if (p) p.textContent = eventPhotos.length;
+    if (v) v.textContent = eventVideos.length;
+    if (a) a.textContent = eventAlbums.length;
+  }
+
   function renderHomeAlbums() {
     const wrap = document.getElementById('home-albums-wrap');
     if (!wrap) return;
@@ -4634,6 +4659,7 @@
         renderMyPhotosResults();
         renderStories();
         renderFavorites();
+        renderHomeStats();
         renderGalleryUploadUI();
         // Home's Highlights folder card now depends on eventPhotos (isHighlight flags,
         // count), not just eventAlbums — needs its own refresh here too, or a newly
@@ -6599,6 +6625,7 @@
     renderNotifications();
     updateNotifBadge();
     renderVideos();
+    renderHomeStats();
 
     // Restore a previously-taken selfie on reload so matches don't just vanish. Photo
     // sync + snapshot handlers already call matchAllTestPhotos() automatically once
