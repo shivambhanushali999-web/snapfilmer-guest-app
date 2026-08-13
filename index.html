@@ -164,6 +164,26 @@
   .gate-footer .gate-icon-btn { background: rgba(255,255,255,.1); color: #fff; }
   .gate-footer .ft-copy { font-size: 10.5px; color: rgba(255,255,255,.45); border-top: 1px solid rgba(255,255,255,.12); padding-top: 14px; }
 
+  /* ===== Phase 2 dark theme — My Photos, Gallery, Videos, Viewer, Video Player =====
+     Every existing rule in this file already reads colors through --bg/--surface/
+     --border/--ink/--muted/--accent-soft/--accent-ink custom properties (never a
+     hardcoded hex for card/text/border colors), so re-declaring just those properties
+     on .dark-screen makes the whole screen — and everything already built inside it —
+     repaint dark automatically, with zero risk to any existing layout or JS. Photo/
+     video content is the whole point of these screens, so a dark backdrop makes the
+     actual photos/videos pop the way a light cream background never could. --accent/
+     --accent-gold are deliberately left as the global values: the olive/gold brand
+     colors already read fine against a dark backdrop. */
+  .dark-screen {
+    --bg: #14140F;
+    --surface: #1D1D16;
+    --ink: #F5F1E7;
+    --muted: rgba(245,241,231,.6);
+    --border: rgba(245,241,231,.14);
+    --accent-soft: rgba(176,138,74,.22);
+    --accent-ink: #E4C58C;
+  }
+
   .phone {
     width: 390px; max-width: 100vw; height: 844px; max-height: 100vh;
     background: var(--bg); border-radius:0; border: 8px solid #000;
@@ -1086,6 +1106,7 @@
         <div class="chip" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span>My Photos</div>
         <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Videos</div>
         <div class="chip" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span>Highlights</div>
+        <div class="chip" onclick="openEventInfo()"><span class="dot"><i data-icon="INFO"></i></span>Event Info</div>
       </div>
 
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
@@ -1178,6 +1199,21 @@
         </div>
       </div>
 
+      <!-- Events and Posts used to be their own bottom-nav buttons — moved here (Phase 2
+           nav redesign) once Photos/Videos took those two slots for one-tap gallery
+           access. Both are real, working screens (showTab still renders them exactly as
+           before), just reached from More now instead of the bottom bar. -->
+      <div class="list-card">
+        <div class="list-row" onclick="showTab('events')" style="cursor:pointer;">
+          <div><div class="lt">Events</div><div class="ld">Every event you've followed on this device.</div></div>
+          <span class="arrow"><i data-icon="CHEVRON"></i></span>
+        </div>
+        <div class="list-row" onclick="showTab('posts')" style="cursor:pointer;">
+          <div><div class="lt">Posts</div><div class="ld">Announcements and updates from your studio.</div></div>
+          <span class="arrow"><i data-icon="CHEVRON"></i></span>
+        </div>
+      </div>
+
       <div class="list-card">
         <!-- Hidden once the app is actually running installed/standalone (nothing left to
              install) — see updateInstallUI(). Always available here even if the guest
@@ -1255,14 +1291,20 @@
   <!-- ========== BOTTOM NAV ========== -->
   <div class="bottom-nav" id="bottom-nav">
     <button class="nav-item active" data-tab="home" onclick="showTab('home')"><span class="nav-dot"><i data-icon="HOME"></i></span><span>Home</span></button>
-    <button class="nav-item" data-tab="events" onclick="showTab('events')"><span class="nav-dot"><i data-icon="EVENTS"></i></span><span>Events</span></button>
-    <button class="nav-item" data-tab="posts" onclick="showTab('posts')"><span class="nav-dot"><i data-icon="POSTS"></i></span><span>Posts</span></button>
+    <!-- Photos/Videos replace the old Events/Posts nav buttons (per the Phase 2 design
+         pass) — they open the same real screens the Home chip row already links to
+         (openMyPhotos()/pushScreen('videos')), just promoted to the bottom nav for
+         one-tap access. Events and Posts still exist (real features — Events lists every
+         event this guest follows, Posts is the studio's announcements) — moved into the
+         More screen as list rows instead of losing them; see screen-more below. -->
+    <button class="nav-item" onclick="openMyPhotos()"><span class="nav-dot"><i data-icon="SPARKLE"></i></span><span>Photos</span></button>
+    <button class="nav-item" onclick="pushScreen('videos')"><span class="nav-dot"><i data-icon="PLAY_SM"></i></span><span>Videos</span></button>
     <button class="nav-item" data-tab="more" onclick="showTab('more')"><span class="nav-dot"><i data-icon="MORE"></i></span><span>More</span></button>
   </div>
 
   <!-- ========== SUB SCREENS ========== -->
 
-  <div id="screen-videos" class="sub-screen">
+  <div id="screen-videos" class="sub-screen dark-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1>Videos</h1>
@@ -1270,7 +1312,7 @@
     <div class="videos-body"><div class="video-grid" id="videos-list"></div></div>
   </div>
 
-  <div id="screen-myphotos" class="sub-screen">
+  <div id="screen-myphotos" class="sub-screen dark-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <div style="flex:1;">
@@ -1346,7 +1388,7 @@
     </div>
     <!-- Fixed bottom bar for the per-photo "select to buy" cart — only ever visible
          while sellingSelectMode is on and at least one photo is selected. -->
-    <div id="mp-cart-bar" style="display:none;position:absolute;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--border);padding:12px 16px;align-items:center;justify-content:space-between;gap:10px;z-index:5;">
+    <div id="mp-cart-bar" style="display:none;position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px;align-items:center;justify-content:space-between;gap:10px;z-index:5;">
       <div style="font-size:12.5px;font-weight:700;" id="mp-cart-summary">0 selected &middot; &#8377;0</div>
       <button class="btn-solid-sm" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;" onclick="buySelectedPhotos()" id="mp-cart-buy-btn">Buy Selected</button>
     </div>
@@ -1435,7 +1477,7 @@
   </div>
 
   <!-- ========== GALLERY (all event photos) ========== -->
-  <div id="screen-gallery" class="sub-screen">
+  <div id="screen-gallery" class="sub-screen dark-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <h1 id="gallery-title">Gallery</h1>
@@ -1516,6 +1558,43 @@
     </div>
   </div>
 
+  <!-- ========== EVENT INFO — real fields only (venue/category/hosts from the dashboard's
+       Create Event wizard + General tab, access type derived from the actual PIN setting).
+       Opened from the "Event Info" chip on Home; see openEventInfo()/renderEventInfo(). ========== -->
+  <div id="screen-eventinfo" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1>Event Info</h1>
+    </div>
+    <div class="scroll" style="padding:16px;">
+      <div class="list-card">
+        <div class="list-row" style="cursor:default;">
+          <div><div class="lt">Event</div><div class="ld" id="ei-name" style="padding-right:0;">&mdash;</div></div>
+        </div>
+        <div class="list-row" id="ei-date-row" style="cursor:default;display:none;">
+          <div><div class="lt">Date</div><div class="ld" id="ei-date" style="padding-right:0;">&mdash;</div></div>
+        </div>
+        <div class="list-row" id="ei-venue-row" style="cursor:default;display:none;">
+          <div><div class="lt">Venue</div><div class="ld" id="ei-venue" style="padding-right:0;">&mdash;</div></div>
+        </div>
+        <div class="list-row" id="ei-category-row" style="cursor:default;display:none;">
+          <div><div class="lt">Event Type</div><div class="ld" id="ei-category" style="padding-right:0;">&mdash;</div></div>
+        </div>
+        <div class="list-row" style="cursor:default;">
+          <div><div class="lt">Photographer</div><div class="ld" id="ei-studio" style="padding-right:0;">&mdash;</div></div>
+        </div>
+        <div class="list-row" style="cursor:default;">
+          <div><div class="lt">Access Type</div><div class="ld" id="ei-access" style="padding-right:0;">&mdash;</div></div>
+        </div>
+        <div class="list-row" style="cursor:default;border-bottom:none;">
+          <div><div class="lt">Event ID</div><div class="ld" id="ei-id" style="padding-right:0;">&mdash;</div></div>
+          <button class="ghost-btn" title="Copy Event ID" onclick="copyEventId()"><i data-icon="SHARE_IOS"></i></button>
+        </div>
+      </div>
+      <button class="btn-solid-sm" onclick="shareCurrentEvent()" style="background:var(--ink);color:#fff;border:none;border-radius:0;padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;"><i data-icon="SHARE"></i>Share Event</button>
+    </div>
+  </div>
+
   <div id="screen-notifications" class="sub-screen">
     <div class="sub-bar">
       <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
@@ -1524,7 +1603,7 @@
     <div class="notif-body" id="notif-list"></div>
   </div>
 
-  <div id="screen-viewer" class="sub-screen">
+  <div id="screen-viewer" class="sub-screen dark-screen">
     <div class="viewer-top">
       <button class="glass-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
       <div class="viewer-count" id="viewer-count">1 / 1</div>
@@ -1574,7 +1653,7 @@
     </div>
   </div>
 
-  <div id="screen-video-player" class="sub-screen video-player-screen">
+  <div id="screen-video-player" class="sub-screen video-player-screen dark-screen">
     <div class="video-player-top">
       <button class="glass-btn" onclick="closeVideoPlayer()"><i data-icon="BACK"></i></button>
       <h1 class="video-player-title" id="video-player-title">Video</h1>
@@ -1650,7 +1729,7 @@
   // works the same way. Which event to show comes from ?event=<id> in the link/QR the
   // studio shares (dashboard's Share & QR tab), not a hardcoded value. Starts empty;
   // populated once the matching Firestore doc is fetched.
-  let EVENT = { id: '', name: '', date: '', cover: '' };
+  let EVENT = { id: '', name: '', date: '', cover: '', venue: '', category: '' };
 
   // Watermark settings for the currently loaded event (kept in sync live from
   // Firestore in startEventSettingsSync below), plus the studio's uploaded logo (from
@@ -2247,6 +2326,54 @@
     const gate = document.getElementById('event-gate');
     if (gate) gate.style.display = 'none';
     openPortfolio();
+  }
+
+  // ================= Event Info =================
+  // Real fields only — Venue/Event Type come straight off the event doc (set by the
+  // studio in the dashboard's Create Event wizard / General tab), Access Type is
+  // derived from the actual PIN setting rather than a separate stored field, and
+  // Photographer reuses the same studio name already synced everywhere else on Home.
+  function renderEventInfo() {
+    const set = function (id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    const setRow = function (rowId, val) {
+      const row = document.getElementById(rowId);
+      if (row) row.style.display = val ? 'flex' : 'none';
+    };
+    set('ei-name', EVENT.name || '—');
+    setRow('ei-date-row', EVENT.date);
+    set('ei-date', EVENT.date || '');
+    setRow('ei-venue-row', EVENT.venue);
+    set('ei-venue', EVENT.venue || '');
+    setRow('ei-category-row', EVENT.category);
+    set('ei-category', EVENT.category || '');
+    const studioNameEl = document.getElementById('studio-name');
+    set('ei-studio', studioNameEl ? studioNameEl.textContent : 'SnapFilmer');
+    set('ei-access', eventSettings.pin ? 'PIN Protected' : 'Open Access');
+    set('ei-id', EVENT.id || '—');
+  }
+
+  function openEventInfo() {
+    renderEventInfo();
+    pushScreen('eventinfo');
+  }
+
+  function copyEventId() {
+    if (!EVENT.id) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(EVENT.id).then(function () {
+        alert('Event ID copied!');
+      }).catch(function () { alert(EVENT.id); });
+    } else {
+      alert(EVENT.id);
+    }
+  }
+
+  function shareCurrentEvent() {
+    const url = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(EVENT.id);
+    shareLinkOrCopy(url, EVENT.name + ' — SnapFilmer');
   }
 
   let currentHighlightsPhotos = [];
@@ -4022,6 +4149,8 @@
         name: d.name || 'Untitled Event',
         date: d.date || '',
         cover: d.cover || ('https://picsum.photos/seed/' + eventId + '/800/900'),
+        venue: d.venue || '',
+        category: d.category || '',
       };
       try { localStorage.setItem('sf_last_event_id', EVENT.id); } catch (err) {}
       addOrUpdateFollowedEvent(EVENT);
