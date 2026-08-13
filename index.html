@@ -238,8 +238,11 @@
   .nav-item.active span { color: var(--accent); }
 
   /* ---- Home hero ---- */
-  .hero { position: relative; margin: 0 0 0; }
-  .hero img { width: 100%; height: 460px; object-fit: cover; display: block; }
+  /* Inset card with soft rounded corners (not full-bleed) and a shorter image, matching
+     the reference exactly instead of the earlier oversized full-bleed version. overflow:
+     hidden on the rounded wrapper clips both the img and the ::after gradient to match. */
+  .hero { position: relative; margin: 0 16px 18px; border-radius: 24px; overflow: hidden; }
+  .hero img { width: 100%; height: 300px; object-fit: cover; display: block; }
   /* Two gradients: the original bottom-up one (for the date/title text), plus a new
      top-down one so the bell button in .hero-top always has a dark backdrop to sit on.
      Without the top gradient, a bright/light-colored cover photo (e.g. a light-colored
@@ -249,24 +252,24 @@
   .hero-top { position: absolute; top: 20px; left: 16px; right: 16px; display: flex; justify-content: flex-end; z-index: 2; }
   .glass-btn { width: 40px; height: 40px; border-radius:10px; background: rgba(255,255,255,.3); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.4); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .notif-badge { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius:6px; background: #FF4747; border: 1.5px solid var(--bg); }
-  .date-pill-corner { position: absolute; top: 20px; left: 16px; z-index: 2; background: rgba(10,8,6,.55); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.25); color: var(--accent-gold); font-weight: 700; font-size: 11px; letter-spacing: .3px; padding: 7px 12px; }
+  .date-pill-corner { position: absolute; top: 20px; left: 16px; z-index: 2; background: rgba(10,8,6,.55); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.25); border-radius: 10px; color: var(--accent-gold); font-weight: 700; font-size: 11px; letter-spacing: .3px; padding: 7px 12px; }
   /* Studio wordmark centered near the top of the hero — real name/kicker (applyStudioProfile),
      tap-through to Portfolio same as everywhere else this wordmark appears. */
-  .hero-brand { position: absolute; top: 96px; left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
+  .hero-brand { position: absolute; top: 52px; left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
   .hero-brand .crown { color: var(--accent-gold); margin-bottom: 2px; }
   .hero-brand .crown svg { width: 20px; height: 20px; }
   .hero-brand .wordmark { font-size: 26px; font-weight: 700; color: #fff; }
   .hero-brand .wordmark em { font-style: normal; color: var(--accent-gold); }
   .hero-brand .kicker { color: var(--accent-gold); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
-  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 2; text-align: center; }
-  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 600; margin: 0; }
-  .hero-info .cat { display: block; }
-  .hero-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; }
+  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 14px; z-index: 2; text-align: center; }
+  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 23px; font-weight: 600; margin: 0; }
+  .hero-info .cat { display: block; font-size: 17px; }
+  .hero-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 7px 0; }
   .hero-divider span { width: 34px; height: 1px; background: rgba(255,255,255,.3); }
   /* Real Photos/Videos/Albums counts (renderHomeStats) — mirrors the "Event Dashboard"
      stat row from the approved Phase 1 mockup, but only ever shows real numbers pulled
      from eventPhotos/eventVideos/eventAlbums, never a placeholder figure. */
-  .hero-stats { display: flex; align-items: center; justify-content: center; gap: 30px; margin-top: 4px; }
+  .hero-stats { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 2px; }
   .hero-stats .stat { display: flex; flex-direction: column; align-items: center; }
   .hero-stats .stat i { color: var(--accent-gold); margin-bottom: 3px; width: 16px; height: 16px; }
   .hero-stats .stat b { color: #fff; font-size: 16px; font-weight: 800; line-height: 1.2; }
@@ -275,12 +278,12 @@
   /* Home cards below the hero (notify banner / promo / 3-up / love-card) — all share
      .home-sec spacing so they line up with each other and with FOLDERS below. */
   .home-sec { margin: 0 16px 14px; }
-  .home-promo-card { background: var(--ink); padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .home-promo-card { background: var(--ink); border-radius: 18px; padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
   .home-promo-card .kicker { color: var(--accent-gold); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
   .home-promo-card h2 { color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 21px; font-weight: 600; margin: 0 0 6px; }
   .home-promo-card p { color: rgba(255,255,255,.7); font-size: 12px; margin: 0; line-height: 1.5; }
   .home-promo-card .sig { color: var(--accent-gold); font-size: 26px; flex-shrink: 0; text-align: center; }
-  .home-love-card { background: var(--accent-soft); padding: 16px; display: flex; align-items: center; gap: 14px; }
+  .home-love-card { background: var(--accent-soft); border-radius: 18px; padding: 16px; display: flex; align-items: center; gap: 14px; }
   .home-love-card .ico { color: var(--accent-gold); flex-shrink: 0; }
   .home-love-card .txt { flex: 1; min-width: 0; }
   .home-love-card .txt h3 { margin: 0 0 2px; font-family: 'Playfair Display', Georgia, serif; font-size: 16px; font-weight: 600; color: var(--ink); }
@@ -296,7 +299,7 @@
      pills with a card that carries a real one-line description each, per the approved
      reference. */
   .home-card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 18px; }
-  .home-card { background: var(--surface); border: 1px solid var(--border); padding: 12px 10px; cursor: pointer; text-align: left; }
+  .home-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px 10px; cursor: pointer; text-align: left; }
   .home-card .dot { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
   .home-card .ttl { font-size: 12px; font-weight: 800; color: var(--ink); margin-bottom: 2px; }
   .home-card .dsc { font-size: 10px; color: var(--muted); line-height: 1.35; }
@@ -1074,7 +1077,7 @@
                Pre-Wedding, etc. as picked in the dashboard's Create Event wizard); the
                whole line + divider stays hidden if the event has no category set, rather
                than showing a fake "Wedding" label. See renderHomeStats() below. -->
-          <span class="gate-script cat" id="home-event-cat" style="display:none;color:var(--accent-gold);font-size:19px;"></span>
+          <span class="gate-script cat" id="home-event-cat" style="display:none;color:var(--accent-gold);"></span>
           <div class="hero-divider"><span></span><i data-icon="HEART" style="width:12px;height:12px;color:var(--accent-gold);"></i><span></span></div>
           <div class="hero-stats" id="home-stats">
             <div class="stat"><i data-icon="SPARKLE"></i><b id="home-stat-photos">0</b><span>Photos</span></div>
@@ -1092,7 +1095,7 @@
            work for an installed home-screen app, never a plain Safari tab — so this is
            the one thing that actually unlocks notifications for iPhone guests, not just a
            nice-to-have. See initInstallPrompt()/updateInstallUI() in the script below. -->
-      <div id="install-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:0;padding:14px 16px;position:relative;">
+      <div id="install-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 16px;position:relative;">
         <button onclick="dismissInstallBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
         <div id="install-banner-body"></div>
       </div>
@@ -1106,7 +1109,7 @@
            This banner requires an actual tap on the button below, so the resulting
            requestPermission() call is gesture-triggered and gets the real, non-quiet
            permission dialog. See showNotifyBanner()/enableNotificationsFromBanner() below. -->
-      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:0;padding:14px 16px;position:relative;">
+      <div id="notify-banner" style="display:none;margin:0 16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 16px;position:relative;">
         <button onclick="dismissNotifyBanner()" title="Dismiss" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i data-icon="CLOSE_X"></i></button>
         <div style="display:flex;gap:12px;align-items:center;padding-right:22px;">
           <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-icon="BELL"></i></div>
@@ -1185,7 +1188,7 @@
         </div>
       </div>
       <div class="home-sec" style="margin-top:-6px;">
-        <a class="btn-solid-sm" id="home-love-book-btn" href="#" target="_blank" rel="noopener" style="display:none;background:var(--accent-gold);color:#fff;text-decoration:none;align-items:center;justify-content:center;gap:6px;padding:12px 18px;font-size:12.5px;font-weight:700;width:100%;box-sizing:border-box;"><i data-icon="HEART"></i>Book Your Date</a>
+        <a class="btn-solid-sm" id="home-love-book-btn" href="#" target="_blank" rel="noopener" style="display:none;background:var(--accent-gold);color:#fff;text-decoration:none;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:14px;font-size:12.5px;font-weight:700;width:100%;box-sizing:border-box;"><i data-icon="HEART"></i>Book Your Date</a>
       </div>
 
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
