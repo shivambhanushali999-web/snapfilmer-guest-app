@@ -766,7 +766,7 @@
           <div class="studio-avatar" id="gate-studio-avatar" style="width:42px;height:42px;border-radius:10px;font-size:14px;">SF</div>
           <div class="studio-meta">
             <h3 class="gate-serif" onclick="openPortfolioFromGate()" id="gate-studio-name" style="font-size:16px;">SnapFilmer</h3>
-            <p class="gate-kicker" style="font-size:9px;">Wedding &amp; Portrait Studio</p>
+            <p class="gate-kicker" style="font-size:9px;">Wedding Photography &amp; Films</p>
           </div>
         </div>
         <div class="gate-topbar-icons">
@@ -944,7 +944,7 @@
            exist yet and a dead link is worse than no link. -->
       <div class="gate-footer">
         <p class="ft-name gate-serif" id="gate-foot-name">SnapFilmer</p>
-        <p class="ft-kicker">Wedding &amp; Portrait Studio</p>
+        <p class="ft-kicker">Wedding Photography &amp; Films</p>
         <div class="ft-icons">
           <a class="gate-icon-btn" id="gate-foot-call-btn" href="#" title="Call"><i data-icon="PHONE"></i></a>
           <a class="gate-icon-btn" id="gate-foot-wa-btn" href="#" target="_blank" rel="noopener" title="WhatsApp"><i data-icon="WHATSAPP_O"></i></a>
@@ -1102,7 +1102,7 @@
                split was only ever a default-brand visual, never meant to survive a
                different real studio name. -->
           <div class="wordmark" id="studio-name">Snap<em>Filmer</em></div>
-          <div class="kicker">Wedding &amp; Portrait Studio</div>
+          <div class="kicker">Wedding Photography &amp; Films</div>
         </div>
         <div class="hero-info" title="Event Info">
           <h2 id="home-event-name" onclick="openEventInfo()" style="cursor:pointer;">Vaibhav &amp; Komal</h2>
@@ -1349,7 +1349,7 @@
         <div class="profile-block-studio">
           <div class="lg" id="profile-studio-avatar">SF</div>
           <div class="nm2 gate-serif" id="profile-studio-name">SnapFilmer</div>
-          <div class="kk">Wedding &amp; Portrait Studio</div>
+          <div class="kk">Wedding Photography &amp; Films</div>
         </div>
       </div>
 
@@ -3172,6 +3172,27 @@
     link.textContent = expanded ? 'Read less' : 'Read more';
   }
 
+  // "Read more" should only ever appear when the bio genuinely doesn't fit the 2-line
+  // clamp — a short studio bio just renders plainly with no dead link underneath.
+  // Measures the text's true height by briefly lifting the clamp (reusing the existing
+  // .expanded class/CSS, no separate measuring markup needed) and comparing it against
+  // what 2 lines of this element's own line-height would take.
+  function updateBioReadMoreVisibility(prefix) {
+    const p = document.getElementById((prefix || '') + 'studio-bio-p');
+    const textEl = document.getElementById((prefix || '') + 'studio-bio-text');
+    const link = document.getElementById((prefix || '') + 'bio-toggle-link');
+    if (!p || !textEl || !link) return;
+    const wasExpanded = p.classList.contains('expanded');
+    p.classList.add('expanded');
+    const fullHeight = textEl.scrollHeight;
+    if (!wasExpanded) p.classList.remove('expanded');
+    const lineHeight = parseFloat(getComputedStyle(textEl).lineHeight) || 18;
+    const overflowing = fullHeight > lineHeight * 2 + 2; // +2px tolerance for rounding
+    link.style.display = overflowing ? '' : 'none';
+    // Nothing to collapse back to if it never overflowed in the first place.
+    if (!overflowing) { p.classList.remove('expanded'); link.textContent = 'Read more'; }
+  }
+
   function showAppInfo(context) {
     if (context === 'create-event') {
       alert('Creating a new event is done from the SnapFilmer Studio Dashboard — the separate app photographers use to manage events, uploads and guests.');
@@ -4751,7 +4772,13 @@
       nameEls.forEach(function (el) { if (el) el.textContent = profile.name; });
       if (portfolioTitleEl) portfolioTitleEl.textContent = profile.name;
     }
-    if (profile.about) bioEls.forEach(function (el) { if (el) el.textContent = profile.about; });
+    if (profile.about) {
+      bioEls.forEach(function (el) { if (el) el.textContent = profile.about; });
+      // Re-check overflow now that the real bio text has replaced the placeholder —
+      // a studio's actual bio can be shorter or longer than the default copy.
+      updateBioReadMoreVisibility('');
+      updateBioReadMoreVisibility('gate-');
+    }
     if (profile.email) studioContactEmail = profile.email;
     if (profile.phone) studioContactPhone = profile.phone;
     if (profile.social) studioSocial = profile.social;
@@ -6969,6 +6996,11 @@
   // Icon rendering doesn't depend on which event is loaded, so this runs immediately
   // rather than waiting behind the event gate.
   fillIcons();
+  // Same reasoning — the gate's default bio copy is visible before any event/profile
+  // data has loaded, so its own "Read more" overflow check needs to run immediately
+  // too (applyStudioProfile() re-checks it again once the real bio text arrives).
+  updateBioReadMoreVisibility('');
+  updateBioReadMoreVisibility('gate-');
 
   // Everything below used to run unconditionally at page load, back when EVENT was a
   // hardcoded constant. Now it's a function, called from loadEventAndBoot() above once
