@@ -248,7 +248,7 @@
      with the screen, only the bottom two corners rounded into the page background below.
      overflow: hidden on .hero clips both the img and the ::after gradient to match. */
   .hero { position: relative; margin: 0 0 18px; border-radius: 0 0 28px 28px; overflow: hidden; }
-  .hero img { width: 100%; height: 360px; object-fit: cover; display: block; }
+  .hero img { width: 100%; height: 300px; object-fit: cover; display: block; }
   /* Two gradients: the original bottom-up one (for the date/title text), plus a new
      top-down one so the bell button in .hero-top always has a dark backdrop to sit on.
      Without the top gradient, a bright/light-colored cover photo (e.g. a light-colored
@@ -273,37 +273,37 @@
   .date-pill-corner .yr { display: block; font-size: 10px; font-weight: 700; }
   /* Studio wordmark centered near the top of the hero — real name/kicker (applyStudioProfile),
      tap-through to Portfolio same as everywhere else this wordmark appears. */
-  .hero-brand { position: absolute; top: calc(48px + env(safe-area-inset-top)); left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
-  .hero-brand .crown { color: var(--accent-gold); margin-bottom: 4px; }
-  .hero-brand .crown svg { width: 22px; height: 22px; }
-  .hero-brand .wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 30px; font-weight: 700; color: #fff; }
+  .hero-brand { position: absolute; top: calc(38px + env(safe-area-inset-top)); left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
+  .hero-brand .crown { color: var(--accent-gold); margin-bottom: 2px; }
+  .hero-brand .crown svg { width: 17px; height: 17px; }
+  .hero-brand .wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 23px; font-weight: 700; color: #fff; }
   .hero-brand .wordmark em { font-style: normal; color: var(--accent-gold); }
-  .hero-brand .kicker { color: var(--accent-gold); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; margin-top: 4px; }
-  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 2; text-align: center; }
-  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 600; margin: 0; }
-  .hero-info .cat { display: block; font-size: 21px; }
-  .hero-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0 16px; }
-  .hero-divider span { width: 40px; height: 1px; background: rgba(255,255,255,.35); }
+  .hero-brand .kicker { color: var(--accent-gold); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
+  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 12px; z-index: 2; text-align: center; }
+  .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 600; margin: 0; }
+  .hero-info .cat { display: block; font-size: 15px; }
+  .hero-divider { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 8px; }
+  .hero-divider span { width: 30px; height: 1px; background: rgba(255,255,255,.35); }
   /* Real Photos/Videos/Albums counts (renderHomeStats) — mirrors the "Event Dashboard"
      stat row from the approved Phase 1 mockup, but only ever shows real numbers pulled
      from eventPhotos/eventVideos/eventAlbums, never a placeholder figure. Thin vertical
      dividers between each stat, matching the reference. */
   .hero-stats { display: flex; align-items: center; justify-content: center; }
-  .hero-stats .stat { display: flex; flex-direction: column; align-items: center; padding: 0 22px; }
-  .hero-stats .stat-sep { width: 1px; height: 30px; background: rgba(255,255,255,.25); }
-  .hero-stats .stat i { color: var(--accent-gold); margin-bottom: 5px; width: 17px; height: 17px; }
-  .hero-stats .stat b { color: #fff; font-size: 18px; font-weight: 800; line-height: 1.2; }
-  .hero-stats .stat span { color: rgba(255,255,255,.75); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .hero-stats .stat { display: flex; flex-direction: column; align-items: center; padding: 0 16px; }
+  .hero-stats .stat-sep { width: 1px; height: 24px; background: rgba(255,255,255,.25); }
+  .hero-stats .stat i { color: var(--accent-gold); margin-bottom: 3px; width: 14px; height: 14px; }
+  .hero-stats .stat b { color: #fff; font-size: 15px; font-weight: 800; line-height: 1.2; }
+  .hero-stats .stat span { color: rgba(255,255,255,.75); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
 
   /* Home cards below the hero (notify banner / promo / 3-up / love-card) — all share
      .home-sec spacing so they line up with each other and with FOLDERS below. */
   .home-sec { margin: 0 16px 14px; }
-  .home-promo-card { background: var(--ink); border-radius: 18px; padding: 22px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .home-promo-card .kicker { color: var(--accent-gold); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin: 0 0 10px; display: flex; align-items: center; gap: 7px; }
-  .home-promo-card .kicker::before { content: ""; width: 12px; height: 1.5px; background: var(--accent-gold); display: block; }
-  .home-promo-card h2 { color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 22px; font-weight: 600; margin: 0 0 8px; }
-  .home-promo-card p { color: rgba(255,255,255,.7); font-size: 12.5px; margin: 0; line-height: 1.5; max-width: 200px; }
-  .home-promo-card .sig { color: var(--accent-gold); font-size: 25px; flex-shrink: 0; text-align: center; white-space: nowrap; }
+  .home-promo-card { background: var(--ink); border-radius: 18px; padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .home-promo-card .kicker { color: var(--accent-gold); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 5px; display: flex; align-items: center; gap: 6px; }
+  .home-promo-card .kicker::before { content: ""; width: 10px; height: 1.5px; background: var(--accent-gold); display: block; }
+  .home-promo-card h2 { color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 17px; font-weight: 600; margin: 0 0 3px; }
+  .home-promo-card p { color: rgba(255,255,255,.7); font-size: 11px; margin: 0; line-height: 1.4; max-width: 190px; }
+  .home-promo-card .sig { color: var(--accent-gold); font-size: 20px; flex-shrink: 0; text-align: center; white-space: nowrap; }
   .home-love-card { background: var(--accent-soft); border-radius: 18px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
   .home-love-card .ico { color: var(--accent-gold); flex-shrink: 0; }
   .home-love-card .txt { flex: 1; min-width: 0; }
@@ -366,8 +366,8 @@
   .stories-label { padding: 4px 16px 10px; font-size: 13px; font-weight: 800; color: var(--ink); text-transform: uppercase; letter-spacing: .6px; }
   .stories-row { display: flex; gap: 16px; padding: 0 16px 22px; overflow-x: auto; }
   .story { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; cursor: pointer; }
-  .story-ring { width: 66px; height: 66px; border-radius:18px; padding: 3px; background: linear-gradient(135deg, var(--accent), #8FA37E); }
-  .story-ring img { width: 100%; height: 100%; border-radius:16px; object-fit: cover; display: block; border: 2px solid var(--bg); }
+  .story-ring { width: 66px; height: 66px; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, var(--accent), #8FA37E); }
+  .story-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; border: 2px solid var(--bg); }
   .story span { font-size: 11px; font-weight: 700; color: var(--ink); }
 
   /* ---- Home album banner cards (folders, Kamero-style) ---- */
@@ -1219,9 +1219,9 @@
 
       <div id="home-enquiry-wrap" style="display:none;padding:0 16px;">
         <div class="stories-label" style="padding:20px 0 10px;">Interested in booking us?</div>
-        <div style="border:1px solid var(--border);border-radius:0;padding:16px;">
+        <div style="border:1px solid var(--border);border-radius:16px;padding:16px;">
           <p style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Loved what you see? Send us an enquiry and we'll get back to you.</p>
-          <button class="btn-solid-sm" onclick="openEnquiryModal()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
+          <button class="btn-solid-sm" onclick="openEnquiryModal()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
         </div>
       </div>
 
