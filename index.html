@@ -330,6 +330,14 @@
   .home-love-card .txt h3 { margin: 0 0 3px; font-family: 'Playfair Display', Georgia, serif; font-size: 16.5px; font-weight: 600; color: var(--ink); }
   .home-love-card .txt p { margin: 0; font-size: 11.5px; color: var(--muted); }
   .home-love-card .book-btn { flex-shrink: 0; background: var(--accent-gold); color: #fff; border: none; border-radius: 12px; padding: 11px 16px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 5px; text-decoration: none; white-space: nowrap; }
+  /* Compact real-contact row (Call/Email/Website + Instagram/Vimeo/WhatsApp/YouTube) —
+     smaller icons than their old 40/36px sizes so the whole row stays low-height and
+     doesn't compete for attention with the cards around it, while still being visible
+     and tappable. margin-bottom trimmed to 10px (vs the usual 14px .home-sec gap) since
+     this is a slim utility row, not a card. */
+  .home-social-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
+  .home-social-row .ghost-btn, .home-social-row .social-ghost { width: 32px; height: 32px; border-radius: 9px; }
+  .home-social-row .social-strip { display: flex; gap: 8px; }
 
   /* ---- Quick action chips ---- */
   .chip-row { display: flex; gap: 10px; padding: 0 16px 18px; overflow-x: auto; }
@@ -1222,14 +1230,10 @@
         <div class="home-card" id="home-highlights-card" onclick="openRealHighlights()" style="display:none;"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div><span class="arr">View Highlights <i data-icon="CHEVRON"></i></span></div>
       </div>
 
-      <!-- Replaces the old studio bio/contact card (.studio-block) — matches the reference
-           exactly: camera icon, "Love what you see?" text, and a single gold "Book Your
-           Date" button in the same row, no separate contact-icon row (the reference
-           doesn't show one here). The real Call/Email/Website/social icons aren't gone
-           from the app — they're still on the Portfolio-bound studio wordmark tap above,
-           and can be added to the More tab's profile card too if you want them
-           reachable somewhere on Home again; just didn't want to add anything the
-           reference doesn't show without checking first. -->
+      <!-- Replaces the old studio bio/contact card (.studio-block) — camera icon, "Love
+           what you see?" text, and a single gold "Book Your Date" button in one row. The
+           real Call/Email/Website/social icons live just below this now, in their own
+           compact row (see .home-social-row further down). -->
       <div class="home-sec home-love-card">
         <div class="ico"><i data-icon="CAMERA" style="width:30px;height:30px;"></i></div>
         <div class="txt">
@@ -1241,13 +1245,28 @@
 
       <div id="home-albums-wrap" class="home-albums-wrap" style="display:none;"></div>
 
-      <!-- Wrapped so renderStories() can hide the label along with the row — the label
-           alone used to always render regardless of whether there was anything real to
-           show underneath it (no highlighted photos yet, no albums with a cover/photos
-           yet), leaving an orphaned "Highlights" heading sitting over dead empty space. -->
-      <div id="stories-section">
-        <div class="stories-label">Highlights</div>
-        <div class="stories-row" id="stories-row"></div>
+      <!-- The circular "Highlights" story row (removed here) duplicated what FOLDERS
+           above already shows — one circle per album repeating the exact same albums as
+           cards, plus a "Highlights" circle that duplicates the View Highlights card in
+           the 3-up row further up. renderStories() (below) still runs — it also drives
+           renderHomeCardVisibility() — it just no longer has a #stories-row to render
+           into, which is a harmless no-op. -->
+
+      <!-- Real Call/Email/Website + Instagram/Vimeo/WhatsApp/YouTube — brought back after
+           being dropped from the Love card during the pixel-match pass, compact single
+           row so it doesn't eat much space. Same ids or wiring pattern as before, so
+           applyStudioProfile()/wireGateQuickLinks() populate/hide these automatically
+           with no separate code needed. -->
+      <div class="home-sec home-social-row">
+        <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+        <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+        <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+        <div class="social-strip" id="social-strip">
+          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+        </div>
       </div>
 
       <div id="home-enquiry-wrap" style="display:none;padding:0 16px;">
