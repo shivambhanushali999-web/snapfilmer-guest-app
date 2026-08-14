@@ -159,11 +159,24 @@
   .gate-promo-card { display: flex; align-items: center; gap: 14px; background: var(--accent-soft); padding: 16px; }
   .gate-promo-card .icon { width: 46px; height: 46px; border-radius: 12px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .gate-cat-strip { display: flex; gap: 10px; overflow-x: auto; }
-  .gate-why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .gate-why-card { border: 1px solid var(--border); padding: 14px 12px; }
-  .gate-why-card .icon { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
-  .gate-why-card .ttl { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
-  .gate-why-card .dsc { font-size: 11px; color: var(--muted); line-height: 1.45; }
+  /* 3-up, centered, rounded cards (was a 2-up left-aligned/square grid) to match the
+     reference the user shared. Sizes mirror the already-proven 3-col .home-card scale
+     (ttl 11-11.5px / dsc ~9.5px) so six cards stay comfortably readable on real phone
+     widths instead of the reference's wider desktop-style spacing. */
+  .gate-why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .gate-why-card { border: 1px solid var(--border); border-radius: 16px; padding: 14px 8px 12px; text-align: center; }
+  .gate-why-card .icon { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; }
+  .gate-why-card .icon svg { width: 17px; height: 17px; }
+  .gate-why-card .ttl { font-size: 11px; font-weight: 700; color: var(--ink); line-height: 1.25; margin-bottom: 5px; }
+  .gate-why-card .dsc { font-size: 9.5px; color: var(--muted); line-height: 1.4; }
+  /* Small decorative line-diamond-line divider reused under the section heading and
+     under each card title — matches the gold hairline motif already used in the hero. */
+  .sf-divider-diamond { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .sf-divider-diamond .line { height: 1px; width: 26px; background: var(--border); }
+  .sf-divider-diamond .dot { width: 4px; height: 4px; background: var(--accent-gold); transform: rotate(45deg); display: inline-block; flex-shrink: 0; }
+  .sf-divider-diamond.sm { gap: 4px; margin-bottom: 6px; }
+  .sf-divider-diamond.sm .line { width: 12px; background: var(--accent-gold); opacity: .45; }
+  .sf-divider-diamond.sm .dot { width: 3px; height: 3px; }
   .gate-cta-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
   .gate-cta-row .btn-solid-sm, .gate-cta-row .btn-outline-sm { flex: 1; min-width: 120px; }
   /* Full-bleed dark break between "Why Couples Choose" and the final CTA — gives the
@@ -864,14 +877,19 @@
       </div>
 
       <!-- ============ Why SnapFilmer ============
-           Static marketing copy, no data dependency — safe, honest (no invented stats). -->
+           6-card layout (was 4) with per-card gold divider, matching the reference the
+           user shared. Static marketing copy, no data dependency — safe, honest (no
+           invented stats/numbers). -->
       <div class="gate-section" style="padding-top:4px;">
-        <h2 class="gate-serif" style="margin:0 0 14px;font-size:18px;">Why Couples Choose SnapFilmer</h2>
+        <h2 class="gate-serif" style="margin:0 0 8px;font-size:18px;text-align:center;">Why Couples Choose SnapFilmer</h2>
+        <div class="sf-divider-diamond" style="margin-bottom:16px;"><span class="line"></span><i class="dot"></i><span class="line"></span></div>
         <div class="gate-why-grid">
-          <div class="gate-why-card"><div class="icon"><i data-icon="LOCK"></i></div><div class="ttl">Private &amp; Secure</div><div class="dsc">Your event memories stay protected.</div></div>
-          <div class="gate-why-card"><div class="icon"><i data-icon="REEL"></i></div><div class="ttl">Cinematic Storytelling</div><div class="dsc">Photography and films crafted with intention.</div></div>
-          <div class="gate-why-card"><div class="icon"><i data-icon="DOWNLOAD"></i></div><div class="ttl">Fast Digital Delivery</div><div class="dsc">Access your memories in one place.</div></div>
-          <div class="gate-why-card"><div class="icon"><i data-icon="SPARKLE"></i></div><div class="ttl">AI-Powered Sharing</div><div class="dsc">Find your moments instantly, no endless scrolling.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="LOCK"></i></div><div class="ttl">Trusted &amp; Secure</div><div class="sf-divider-diamond sm"><span class="line"></span><i class="dot"></i><span class="line"></span></div><div class="dsc">Your memories are safe with us, always private and protected.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="REEL"></i></div><div class="ttl">Cinematic Storytelling</div><div class="sf-divider-diamond sm"><span class="line"></span><i class="dot"></i><span class="line"></span></div><div class="dsc">We don't just click, we craft beautiful stories you'll relive forever.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="IMAGE"></i></div><div class="ttl">Curated Perfection</div><div class="sf-divider-diamond sm"><span class="line"></span><i class="dot"></i><span class="line"></span></div><div class="dsc">Handpicked, edited &amp; color-graded to make every moment timeless.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="CLOUD_DL"></i></div><div class="ttl">Instant Digital Access</div><div class="sf-divider-diamond sm"><span class="line"></span><i class="dot"></i><span class="line"></span></div><div class="dsc">Access your photos &amp; videos anytime, anywhere in one place.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="SPARKLE"></i></div><div class="ttl">AI-Powered Sharing</div><div class="sf-divider-diamond sm"><span class="line"></span><i class="dot"></i><span class="line"></span></div><div class="dsc">Find your best moments instantly — no endless scrolling.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="HEADSET"></i></div><div class="ttl">Dedicated Support</div><div class="sf-divider-diamond sm"><span class="line"></span><i class="dot"></i><span class="line"></span></div><div class="dsc">We're with you before, during &amp; after your event, always.</div></div>
         </div>
       </div>
 
@@ -908,95 +926,6 @@
         <div class="gate-cta-row">
           <a class="btn-outline-sm" id="gate-cta-book-btn" href="#" target="_blank" rel="noopener" style="display:none;">Book Your Date</a>
           <button class="btn-solid-sm" onclick="openPortfolioFromGate()" style="background:var(--ink);color:#fff;border:none;border-radius:0;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;">View Our Work</button>
-        </div>
-      </div>
-
-      <div style="height:1px;background:var(--border);margin:0 20px;"></div>
-
-      <!-- Section 3: purely decorative "welcome" story strip — an original illustration
-           (not traced/copied art), no real data involved. Each icon carries a numbered
-           badge and a two-line caption; node badges are squares (not circles) to match. -->
-      <div style="padding:22px 20px 24px;text-align:center;position:relative;">
-        <div class="gate-corner-lines tl"></div>
-        <div class="gate-corner-lines tr"></div>
-        <h2 class="gate-serif" style="margin:0 0 4px;font-size:20px;color:var(--ink);line-height:1.35;font-weight:600;position:relative;">Welcome to the future<br>of Photo Sharing</h2>
-        <p style="margin:0 0 16px;font-size:11.5px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;position:relative;" id="gate-welcome-studio-name-wrap">
-          <span style="width:20px;height:1px;background:var(--border);"></span>
-          by <span id="gate-welcome-studio-name" style="color:var(--accent-gold);font-weight:700;">SnapFilmer</span>
-          <span style="width:20px;height:1px;background:var(--border);"></span>
-        </p>
-        <svg viewBox="0 0 320 100" width="100%" height="100" style="max-width:300px;display:block;margin:0 auto;position:relative;">
-          <defs>
-            <filter id="gateNodeShadow" x="-60%" y="-60%" width="220%" height="220%">
-              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(20,16,20,0.16)"/>
-            </filter>
-          </defs>
-
-          <path d="M63,40H257" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 7" opacity=".5" style="animation:sf-dash-flow 1s linear infinite;"/>
-
-          <!-- Step 1: Scan -->
-          <g style="animation:sf-float 3s ease-in-out infinite;">
-            <rect x="18" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-            <rect x="18" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-            <g transform="translate(40,40)">
-              <path d="M-8 -8v-3a2 2 0 012-2h3M8 -8v-3a2 2 0 00-2-2H3M-8 8v3a2 2 0 002 2h3M8 8v3a2 2 0 01-2 2H3" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
-              <rect x="-3.5" y="-3.5" width="7" height="7" fill="var(--accent)"/>
-            </g>
-            <rect x="18.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
-            <text x="26" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">1</text>
-            <text x="40" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Scan</text>
-            <text x="40" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Event Code</text>
-          </g>
-
-          <!-- Step 2: View -->
-          <g style="animation:sf-float 3.2s ease-in-out infinite;animation-delay:.2s;">
-            <rect x="98" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-            <rect x="98" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-            <g transform="translate(120,40)">
-              <rect x="-9" y="-7" width="18" height="14" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-              <circle cx="-3.8" cy="-2.8" r="1.6" fill="var(--accent)"/>
-              <path d="M-9 5l5-5 3 3 4-4 4 4" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </g>
-            <rect x="98.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
-            <text x="106" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">2</text>
-            <text x="120" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">View</text>
-            <text x="120" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Your Moments</text>
-          </g>
-
-          <!-- Step 3: Share -->
-          <g style="animation:sf-float 3.4s ease-in-out infinite;animation-delay:.4s;">
-            <rect x="178" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-            <rect x="178" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-            <g transform="translate(200,40)">
-              <circle cx="6.5" cy="-7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-              <circle cx="-6.5" cy="0" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-              <circle cx="6.5" cy="7" r="2.6" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
-              <path d="M-3.9 1.6L4 5.6M4 -5.6L-3.9 -1.6" stroke="var(--accent)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-            </g>
-            <rect x="178.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
-            <text x="186" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">3</text>
-            <text x="200" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Share</text>
-            <text x="200" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">with Loved Ones</text>
-          </g>
-
-          <!-- Step 4: Enjoy — heart icon (reused HEART icon path, scaled) instead of the old
-               smiley, matching the guest flow's actual emotional payoff. -->
-          <g style="animation:sf-float 2.8s ease-in-out infinite;animation-delay:.6s;">
-            <rect x="258" y="18" width="44" height="44" fill="var(--accent-soft)" filter="url(#gateNodeShadow)"/>
-            <rect x="258" y="18" width="44" height="44" fill="none" stroke="var(--border)" stroke-width="1" opacity=".6"/>
-            <g transform="translate(280,40) scale(.583) translate(-12,-11)" stroke="var(--accent)" stroke-width="3.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 000-7.8z"/>
-            </g>
-            <rect x="258.5" y="18.5" width="15" height="15" fill="var(--accent)"/>
-            <text x="266" y="29" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">4</text>
-            <text x="280" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="var(--ink)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Enjoy</text>
-            <text x="280" y="87" text-anchor="middle" font-size="8" font-weight="600" fill="var(--muted)" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">Every Memory</text>
-          </g>
-        </svg>
-        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;position:relative;">
-          <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
-          <i data-icon="HEART" style="color:var(--accent-gold);opacity:.7;"></i>
-          <span style="flex:1;max-width:64px;height:1px;background:var(--border);"></span>
         </div>
       </div>
 
@@ -1905,6 +1834,8 @@
     CAMERA: icon('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="14" r="3.5"/>'),
     LOCK: icon('<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/>'),
     IMAGE: icon('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'),
+    CLOUD_DL: icon('<path d="M12 13v8"/><path d="m8 17 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 104 16.29"/>'),
+    HEADSET: icon('<path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/>'),
     MAIL: icon('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>'),
     PHONE: icon('<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7a2 2 0 011.72 2.03z"/>'),
     GLOBE: icon('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'),
