@@ -248,7 +248,7 @@
      with the screen, only the bottom two corners rounded into the page background below.
      overflow: hidden on .hero clips both the img and the ::after gradient to match. */
   .hero { position: relative; margin: 0 0 18px; border-radius: 0 0 28px 28px; overflow: hidden; }
-  .hero img { width: 100%; height: 430px; object-fit: cover; display: block; }
+  .hero img { width: 100%; height: 360px; object-fit: cover; display: block; }
   /* Two gradients: the original bottom-up one (for the date/title text), plus a new
      top-down one so the bell button in .hero-top always has a dark backdrop to sit on.
      Without the top gradient, a bright/light-colored cover photo (e.g. a light-colored
@@ -273,13 +273,13 @@
   .date-pill-corner .yr { display: block; font-size: 10px; font-weight: 700; }
   /* Studio wordmark centered near the top of the hero — real name/kicker (applyStudioProfile),
      tap-through to Portfolio same as everywhere else this wordmark appears. */
-  .hero-brand { position: absolute; top: calc(68px + env(safe-area-inset-top)); left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
+  .hero-brand { position: absolute; top: calc(48px + env(safe-area-inset-top)); left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
   .hero-brand .crown { color: var(--accent-gold); margin-bottom: 4px; }
   .hero-brand .crown svg { width: 22px; height: 22px; }
   .hero-brand .wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 30px; font-weight: 700; color: #fff; }
   .hero-brand .wordmark em { font-style: normal; color: var(--accent-gold); }
   .hero-brand .kicker { color: var(--accent-gold); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; margin-top: 4px; }
-  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 22px; z-index: 2; text-align: center; }
+  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 2; text-align: center; }
   .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 600; margin: 0; }
   .hero-info .cat { display: block; font-size: 21px; }
   .hero-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0 16px; }
@@ -378,7 +378,7 @@
      time here. aspect-ratio (instead of a fixed height) scales consistently across
      phone widths and now matches the crop tool exactly, so what the photographer
      frames in the crop is exactly what guests see, uncut. */
-  .home-album-card { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius:0; overflow: hidden; margin-bottom: 14px; cursor: pointer; background: linear-gradient(135deg, var(--accent), #8FA37E); }
+  .home-album-card { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; margin-bottom: 14px; cursor: pointer; background: linear-gradient(135deg, var(--accent), #8FA37E); }
   .home-album-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
   .home-album-card .overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.62) 100%); }
   .home-album-card .name { position: absolute; left: 16px; bottom: 14px; right: 90px; color: #fff; font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; line-height: 1.25; text-shadow: 0 1px 4px rgba(0,0,0,.35); }
