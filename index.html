@@ -339,11 +339,11 @@
   /* Home's 3-up "My Photos / Videos / Highlights" cards — replaces the old chip-row
      pills with a card that carries a real one-line description each, per the approved
      reference. */
+  /* grid-template-columns is recalculated in JS (renderHomeCardVisibility) based on how
+     many of My Photos/Videos/Highlights are actually visible, so the remaining cards
+     always fill the row evenly instead of sitting at fixed 1/3-width slots with dead
+     space where a hidden card used to be. This is just the initial/fallback value. */
   .home-card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 18px; }
-  /* Applied when the Videos card is hidden (no real videos uploaded yet) so the remaining
-     2 cards fill the row evenly instead of sitting at 1/3-width with dead space on the
-     right — see renderHomeVideosCard(). */
-  .home-card-row.two-col { grid-template-columns: repeat(2, 1fr); }
   .home-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 10px 12px; cursor: pointer; text-align: left; display: flex; flex-direction: column; }
   .home-card .dot { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
   .home-card .ttl { font-family: 'Playfair Display', Georgia, serif; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 3px; text-align: center; }
@@ -1213,9 +1213,13 @@
              the studio's real workflow) — showing this card before any video actually
              exists just leads a guest into an empty "No videos added yet" screen. Hidden
              by default, only shown once eventVideos genuinely has something in it — see
-             renderVideos()/renderHomeVideosCard() below. -->
+             renderVideos()/renderHomeCardVisibility() below. -->
         <div class="home-card" id="home-videos-card" onclick="pushScreen('videos')" style="display:none;"><span class="dot"><i data-icon="PLAY_SQ"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div><span class="arr">Watch Videos <i data-icon="CHEVRON"></i></span></div>
-        <div class="home-card" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div><span class="arr">View Highlights <i data-icon="CHEVRON"></i></span></div>
+        <!-- Same reasoning as the Videos card above — tapping this used to just pop an
+             alert() explaining Highlights aren't on yet / nothing's starred yet, which
+             reads as a broken button. Hidden until eventSettings.highlightEnabled AND at
+             least one real starred photo exist — see renderHomeCardVisibility(). -->
+        <div class="home-card" id="home-highlights-card" onclick="openRealHighlights()" style="display:none;"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div><span class="arr">View Highlights <i data-icon="CHEVRON"></i></span></div>
       </div>
 
       <!-- Replaces the old studio bio/contact card (.studio-block) — matches the reference
@@ -3315,6 +3319,7 @@
   }
 
   function renderStories() {
+    renderHomeCardVisibility();
     const wrap = document.getElementById('stories-row');
     if (!wrap) return;
     wrap.innerHTML = '';
@@ -3554,22 +3559,31 @@
     return m ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : '';
   }
 
-  // Video editing/upload genuinely lags behind the event on the studio's side (sometimes
-  // by weeks, occasionally a month+) — the Home "Videos" card used to always show up
-  // front regardless, which just walked a guest into an empty "No videos added yet"
-  // screen for however long that gap lasts. Now it only appears once eventVideos
-  // actually has something real in it, and the remaining cards reflow to fill the row.
-  function renderHomeVideosCard() {
-    const card = document.getElementById('home-videos-card');
+  // My Photos always shows (a guest always has this, even at zero, since matching runs
+  // the moment a selfie's taken). Videos and Highlights are each hidden until there's
+  // something real behind them — video editing/upload can lag the studio by weeks
+  // (sometimes a month+), and Highlights needs the studio to have both turned the
+  // feature on AND actually starred a photo. Previously both cards always showed and
+  // either led to an empty screen or a dead-end alert(), which read as broken buttons.
+  // Whichever of Videos/Highlights end up visible, the row's column count adjusts so
+  // the remaining cards fill the width evenly instead of sitting at fixed 1/3 slots
+  // with dead space. Called from both renderVideos() and renderStories() so it stays
+  // in sync regardless of which data (videos vs. photos/settings) finishes loading first.
+  function renderHomeCardVisibility() {
+    const videosCard = document.getElementById('home-videos-card');
+    const highlightsCard = document.getElementById('home-highlights-card');
     const row = document.getElementById('home-card-row');
-    if (!card) return;
+    if (!row) return;
     const hasVideos = eventVideos.length > 0;
-    card.style.display = hasVideos ? 'flex' : 'none';
-    if (row) row.classList.toggle('two-col', !hasVideos);
+    const hasHighlights = !!(eventSettings.highlightEnabled && getHighlightedPhotos().length);
+    if (videosCard) videosCard.style.display = hasVideos ? 'flex' : 'none';
+    if (highlightsCard) highlightsCard.style.display = hasHighlights ? 'flex' : 'none';
+    const visibleCount = 1 + (hasVideos ? 1 : 0) + (hasHighlights ? 1 : 0);
+    row.style.gridTemplateColumns = 'repeat(' + visibleCount + ', 1fr)';
   }
 
   function renderVideos() {
-    renderHomeVideosCard();
+    renderHomeCardVisibility();
     const wrap = document.getElementById('videos-list');
     if (!wrap) return;
     if (!eventVideos.length) {
