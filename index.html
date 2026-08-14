@@ -166,6 +166,18 @@
   .gate-why-card .dsc { font-size: 11px; color: var(--muted); line-height: 1.45; }
   .gate-cta-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
   .gate-cta-row .btn-solid-sm, .gate-cta-row .btn-outline-sm { flex: 1; min-width: 120px; }
+  /* Full-bleed dark break between "Why Couples Choose" and the final CTA — gives the
+     portfolio page a premium beat and a concrete reason to book, without inventing any
+     stats/numbers. Each line ties to a feature that's actually built (private per-guest
+     gallery access, the edit/watermark pass, real contact buttons), so it stays honest. */
+  .gate-promise { background: var(--ink); padding: 26px 20px; }
+  .gate-promise-kicker { color: var(--accent-gold); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; margin: 0 0 4px; }
+  .gate-promise h2 { margin: 0 0 18px; font-size: 18px; color: #fff; }
+  .gate-promise-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(255,255,255,.1); }
+  .gate-promise-item:first-of-type { border-top: none; padding-top: 0; }
+  .gate-promise-item .icon { width: 34px; height: 34px; border-radius: 9px; background: rgba(255,255,255,.1); color: var(--accent-gold); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .gate-promise-item .txt h4 { margin: 0 0 3px; font-size: 12.5px; font-weight: 700; color: #fff; }
+  .gate-promise-item .txt p { margin: 0; font-size: 11px; color: rgba(255,255,255,.6); line-height: 1.45; }
   .btn-outline-sm { background: transparent; color: var(--ink); border: 1px solid var(--border); border-radius: 0; padding: 10px 14px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .gate-footer { background: var(--ink); color: rgba(255,255,255,.7); padding: 26px 20px calc(22px + env(safe-area-inset-bottom)); text-align: left; }
   .gate-footer .ft-name { color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 17px; font-weight: 600; margin: 0 0 2px; }
@@ -856,10 +868,36 @@
       <div class="gate-section" style="padding-top:4px;">
         <h2 class="gate-serif" style="margin:0 0 14px;font-size:18px;">Why Couples Choose SnapFilmer</h2>
         <div class="gate-why-grid">
-          <div class="gate-why-card"><div class="icon"><i data-icon="SPARKLE"></i></div><div class="ttl">AI-Powered Sharing</div><div class="dsc">Find your moments instantly, no endless scrolling.</div></div>
           <div class="gate-why-card"><div class="icon"><i data-icon="LOCK"></i></div><div class="ttl">Private &amp; Secure</div><div class="dsc">Your event memories stay protected.</div></div>
           <div class="gate-why-card"><div class="icon"><i data-icon="REEL"></i></div><div class="ttl">Cinematic Storytelling</div><div class="dsc">Photography and films crafted with intention.</div></div>
           <div class="gate-why-card"><div class="icon"><i data-icon="DOWNLOAD"></i></div><div class="ttl">Fast Digital Delivery</div><div class="dsc">Access your memories in one place.</div></div>
+          <div class="gate-why-card"><div class="icon"><i data-icon="SPARKLE"></i></div><div class="ttl">AI-Powered Sharing</div><div class="dsc">Find your moments instantly, no endless scrolling.</div></div>
+        </div>
+      </div>
+
+      <!-- ============ SnapFilmer Promise ============
+           Full-bleed dark section, edge-to-edge like the footer — gives the page a premium
+           beat between the feature grid and the closing CTA, and doubles as a concrete
+           "why book us" pitch. Every line maps to a real, already-built feature; nothing
+           here is an invented stat or number. -->
+      <div class="gate-promise">
+        <p class="gate-promise-kicker">Our Promise</p>
+        <h2 class="gate-serif">Why Couples Choose to Book Us</h2>
+        <div class="gate-promise-item">
+          <span class="icon"><i data-icon="CROWN"></i></span>
+          <div class="txt"><h4>Curated, Not Dumped in Bulk</h4><p>Every gallery is handpicked — your best moments, not a folder of everything shot that day.</p></div>
+        </div>
+        <div class="gate-promise-item">
+          <span class="icon"><i data-icon="EYE"></i></span>
+          <div class="txt"><h4>Every Frame Refined</h4><p>Colour-graded and retouched with a photographer's eye before it ever reaches you.</p></div>
+        </div>
+        <div class="gate-promise-item">
+          <span class="icon"><i data-icon="LOCK"></i></span>
+          <div class="txt"><h4>Private by Default</h4><p>Your gallery stays visible only to the people you personally invite.</p></div>
+        </div>
+        <div class="gate-promise-item">
+          <span class="icon"><i data-icon="HEART"></i></span>
+          <div class="txt"><h4>We Stay in Touch</h4><p>Reach us directly, anytime — before, during, or after your event.</p></div>
         </div>
       </div>
 
