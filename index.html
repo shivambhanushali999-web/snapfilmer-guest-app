@@ -31,8 +31,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="SnapFilmer" />
-<!-- Real in-browser AI face detection/recognition, used by the My Photos test panel -->
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <!-- Firebase (Firestore + Auth) — persists photos and handles real login -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -536,11 +534,22 @@
 
   /* ---- My Photos ---- */
   .myphotos-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
-  .avatar-row { display: flex; gap: 14px; margin-bottom: 20px; }
-  .avatar-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .add-circle { width: 58px; height: 58px; border-radius:18px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; background: var(--surface); }
+  .avatar-row { display: flex; gap: 14px; margin-bottom: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
+  .avatar-row::-webkit-scrollbar { display: none; }
+  .avatar-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+  .add-circle { width: 58px; height: 58px; border-radius:18px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; background: var(--surface); flex-shrink: 0; }
   .selfie-circle { width: 58px; height: 58px; border-radius:18px; object-fit: cover; border: 2px solid var(--accent); cursor: pointer; display: none; }
-  .avatar-slot span { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .avatar-slot span { font-size: 11px; color: var(--muted); font-weight: 600; max-width: 62px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Multi-person selfie circles — added alongside the existing single "Selfie" (the
+     guest's own face, unchanged) so a guest can also add other people's selfies (e.g.
+     family members sharing one phone) and tap between them to see each person's
+     matched photos. Tapping the already-active circle retakes that person's selfie;
+     tapping a different one just switches the active view (no camera opens). */
+  .person-circle-wrap { position: relative; flex-shrink: 0; }
+  .person-circle { width: 58px; height: 58px; border-radius: 18px; object-fit: cover; border: 2px solid var(--border); cursor: pointer; display: block; }
+  .person-circle.active { border-color: var(--accent-gold); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .person-remove-badge { position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+  .person-remove-badge svg { width: 9px; height: 9px; }
   .seg-tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius:10px; padding: 4px; margin-bottom: 16px; overflow-x: auto; }
   .seg-tab { flex-shrink: 0; padding: 9px 14px; border-radius:8px; font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
   .seg-tab.active { background: var(--ink); color: #fff; }
@@ -1113,6 +1122,22 @@
         </div>
       </div>
 
+      <!-- Real Call/Email/Website + Instagram/Vimeo/WhatsApp/YouTube — moved up here,
+           right under the hero, so it's visible without scrolling instead of sitting
+           below Folders. Same ids/wiring as before, so applyStudioProfile()/
+           wireGateQuickLinks() populate/hide these automatically with no code changes. -->
+      <div class="home-sec home-social-row" style="margin-top:16px;">
+        <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+        <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+        <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+        <div class="social-strip" id="social-strip">
+          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+        </div>
+      </div>
+
       <!-- "Install App" nudge — shown once per guest (dismissible, remembered in
            localStorage) unless already installed/running standalone. On Android/Chrome
            this becomes a real one-tap install button (captured beforeinstallprompt); on
@@ -1219,23 +1244,6 @@
            renderHomeCardVisibility() — it just no longer has a #stories-row to render
            into, which is a harmless no-op. -->
 
-      <!-- Real Call/Email/Website + Instagram/Vimeo/WhatsApp/YouTube — brought back after
-           being dropped from the Love card during the pixel-match pass, compact single
-           row so it doesn't eat much space. Same ids or wiring pattern as before, so
-           applyStudioProfile()/wireGateQuickLinks() populate/hide these automatically
-           with no separate code needed. -->
-      <div class="home-sec home-social-row">
-        <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
-        <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
-        <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
-        <div class="social-strip" id="social-strip">
-          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
-          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
-          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
-          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
-        </div>
-      </div>
-
       <div id="home-enquiry-wrap" style="display:none;padding:0 16px;">
         <div class="stories-label" style="padding:20px 0 10px;">Interested in booking us?</div>
         <div style="border:1px solid var(--border);border-radius:16px;padding:16px;">
@@ -1267,6 +1275,20 @@
       <button class="btn-solid-sm" id="enq-submit-btn" onclick="submitEnquiry()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:12px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Send Enquiry</button>
       <p id="enq-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
     </div>
+  </div>
+
+  <!-- Full-screen "Enable Notifications" first-visit prompt — replaces the old small
+       inline banner for the very first ask, so a fresh guest can't miss it scrolling
+       past. Only ever shown once (initNotifyMuteToggle() below triggers this only when
+       sf_notify_<eventId> has never been set); after Enable/Maybe Later it's gone for
+       good and the persistent Home pill (updateNotifyPill()) covers every case after
+       that (dismissed/denied/re-enable later). -->
+  <div id="notify-fullscreen" style="display:none;position:fixed;inset:0;z-index:1400;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:32px 28px calc(32px + env(safe-area-inset-bottom));text-align:center;box-sizing:border-box;">
+    <div style="width:76px;height:76px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;margin-bottom:22px;"><i data-icon="BELL" style="width:32px;height:32px;"></i></div>
+    <h2 class="gate-serif" style="margin:0 0 10px;font-size:21px;color:var(--ink);">Never miss a moment</h2>
+    <p style="margin:0 0 30px;font-size:13px;color:var(--muted);line-height:1.55;max-width:280px;">Turn on notifications to know the moment new photos, videos or announcements are shared for this event.</p>
+    <button class="btn-solid-sm" onclick="enableNotificationsFromFullScreen()" style="background:var(--ink);color:#fff;border:none;border-radius:14px;padding:14px 20px;font-size:13.5px;font-weight:700;cursor:pointer;width:100%;max-width:300px;margin-bottom:12px;">Turn On Notifications</button>
+    <button onclick="dismissNotifyFullScreen()" style="background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;padding:8px;">Maybe Later</button>
   </div>
 
   <!-- ========== EVENTS ========== -->
@@ -1434,34 +1456,29 @@
         <button class="ghost-btn" id="myphotos-buy-btn" style="display:none;" onclick="toggleSellingSelectMode()" title="Buy Photos"><i data-icon="BAG"></i></button>
         <button class="ghost-btn" onclick="openMyReel()" title="Create My Reel"><i data-icon="REEL"></i></button>
         <button class="ghost-btn" style="position:relative;" onclick="openFavorites()" title="My Favorites"><i data-icon="HEART"></i><span class="fav-count-badge" style="display:none;">0</span></button>
-        <button class="ghost-btn" onclick="deleteSelectedTestPhotos()"><i data-icon="TRASH"></i></button>
-        <button class="ghost-btn" id="myphotos-selectmode-btn" onclick="toggleMyPhotosSelectMode()"><i data-icon="CHECK_SQ"></i></button>
       </div>
     </div>
     <div class="myphotos-body">
       <div class="avatar-row">
         <div class="avatar-slot">
-          <label class="add-circle" style="cursor:pointer;">
-            <i data-icon="PLUS"></i>
-            <input type="file" accept="image/*" multiple style="display:none" onchange="addTestPhotos(event)">
-          </label>
-          <span>Add</span>
-        </div>
-        <div class="avatar-slot">
-          <img class="selfie-circle" id="selfie-thumb" src="" style="cursor:pointer;" onclick="openCamera()" title="Tap to retake">
-          <div class="add-circle" id="selfie-add" style="cursor:pointer;" onclick="openCamera()">
+          <img class="selfie-circle" id="selfie-thumb" src="" style="cursor:pointer;" onclick="handleSelfieThumbTap()" title="Tap to retake">
+          <div class="add-circle" id="selfie-add" style="cursor:pointer;" onclick="handleSelfieThumbTap()">
             <i data-icon="SPARKLE"></i>
           </div>
           <span>Selfie</span>
         </div>
+        <!-- Other people's selfies (family members sharing this phone, etc.) render here —
+             see renderPersonCircles(). Uses display:contents so each circle joins the
+             parent .avatar-row flex layout directly, without an extra wrapping box. -->
+        <div id="person-circles-row" style="display:contents;"></div>
+        <div class="avatar-slot">
+          <div class="add-circle" id="add-person-btn" style="cursor:pointer;" onclick="startAddPersonSelfie()" title="Add another person's selfie">
+            <i data-icon="PLUS"></i>
+          </div>
+          <span>Add Person</span>
+        </div>
       </div>
-      <p id="ai-status" style="font-size:11.5px;color:var(--muted);margin:0 0 16px;line-height:1.5;">Tap + to add a few photos of yourself, then tap Selfie — this uses real AI face matching, run entirely in your browser.</p>
-
-      <div id="test-gallery-section" style="display:none;">
-        <div class="stories-label" style="padding:0 0 10px;">Your Test Photos</div>
-        <div class="grid2" id="test-gallery-grid"></div>
-        <div style="height:20px;"></div>
-      </div>
+      <p id="ai-status" style="font-size:11.5px;color:var(--muted);margin:0 0 16px;line-height:1.5;">Tap Selfie to find yourself in the gallery — this uses real AI face matching.</p>
 
       <div class="stories-label" style="padding:0 0 10px;">Your Photos</div>
       <div id="mp-selfie-prompt" style="display:none;text-align:center;padding:30px 16px;border:1px dashed var(--border);border-radius:0;">
@@ -2074,7 +2091,12 @@
     // the guest actually taps Enable (or the toggle) and the request becomes gesture-driven.
     if (notifyStored === null) {
       toggle.checked = true;
-      showNotifyBanner();
+      // First-ever visit for this guest/event: a big, unmissable full-screen ask
+      // instead of the small inline banner (which was easy to scroll straight past).
+      // The inline banner/functions below are kept as-is for the toggle's own re-ask
+      // path, just no longer used for this very first prompt.
+      showNotifyFullScreen();
+      hideNotifyBanner();
       hideNotifyPill();
       updateNotifyDesc();
     } else {
@@ -2218,6 +2240,38 @@
   function enableNotificationsFromBanner() {
     hideNotifyBanner();
     enablePushNotifications();
+  }
+
+  function showNotifyFullScreen() {
+    const el = document.getElementById('notify-fullscreen');
+    if (!el) return;
+    el.style.display = 'flex';
+    fillIcons();
+  }
+
+  function hideNotifyFullScreen() {
+    const el = document.getElementById('notify-fullscreen');
+    if (el) el.style.display = 'none';
+  }
+
+  // Tapping "Turn On Notifications" on the full-screen prompt — this click is the real
+  // user gesture, so requestPermission() inside enablePushNotifications() gets the
+  // browser's actual dialog rather than a quiet, auto-collapsing one.
+  function enableNotificationsFromFullScreen() {
+    hideNotifyFullScreen();
+    enablePushNotifications();
+  }
+
+  // "Maybe Later" — same outcome as dismissing the old inline banner: remembered as a
+  // real decision (not "never asked") so this full-screen prompt never reappears, and
+  // the persistent Home pill takes over as the one-tap way back in.
+  function dismissNotifyFullScreen() {
+    try { localStorage.setItem('sf_notify_' + EVENT.id, '0'); } catch (err) {}
+    hideNotifyFullScreen();
+    const toggle = document.getElementById('mute-toggle');
+    if (toggle) toggle.checked = true;
+    updateNotifyPill();
+    updateNotifyDesc();
   }
 
   // silent: true is no longer used for the first-boot path (that now goes through the
@@ -2374,7 +2428,7 @@
   // so a favorite can never go "missing" from the count just because of which array
   // its id happens to live in.
   function getFavoritedPhotos() {
-    return eventPhotos.concat(testPhotos).filter(function (p) { return favoritedPhotoIds[p.id]; });
+    return eventPhotos.filter(function (p) { return favoritedPhotoIds[p.id]; });
   }
   function updateFavoriteBadges() {
     const n = Object.keys(favoritedPhotoIds).length;
@@ -3955,6 +4009,18 @@
   }
 
   function applySelfie(dataUrl) {
+    // A capture that started from "Add Person" or a person-circle's retake goes down a
+    // completely separate path from the primary/"You" selfie below — see
+    // applyPersonSelfie(). Reset the mode back to 'you' immediately either way so a
+    // later plain openCamera() call (e.g. from a notification/deeplink) doesn't
+    // accidentally still think it's mid add-person flow.
+    if (cameraSelfieMode === 'add-person' || cameraSelfieMode === 'retake-person') {
+      const mode = cameraSelfieMode, targetId = cameraSelfieTargetId;
+      cameraSelfieMode = 'you';
+      cameraSelfieTargetId = null;
+      applyPersonSelfie(dataUrl, mode, targetId);
+      return;
+    }
     const thumb = document.getElementById('selfie-thumb');
     thumb.src = dataUrl;
     thumb.style.display = 'block';
@@ -3965,7 +4031,160 @@
     // the page wiped selfieRawDataUrl and kicked the guest back to "take a selfie" with all
     // their matches gone, even though nothing was actually wrong with their account/session.
     try { localStorage.setItem('sf_selfie_' + EVENT.id, dataUrl); } catch (err) {}
+    // Switch the view back to "You" so the selfie the guest just took is what they see
+    // matched, even if they were browsing another person's photos beforehand.
+    if (activeProfileId !== null) { activeProfileId = null; renderPersonCircles(); }
     runFaceMatch(dataUrl);
+  }
+
+  // ================= Multi-person selfies =================
+  // Persists selfieProfiles (id/label/dataUrl only — matches are re-searched, not
+  // cached to storage) so a guest's added family members survive a reload, same as the
+  // primary selfie already does via sf_selfie_<eventId>.
+  function persistSelfieProfiles() {
+    try {
+      localStorage.setItem('sf_selfie_profiles_' + EVENT.id, JSON.stringify(selfieProfiles.map(function (p) {
+        return { id: p.id, label: p.label, dataUrl: p.dataUrl };
+      })));
+    } catch (err) {}
+  }
+
+  function restoreSelfieProfiles() {
+    let saved = null;
+    try { saved = localStorage.getItem('sf_selfie_profiles_' + EVENT.id); } catch (err) {}
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) selfieProfiles = parsed;
+    } catch (err) {}
+    renderPersonCircles();
+  }
+
+  function renderPersonCircles() {
+    const wrap = document.getElementById('person-circles-row');
+    if (!wrap) return;
+    wrap.innerHTML = selfieProfiles.map(function (p) {
+      const activeClass = activeProfileId === p.id ? ' active' : '';
+      return '<div class="avatar-slot"><div class="person-circle-wrap">' +
+        '<img class="person-circle' + activeClass + '" src="' + p.dataUrl + '" onclick="handlePersonCircleTap(\'' + p.id + '\')" title="Tap to view' + (activeProfileId === p.id ? ' — tap again to retake' : '') + '">' +
+        '<button class="person-remove-badge" onclick="event.stopPropagation();removePersonProfile(\'' + p.id + '\')" title="Remove"><i data-icon="CLOSE_X"></i></button>' +
+        '</div><span>' + escapeHtml(p.label) + '</span></div>';
+    }).join('');
+    fillIcons();
+  }
+
+  // "+ Add Person" — prompts for a quick label (so multiple circles stay distinguishable)
+  // then opens the same camera screen/gating used for the primary selfie.
+  function startAddPersonSelfie() {
+    const label = prompt('Whose selfie is this? (e.g. a name)', 'Person ' + (selfieProfiles.length + 1));
+    if (label === null) return; // cancelled
+    cameraSelfieMode = 'add-person';
+    cameraSelfieTargetId = null;
+    pendingPersonLabel = (label || '').trim() || ('Person ' + (selfieProfiles.length + 1));
+    openCamera();
+  }
+
+  // Tapping a person-circle's own image again (while already the active/selected one)
+  // — retakes that same person's selfie without creating a new profile.
+  function startRetakePersonSelfie(id) {
+    cameraSelfieMode = 'retake-person';
+    cameraSelfieTargetId = id;
+    openCamera();
+  }
+
+  // Finalizes whichever of the two flows above was in progress once a photo actually
+  // comes back from the camera/file picker — mirrors applySelfie()'s own persistence
+  // pattern for the primary selfie.
+  function applyPersonSelfie(dataUrl, mode, targetId) {
+    if (mode === 'add-person') {
+      const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      const label = pendingPersonLabel || ('Person ' + (selfieProfiles.length + 1));
+      selfieProfiles.push({ id: id, label: label, dataUrl: dataUrl });
+      pendingPersonLabel = '';
+      persistSelfieProfiles();
+      activateProfile(id);
+    } else if (mode === 'retake-person' && targetId) {
+      const profile = selfieProfiles.find(function (p) { return p.id === targetId; });
+      if (!profile) return;
+      profile.dataUrl = dataUrl;
+      delete profileMatchCache[targetId];
+      delete profileMatchFailed[targetId];
+      persistSelfieProfiles();
+      activateProfile(targetId, true);
+    }
+  }
+
+  function handlePersonCircleTap(id) {
+    if (activeProfileId === id) {
+      startRetakePersonSelfie(id);
+      return;
+    }
+    activateProfile(id);
+  }
+
+  // Tapping the primary "Selfie" circle while another person's photos are showing just
+  // switches back to "You" (matches the person-circle convention above) — only opens
+  // the camera/retake flow when "You" was already the active view.
+  function handleSelfieThumbTap() {
+    if (activeProfileId !== null) {
+      activeProfileId = null;
+      renderPersonCircles();
+      setAiStatus('Showing your matched photos...');
+      renderGallery();
+      renderMyPhotosResults();
+      return;
+    }
+    openCamera();
+  }
+
+  function removePersonProfile(id) {
+    const profile = selfieProfiles.find(function (p) { return p.id === id; });
+    if (!profile) return;
+    if (!confirm('Remove ' + profile.label + '’s selfie?')) return;
+    selfieProfiles = selfieProfiles.filter(function (p) { return p.id !== id; });
+    delete profileMatchCache[id];
+    delete profileMatchFailed[id];
+    persistSelfieProfiles();
+    if (activeProfileId === id) {
+      activeProfileId = null;
+      renderGallery();
+    }
+    renderPersonCircles();
+    renderMyPhotosResults();
+  }
+
+  // Switches the "Your Photos" grid to show a given profile's matches — runs a real AWS
+  // search the first time (forceResearch=true also re-runs it, used after a retake),
+  // then reuses the cached result on later taps so re-visiting an already-checked
+  // person is instant.
+  async function activateProfile(id, forceResearch) {
+    activeProfileId = id;
+    renderPersonCircles();
+    const profile = selfieProfiles.find(function (p) { return p.id === id; });
+    if (!profile) { renderMyPhotosResults(); return; }
+    if (forceResearch || !profileMatchCache[id]) {
+      setAiStatus('Matching ' + profile.label + '’s selfie against ' + eventPhotos.length + ' photo(s) using AWS Rekognition...');
+      profileSearchInProgress[id] = true;
+      renderMyPhotosResults();
+      try {
+        profileMatchCache[id] = await searchFaceMatchIds(profile.dataUrl);
+        delete profileMatchFailed[id];
+      } catch (err) {
+        profileMatchFailed[id] = true;
+        profileSearchInProgress[id] = false;
+        // profileMatchCache[id] was deliberately never set on failure, so switching to
+        // another circle and back here automatically retries the search (the "already
+        // active" tap on this same circle instead retakes the photo, so this is the
+        // one reliable way back in without a dedicated retry button).
+        setAiStatus('Could not match ' + profile.label + '’s selfie' + (lastAwsError ? ': ' + lastAwsError : '') + '. Switch to another selfie and back to retry.');
+        renderMyPhotosResults();
+        return;
+      }
+      profileSearchInProgress[id] = false;
+    }
+    const count = (profileMatchCache[id] || []).length;
+    setAiStatus(count + ' of ' + eventPhotos.length + ' event photo(s) matched ' + profile.label + '’s face.');
+    renderMyPhotosResults();
   }
 
   function handleSelfieFile(evt) {
@@ -3983,76 +4202,34 @@
   // ================= Real AI face matching =================
   // Primary: AWS Rekognition (via a small Lambda function) — much more accurate than the
   // free client-side library, since it's the same commercial-grade AI real event-photo
-  // platforms use. Falls back to the free in-browser face-api.js matcher if the AWS call
-  // fails (e.g. offline), so the feature still works either way.
+  // platforms use — every photo (test photos and the local face-api.js fallback that
+  // used to back them have been removed, see below) is now matched this same way.
   const FACE_MATCH_API_URL = 'https://qnb4d2vksrtafq2vjf2jhoecyi0apyod.lambda-url.eu-north-1.on.aws/';
-  const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/weights';
-  let modelsLoaded = false;
-  let modelsLoadingPromise = null;
-  let testPhotos = [];
-  let selfieDescriptor = null;
   let selfieRawDataUrl = null;
 
-  // Event photos moved to Firebase Storage during the earlier blurry-download fix are
-  // now plain https:// URLs, not base64. The first attempt to fix AWS matching for
-  // these fetched the photo bytes client-side (in the browser) before sending them to
-  // the Lambda — that seemed reasonable, but Firebase Storage doesn't send the CORS
-  // headers a cross-origin fetch() needs (an <img> tag can load the same URL fine
-  // without CORS, which is why the photo shows up on screen just fine — CORS only
-  // blocks scripted access to the response bytes, not plain image display), so every
-  // one of those fetch() calls failed with a generic "Load failed", which looked
-  // identical to the original bug. Fixed properly this time: for a Storage URL, only
-  // the URL itself is sent to the Lambda, and the LAMBDA fetches the actual bytes
-  // server-to-server — a server calling another server has no CORS restriction at all,
-  // since CORS is a browser-only security rule. See the updated Lambda code.
-  async function compareFacesAWS(payload) {
-    const res = await fetch(FACE_MATCH_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' from AWS Lambda');
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return !!data.isMatch;
-  }
+  // ---- Multi-person selfies (added alongside the primary selfie above, unchanged) ----
+  // Each profile is { id, label, dataUrl }. profileMatchCache holds the last AWS search
+  // result (array of matched eventPhoto ids) per profile id, so switching between
+  // already-searched people is instant instead of re-hitting AWS every tap.
+  let selfieProfiles = [];
+  let activeProfileId = null; // null = viewing the primary/"You" selfie above
+  let profileMatchCache = {};
+  let profileMatchFailed = {};
+  let profileSearchInProgress = {};
+  let pendingPersonLabel = ''; // label typed into startAddPersonSelfie()'s prompt, consumed by applyPersonSelfie() once the camera returns
+  // What the next camera capture should do with the resulting photo — the same camera
+  // screen/openCamera() flow is reused for all three cases so gating (face recognition
+  // on/off, anonymous sign-in requirement) only has to live in one place.
+  let cameraSelfieMode = 'you'; // 'you' | 'add-person' | 'retake-person'
+  let cameraSelfieTargetId = null;
 
-  // Legacy/test photos are still stored as base64 data URLs directly in Firestore, so
-  // those are safe to downsize client-side (no network fetch involved, no CORS issue).
-  function downsizeImageToBase64(img) {
-    let w = img.width, h = img.height;
-    const maxW = 900;
-    if (w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-    return canvas.toDataURL('image/jpeg', 0.82);
-  }
-  function toMatchBase64(dataUrl) {
-    return new Promise(function (resolve, reject) {
-      const img = new Image();
-      img.onload = function () { resolve(downsizeImageToBase64(img)); };
-      img.onerror = function () { reject(new Error('Could not load image')); };
-      img.src = dataUrl;
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
 
-  async function matchOnePhotoLocally(photoDataUrl) {
-    if (!selfieDescriptor || typeof faceapi === 'undefined') return false;
-    try {
-      const img = await loadImageEl(photoDataUrl);
-      const results = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
-        .withFaceLandmarks().withFaceDescriptors();
-      if (!results.length) return false;
-      return results.some(function (r) {
-        return faceapi.euclideanDistance(selfieDescriptor, r.descriptor) < 0.5;
-      });
-    } catch (err) {
-      return false;
-    }
-  }
-
-  // ---- Firebase (Firestore) — persists test photos across reloads ----
+  // ---- Firebase (Firestore) ----
   const firebaseConfig = {
     apiKey: 'AIzaSyCwVBvQuTylTt8_3Ft650y8NHAoUj-Iw8o',
     authDomain: 'snapfilmer-ai-face-app.firebaseapp.com',
@@ -4071,7 +4248,6 @@
   // Firebase Functions (callable) client — used only by the Photo Selling purchase flow
   // (initiatePurchase below) to reach createRazorpayOrder/verifyRazorpayPayment.
   let functionsClient = null;
-  let testPhotosUnsub = null;
   let eventPhotos = [];
   let eventPhotosUnsub = null;
   // faceRecognition: whether the selfie/AI matching feature exists at all for this event.
@@ -4942,39 +5118,6 @@
     if (wrap) wrap.style.display = eventSettings.enquiry ? 'block' : 'none';
   }
 
-  function startTestPhotosSync() {
-    if (!db || testPhotosUnsub) return;
-    // This used to query the ENTIRE testPhotos collection with no filter at all — every
-    // guest, on every event, on every phone, saw the exact same shared pile of
-    // everyone's calibration selfies. Scoping to this event + this guest's own
-    // anonymous-auth uid is what actually makes "My Photos" private per person. Two
-    // plain equality filters don't need a Firestore composite index (adding
-    // .orderBy('createdAt') on top would), so photos are sorted by upload time in JS
-    // below instead, right after fetching.
-    const uid = (auth && auth.currentUser) ? auth.currentUser.uid : null;
-    let query = db.collection('testPhotos').where('eventId', '==', EVENT.id);
-    if (uid) query = query.where('uid', '==', uid);
-    testPhotosUnsub = query.onSnapshot(function (snapshot) {
-      const docs = snapshot.docs.slice().sort(function (a, b) {
-        const at = a.data().createdAt ? a.data().createdAt.toMillis() : 0;
-        const bt = b.data().createdAt ? b.data().createdAt.toMillis() : 0;
-        return at - bt;
-      });
-      testPhotos = docs.map(function (doc) {
-        const existing = testPhotos.find(function (p) { return p.id === doc.id; });
-        return { id: doc.id, dataUrl: doc.data().dataUrl, matched: existing ? existing.matched : null };
-      });
-      if (testPhotos.length) {
-        const section = document.getElementById('test-gallery-section');
-        if (section) section.style.display = 'block';
-      }
-      renderTestGallery();
-      if (selfieRawDataUrl) matchAllTestPhotos();
-    }, function () {
-      setAiStatus('Could not sync with cloud storage — photos will only last this session.');
-    });
-  }
-
   // Remembers which photo IDs matched last time, per event, so a reload can show the
   // guest's known photos instantly instead of wiping the grid and waiting through a
   // fresh AWS pass — that's what made a refresh look like photos "disappearing and
@@ -5044,7 +5187,7 @@
         // highlighted photo wouldn't show up on Home until something else happened to
         // also touch the event's settings doc.
         renderHomeAlbums();
-        if (selfieRawDataUrl) matchAllTestPhotos();
+        if (selfieRawDataUrl) matchEventPhotos();
       });
   }
 
@@ -5072,13 +5215,6 @@
     // in favor of going straight to chips + grid, same as before that was added.
     myPhotosViewMode = 'grid';
     myPhotosAlbumFilter = null;
-    // face-api.js models used to load eagerly here on every visit to My Photos — that's
-    // a 20-30MB download from a CDN, every single time, even though AWS Rekognition
-    // (now that its CORS issue is fixed) handles real matching and rarely needs this
-    // fallback at all. That eager download was a big chunk of "reload takes forever".
-    // Now it only loads lazily, the moment an actual AWS call fails (see
-    // ensureLocalFallbackReady below) — so the common case pays nothing for it.
-    startTestPhotosSync();
     startEventPhotosSync();
     renderMyPhotosResults();
   }
@@ -5121,29 +5257,6 @@
     if (el) el.textContent = msg;
   }
 
-  function loadFaceModels() {
-    if (modelsLoadingPromise) return modelsLoadingPromise;
-    if (typeof faceapi === 'undefined') {
-      setAiStatus('Could not load the AI library (no internet connection?). You can still browse the sample gallery below.');
-      return Promise.resolve();
-    }
-    setAiStatus('Loading AI face recognition models (only happens once)...');
-    // SsdMobilenetv1 is slower to load than TinyFaceDetector but noticeably more accurate at
-    // finding faces at odd angles / in group shots — worth the one-time extra download since
-    // this only runs when the guest opens My Photos, not continuously like a live camera feed.
-    modelsLoadingPromise = Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL),
-    ]).then(function () {
-      modelsLoaded = true;
-      setAiStatus('AI ready. Tap + to add a few photos of yourself, then tap Selfie.');
-    }).catch(function () {
-      setAiStatus('Could not load AI models (check your internet connection) — sample gallery still works below.');
-    });
-    return modelsLoadingPromise;
-  }
-
   function loadImageEl(src) {
     return new Promise(function (resolve, reject) {
       const img = new Image();
@@ -5151,40 +5264,6 @@
       img.onerror = reject;
       img.src = src;
     });
-  }
-
-  function addTestPhotos(evt) {
-    const files = Array.prototype.slice.call(evt.target.files || []);
-    if (!files.length) return;
-    document.getElementById('test-gallery-section').style.display = 'block';
-    setAiStatus('Uploading photo(s)...');
-    files.forEach(function (file) {
-      const reader = new FileReader();
-      reader.onload = function () {
-        resizeDataUrl(reader.result, 720).then(function (resized) {
-          if (db) {
-            db.collection('testPhotos').add({
-              dataUrl: resized,
-              eventId: EVENT.id,
-              uid: (auth && auth.currentUser) ? auth.currentUser.uid : null,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            }).catch(function () {
-              addLocalTestPhoto(resized);
-            });
-          } else {
-            addLocalTestPhoto(resized);
-          }
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-    evt.target.value = '';
-  }
-
-  function addLocalTestPhoto(dataUrl) {
-    testPhotos.push({ id: 'tp_' + Date.now() + '_' + Math.random().toString(36).slice(2), dataUrl: dataUrl, matched: null });
-    renderTestGallery();
-    if (selfieDescriptor) matchAllTestPhotos();
   }
 
   function escWm(s) {
@@ -5231,7 +5310,8 @@
     return '<div class="wm-overlay' + posClass + (sizeClass ? ' ' + sizeClass : '') + '" style="opacity:' + opacity + ';' + posAttr + '">' + inner + '</div>';
   }
 
-  function renderPhotoGrid(gridId, photos) {
+  function renderPhotoGrid(gridId, photos, opts) {
+    opts = opts || {};
     const grid = document.getElementById(gridId);
     if (!grid) return;
     grid.innerHTML = '';
@@ -5239,12 +5319,21 @@
     // Photo Selling badges/checkboxes only ever show on the My Photos grid — this
     // function is shared by several screens (Gallery, Favorites, Highlights...), and
     // selling is scoped to a guest's own matched photos, not the whole public gallery.
-    const sellingHere = gridId === 'mp-yourphotos-grid' && eventSettings.photoSelling && eventSettings.photoSelling.enabled;
+    // opts.suppressSelling additionally turns this off while browsing another person's
+    // selfie matches (see renderMyPhotosResults) — buying is tied to the guest's own
+    // account, not whoever they're currently browsing.
+    const sellingHere = !opts.suppressSelling && gridId === 'mp-yourphotos-grid' && eventSettings.photoSelling && eventSettings.photoSelling.enabled;
     photos.forEach(function (p, i) {
       const cell = document.createElement('div');
       cell.className = 'photo-cell';
       let badge = '';
-      if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
+      // p.matched always reflects the primary/"You" selfie, never another profile's —
+      // when browsing another person's matches every photo shown is already filtered
+      // to their matches, so a "YOU"/"No match" badge sourced from the wrong person's
+      // match state would be actively misleading; opts.suppressMatchBadge skips it.
+      if (opts.suppressMatchBadge) {
+        // no badge
+      } else if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
       else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
       const favBadge = favoritedPhotoIds[p.id] ? '<div class="fav-badge"><i data-icon="HEART"></i></div>' : '';
       let sellBadge = '';
@@ -5269,65 +5358,6 @@
       grid.appendChild(cell);
     });
     fillIcons();
-  }
-
-  // Select-mode state for the "Your Test Photos" grid — these are the guest's own
-  // calibration photos (added via +), so they're the only ones a guest is allowed to
-  // delete. Photographer-uploaded event photos are never guest-deletable.
-  let myPhotosSelectMode = false;
-  let selectedTestPhotoIds = {};
-
-  function toggleMyPhotosSelectMode() {
-    myPhotosSelectMode = !myPhotosSelectMode;
-    if (!myPhotosSelectMode) selectedTestPhotoIds = {};
-    const btn = document.getElementById('myphotos-selectmode-btn');
-    if (btn) btn.classList.toggle('accent', myPhotosSelectMode);
-    renderTestGallery();
-  }
-
-  function deleteSelectedTestPhotos() {
-    const ids = Object.keys(selectedTestPhotoIds).filter(function (id) { return selectedTestPhotoIds[id]; });
-    if (!myPhotosSelectMode || !ids.length) {
-      alert('Tap the checkbox icon above to enter select mode, then tap photos to choose which test photos to delete.');
-      return;
-    }
-    if (!confirm('Delete ' + ids.length + ' test photo(s)? This cannot be undone.')) return;
-    ids.forEach(function (id) {
-      if (db) db.collection('testPhotos').doc(id).delete().catch(function () {});
-    });
-    testPhotos = testPhotos.filter(function (p) { return !selectedTestPhotoIds[p.id]; });
-    selectedTestPhotoIds = {};
-    myPhotosSelectMode = false;
-    const btn = document.getElementById('myphotos-selectmode-btn');
-    if (btn) btn.classList.remove('accent');
-    renderTestGallery();
-  }
-
-  function renderTestGallery() {
-    const grid = document.getElementById('test-gallery-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    testPhotos.forEach(function (p) {
-      const cell = document.createElement('div');
-      cell.className = 'photo-cell';
-      let badge = '';
-      if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
-      else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
-      const selected = !!selectedTestPhotoIds[p.id];
-      const checkOverlay = myPhotosSelectMode
-        ? '<div style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:8px;background:' + (selected ? 'var(--accent)' : 'rgba(255,255,255,.85)') + ';border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;">' + (selected ? '&#10003;' : '') + '</div>'
-        : '';
-      cell.innerHTML = '<img src="' + p.dataUrl + '">' + badge + checkOverlay;
-      cell.addEventListener('click', function () {
-        if (myPhotosSelectMode) {
-          selectedTestPhotoIds[p.id] = !selectedTestPhotoIds[p.id];
-          renderTestGallery();
-        } else {
-          openViewer(testPhotos, testPhotos.indexOf(p));
-        }
-      });
-      grid.appendChild(cell);
-    });
   }
 
   // Gallery = the full/browsable event photo grid. Shown to everyone by default;
@@ -5601,7 +5631,13 @@
     const buyBtn = document.getElementById('myphotos-buy-btn');
     const bundleBanner = document.getElementById('mp-bundle-banner');
 
-    if (!selfieRawDataUrl) {
+    // Viewing another person's selfie match instead of the primary/"You" one — the
+    // "no selfie yet" empty state below only applies to the primary view; a guest can
+    // browse another person's matches even before taking their own selfie.
+    const viewingOther = activeProfileId !== null;
+    const activeProfile = viewingOther ? selfieProfiles.find(function (p) { return p.id === activeProfileId; }) : null;
+
+    if (!viewingOther && !selfieRawDataUrl) {
       if (prompt) prompt.style.display = 'block';
       if (empty) empty.style.display = 'none';
       if (grid) grid.innerHTML = '';
@@ -5616,14 +5652,23 @@
     }
     if (prompt) prompt.style.display = 'none';
 
-    const matchedAll = eventPhotos.filter(function (p) { return p.matched === true; });
+    let matchedAll;
+    if (viewingOther) {
+      const ids = (activeProfile && profileMatchCache[activeProfile.id]) || [];
+      const idSet = {};
+      ids.forEach(function (id) { idSet[id] = true; });
+      matchedAll = eventPhotos.filter(function (p) { return idSet[p.id]; });
+    } else {
+      matchedAll = eventPhotos.filter(function (p) { return p.matched === true; });
+    }
     if (countEl) countEl.textContent = matchedAll.length + (matchedAll.length === 1 ? ' photo found' : ' photos found');
 
     // Photo Selling: the "Buy Photos" toggle only appears once the studio has switched
     // selling on for this event, and the bundle banner additionally needs a bundle
     // price > 0 (a studio can sell single photos only by leaving it at 0) and that this
-    // guest hasn't already bought the bundle.
-    const sellingOn = !!(eventSettings.photoSelling && eventSettings.photoSelling.enabled);
+    // guest hasn't already bought the bundle. Kept scoped to the primary/"You" view —
+    // buying is tied to the guest's own account, not whichever person they're browsing.
+    const sellingOn = !viewingOther && !!(eventSettings.photoSelling && eventSettings.photoSelling.enabled);
     if (buyBtn) buyBtn.style.display = sellingOn ? '' : 'none';
     if (!sellingOn && sellingSelectMode) { sellingSelectMode = false; sellingCartIds = {}; }
     if (bundleBanner) {
@@ -5643,13 +5688,19 @@
     if (backLink) backLink.style.display = 'none';
     renderMyPhotosAlbumChips();
     const matched = myPhotosAlbumFilter ? matchedAll.filter(function (p) { return p.album === myPhotosAlbumFilter; }) : matchedAll;
-    renderPhotoGrid('mp-yourphotos-grid', matched);
+    renderPhotoGrid('mp-yourphotos-grid', matched, viewingOther ? { suppressMatchBadge: true, suppressSelling: true } : undefined);
     if (empty) {
-      if (matched.length === 0 && matchInProgress) {
+      if (viewingOther && matched.length === 0 && activeProfile && profileSearchInProgress[activeProfile.id]) {
+        empty.textContent = 'Matching ' + activeProfile.label + '’s selfie against the gallery — this can take a few seconds...';
+        empty.style.display = 'block';
+      } else if (!viewingOther && matched.length === 0 && matchInProgress) {
         // Matching (AWS network calls) is still running — say so instead of implying
         // nothing was found, which is what made a normal in-progress match look like
         // previously-matched photos had vanished.
         empty.textContent = 'Matching your selfie against the gallery — this can take a few seconds...';
+        empty.style.display = 'block';
+      } else if (viewingOther && matched.length === 0 && activeProfile) {
+        empty.textContent = 'No matching photos found for ' + activeProfile.label + ' yet.';
         empty.style.display = 'block';
       } else if (matched.length === 0 && myPhotosAlbumFilter) {
         empty.textContent = 'No matching photos in "' + myPhotosAlbumFilter + '" yet.';
@@ -6521,74 +6572,28 @@
 
   async function runFaceMatch(selfieDataUrl) {
     selfieRawDataUrl = selfieDataUrl;
-    if (!testPhotos.length && !eventPhotos.length) {
-      setAiStatus('Selfie captured. Once your photographer uploads event photos (or you add test photos with +), matching will run automatically.');
+    if (!eventPhotos.length) {
+      setAiStatus('Selfie captured. Once your photographer uploads event photos, matching will run automatically.');
       return;
     }
-    setAiStatus('Matching against ' + (testPhotos.length + eventPhotos.length) + ' photo(s) using AWS Rekognition...');
+    setAiStatus('Matching against ' + eventPhotos.length + ' photo(s) using AWS Rekognition...');
     renderGallery();
     renderMyPhotosResults();
-
-    // The local face-api.js descriptor used to be computed here eagerly (loading
-    // 20-30MB of models) on every selfie, purely as a fallback for if AWS fails. Now
-    // that's only done lazily, on-demand, the moment an AWS call actually fails — see
-    // ensureLocalFallbackReady(), called from matchOnePhoto()'s catch block.
-    await matchAllTestPhotos();
-  }
-
-  // Loads face-api.js models + computes the selfie's local descriptor, but only the
-  // first time an AWS Rekognition call actually fails — not proactively on every
-  // selfie/reload. AWS handles real matching now, so this heavy (20-30MB) download is
-  // usually never needed at all.
-  async function ensureLocalFallbackReady() {
-    if (typeof faceapi === 'undefined') return;
-    if (!modelsLoaded) await loadFaceModels();
-    if (!selfieDescriptor && selfieRawDataUrl && typeof faceapi !== 'undefined') {
-      try {
-        const selfieImg = await loadImageEl(selfieRawDataUrl);
-        const selfieResult = await faceapi.detectSingleFace(selfieImg, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
-          .withFaceLandmarks().withFaceDescriptor();
-        if (selfieResult) selfieDescriptor = selfieResult.descriptor;
-      } catch (err) {
-        // ignore — matchOnePhotoLocally already handles a missing descriptor gracefully
-      }
-    }
+    await matchEventPhotos();
   }
 
   // Tracks the first AWS failure seen this session so we can surface it in the status
   // line — previously AWS errors were swallowed silently and the guest only ever saw
   // "0 of N matched", which looks identical whether the AI genuinely found no match or
-  // the whole matching pipeline (AWS + local fallback) is broken. Now the real cause
-  // is visible, which is what makes future bug reports about this actually diagnosable.
+  // the matching pipeline is broken. Now the real cause is visible, which is what makes
+  // future bug reports about this actually diagnosable.
   let lastAwsError = null;
-  let usedLocalFallback = false;
   // True while a matching pass is running. Matters because eventPhotos' `matched` flag
   // gets reset to null the instant a fresh Firestore snapshot arrives (e.g. right after
-  // a page reload) — matching each photo against AWS then happens one network round-trip
-  // at a time, which used to run sequentially and could take many seconds for a handful
-  // of photos. During that window My Photos looked completely empty ("photos gaayab ho
-  // gaye"), even though nothing was actually lost — it just hadn't finished re-matching
-  // yet. Parallelizing the calls below + surfacing this flag in the UI fixes both the
-  // speed and the scary-looking empty state.
+  // a page reload) — during that window My Photos looked completely empty ("photos
+  // gaayab ho gaye"), even though nothing was actually lost, it just hadn't finished
+  // re-matching yet. Surfacing this flag in the UI fixes the scary-looking empty state.
   let matchInProgress = false;
-
-  async function matchOnePhoto(photo) {
-    try {
-      const isStorageUrl = photo.dataUrl && photo.dataUrl.indexOf('data:') !== 0;
-      const payload = isStorageUrl
-        ? { selfieBase64: selfieRawDataUrl, photoUrl: photo.dataUrl }
-        : { selfieBase64: selfieRawDataUrl, photoBase64: await toMatchBase64(photo.dataUrl) };
-      photo.matched = await compareFacesAWS(payload);
-    } catch (err) {
-      // AWS call itself failed (offline, cold start, quota, CORS, wrong endpoint, etc.)
-      // — fall back to the free client-side matcher so the feature still works, just
-      // less accurately, and remember what went wrong so it can be shown to the guest.
-      lastAwsError = (err && err.message) || 'Unknown AWS error';
-      usedLocalFallback = true;
-      await ensureLocalFallbackReady();
-      photo.matched = await matchOnePhotoLocally(photo.dataUrl);
-    }
-  }
 
   // Event photos are matched with ONE Rekognition Collection search call instead of
   // comparing the selfie against every photo one at a time — the dashboard now indexes
@@ -6596,18 +6601,29 @@
   // event has 80 photos or 80,000. This is what actually fixes matching being slow AND
   // getting slower the bigger the event gets.
   let eventSearchFailed = false;
+
+  // Low-level Rekognition Collection search, factored out of searchEventPhotos() below
+  // so the multi-person selfie feature (activateProfile()) can run the exact same
+  // search for another person's selfie without touching eventPhotos' own `matched`
+  // flags (those are reserved for the primary/"You" selfie and read by other features
+  // — Reels, buying, the "YOU" badge — that must never think a different person's
+  // matches are the guest's own).
+  async function searchFaceMatchIds(selfieBase64) {
+    const res = await fetch(FACE_MATCH_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'search', eventId: EVENT.id, selfieBase64: selfieBase64 }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' from AWS Lambda');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.matchedPhotoIds || [];
+  }
+
   async function searchEventPhotos() {
     eventSearchFailed = false;
     try {
-      const res = await fetch(FACE_MATCH_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'search', eventId: EVENT.id, selfieBase64: selfieRawDataUrl }),
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' from AWS Lambda');
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      const ids = data.matchedPhotoIds || [];
+      const ids = await searchFaceMatchIds(selfieRawDataUrl);
       eventPhotos.forEach(function (p) { p.matched = ids.indexOf(p.id) !== -1; });
     } catch (err) {
       lastAwsError = (err && err.message) || 'Unknown AWS error';
@@ -6615,61 +6631,27 @@
     }
   }
 
-  async function matchAllTestPhotos() {
-    if (!selfieRawDataUrl) return;
+  async function matchEventPhotos() {
+    if (!selfieRawDataUrl || !eventPhotos.length) return;
     lastAwsError = null;
-    usedLocalFallback = false;
     matchInProgress = true;
     renderMyPhotosResults();
     renderGallery();
     setAiStatus('Matching your face...');
 
-    // Event photos: one search call, no matter how many there are. The (possibly huge)
-    // event photo grid only gets rebuilt once, right when this resolves — rebuilding it
-    // on every single test-photo tick below (like before) was tearing down and
-    // reinserting the whole gallery's DOM repeatedly while a guest might be mid-scroll,
-    // which is what made the page visibly jump up/down during matching.
-    const eventSearchPromise = eventPhotos.length ? searchEventPhotos().then(function () {
-      renderGallery();
-      renderMyPhotosResults();
-    }) : Promise.resolve();
-
-    // Test photos (the manual "+" tray) stay on the old one-by-one compare — that tray
-    // only ever holds a handful of photos, so there's no scale problem to fix there.
-    // Only the small test-photos strip re-renders per tick, not the full gallery.
-    const total = testPhotos.length;
-    let done = 0;
-    const CONCURRENCY = 5;
-    let nextIndex = 0;
-    async function runWorker() {
-      while (nextIndex < testPhotos.length) {
-        const photo = testPhotos[nextIndex++];
-        await matchOnePhoto(photo);
-        done++;
-        renderTestGallery();
-        renderMyPhotosResults();
-      }
-    }
     try {
-      const workers = [];
-      for (let i = 0; i < Math.min(CONCURRENCY, testPhotos.length); i++) workers.push(runWorker());
-      await Promise.all([eventSearchPromise].concat(workers));
+      await searchEventPhotos();
     } finally {
       matchInProgress = false;
     }
     saveCachedMatchIds();
-    const matchedTest = testPhotos.filter(function (p) { return p.matched; }).length;
     const matchedEvent = eventPhotos.filter(function (p) { return p.matched; }).length;
-    let status = matchedEvent + ' of ' + eventPhotos.length + ' event photo(s), ' + matchedTest + ' of ' + testPhotos.length + ' test photo(s) matched your face.';
+    let status = matchedEvent + ' of ' + eventPhotos.length + ' photo(s) matched your face.';
     if (eventSearchFailed) {
-      status += ' (Could not reach AWS for the event gallery search' + (lastAwsError ? ': ' + lastAwsError : '') + ' — try again.)';
+      status += ' (Could not reach AWS for the gallery search' + (lastAwsError ? ': ' + lastAwsError : '') + ' — try again.)';
       console.error('SnapFilmer face-match: AWS Rekognition search failed. Error:', lastAwsError);
-    } else if (usedLocalFallback) {
-      status += ' (AWS matching failed for test photos — used the backup on-device matcher instead' + (lastAwsError ? ': ' + lastAwsError : '') + '.)';
-      console.error('SnapFilmer face-match: AWS Rekognition call failed, used local fallback. Error:', lastAwsError);
     }
     setAiStatus(status);
-    renderTestGallery();
     renderGallery();
     renderMyPhotosResults();
   }
@@ -6942,6 +6924,14 @@
   function closeCamera() {
     stopCameraStream();
     popScreen();
+    // A guest can back out of "Add Person"/retake mid-flow (after confirming the name
+    // prompt but before actually capturing) — without this reset, cameraSelfieMode
+    // would stay stuck on 'add-person'/'retake-person' and the guest's next NORMAL
+    // selfie retake would get silently misfiled as a new/updated person profile
+    // instead of updating their own selfie. applySelfie()/applyPersonSelfie() already
+    // reset this after a successful capture; this covers the cancel path.
+    cameraSelfieMode = 'you';
+    cameraSelfieTargetId = null;
   }
 
   function capturePhoto() {
@@ -7005,7 +6995,7 @@
     renderHomeStats();
 
     // Restore a previously-taken selfie on reload so matches don't just vanish. Photo
-    // sync + snapshot handlers already call matchAllTestPhotos() automatically once
+    // sync + snapshot handlers already call matchEventPhotos() automatically once
     // photos load if selfieRawDataUrl is set, so setting it here is enough to resume.
     (function restoreSelfie() {
       let saved = null;
@@ -7017,6 +7007,11 @@
       if (thumb) { thumb.src = saved; thumb.style.display = 'block'; }
       if (addBtn) addBtn.style.display = 'none';
     })();
+
+    // Restore any other people's selfies added on this device (multi-person matching) —
+    // matches are re-searched on demand when a guest actually taps into one, not eagerly
+    // on load, so this is just repopulating the circles themselves.
+    restoreSelfieProfiles();
 
     // ?album=... deep link (from the dashboard's "Link to Open Specific Album Directly")
     // — jump straight into Gallery filtered to that folder instead of just opening Home.
