@@ -86,6 +86,15 @@
     --accent-gold-soft: #F1E7D3;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* No <button> anywhere in this file had its native OS chrome reset — every custom
+     button class (.glass-btn, .ghost-btn, etc.) relied purely on background/border
+     overrides winning by specificity, which usually works but on WebKit a button can
+     still paint its own default bezel + system-blue tint underneath/around a
+     semi-transparent custom background (backdrop-filter buttons are especially prone to
+     this) — exactly what showed up as "blue, square-bordered" icons on the Viewer's
+     translucent top-bar buttons instead of the intended white glass circles. This is the
+     standard, correct fix: explicitly disable native button styling everywhere, once. */
+  button { -webkit-appearance: none; appearance: none; font-family: inherit; }
   /* overscroll-behavior stops iOS Safari's native "pull to refresh" / rubber-band bounce
      from firing when a guest drags past the top of a scrollable list inside the fake
      phone frame — without this, that drag propagates up to the real page and Safari
@@ -271,6 +280,12 @@
      the date pill rendered underneath the phone's own clock). Every absolutely positioned
      element inside .hero now clears the real status bar first. */
   .hero-top { position: absolute; top: calc(16px + env(safe-area-inset-top)); left: 18px; right: 18px; display: flex; justify-content: flex-end; align-items: flex-start; z-index: 2; }
+  /* Restored — this base rule got accidentally dropped during an earlier edit pass on this
+     block, leaving only the ".viewer-top .glass-btn" override behind. Every glass-btn
+     across the whole app (Viewer/Camera/Video-player back buttons, share/download/like,
+     enquiry modal close, etc.) was silently falling back to unstyled native <button>
+     chrome — the "blue icons in square boxes" the user reported was exactly this. */
+  .glass-btn { width: 40px; height: 40px; border-radius:10px; background: rgba(255,255,255,.3); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.4); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   /* Plain bell (no glass circle behind it, matching the reference) with a real unread-count
      badge — see updateNotifBadge(), which now writes the actual unread number instead of
      just toggling a blank dot. */
@@ -325,6 +340,10 @@
      pills with a card that carries a real one-line description each, per the approved
      reference. */
   .home-card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 18px; }
+  /* Applied when the Videos card is hidden (no real videos uploaded yet) so the remaining
+     2 cards fill the row evenly instead of sitting at 1/3-width with dead space on the
+     right — see renderHomeVideosCard(). */
+  .home-card-row.two-col { grid-template-columns: repeat(2, 1fr); }
   .home-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 10px 12px; cursor: pointer; text-align: left; display: flex; flex-direction: column; }
   .home-card .dot { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
   .home-card .ttl { font-family: 'Playfair Display', Georgia, serif; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 3px; text-align: center; }
@@ -1188,9 +1207,14 @@
            then a solid dark "View X →" pill button (not just a text link). Event Info
            (added earlier) didn't have room here anymore — it's still reachable by
            tapping the event name/date on the hero above (see the onclick added there). -->
-      <div class="home-card-row">
+      <div class="home-card-row" id="home-card-row">
         <div class="home-card" onclick="openMyPhotos()"><span class="dot"><i data-icon="SPARKLE"></i></span><div class="ttl">My Photos</div><div class="dsc">Find all your photos here</div><span class="arr">View Photos <i data-icon="CHEVRON"></i></span></div>
-        <div class="home-card" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SQ"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div><span class="arr">Watch Videos <i data-icon="CHEVRON"></i></span></div>
+        <!-- Video editing/upload can lag weeks behind the event (sometimes a month+, per
+             the studio's real workflow) — showing this card before any video actually
+             exists just leads a guest into an empty "No videos added yet" screen. Hidden
+             by default, only shown once eventVideos genuinely has something in it — see
+             renderVideos()/renderHomeVideosCard() below. -->
+        <div class="home-card" id="home-videos-card" onclick="pushScreen('videos')" style="display:none;"><span class="dot"><i data-icon="PLAY_SQ"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div><span class="arr">Watch Videos <i data-icon="CHEVRON"></i></span></div>
         <div class="home-card" onclick="openRealHighlights()"><span class="dot"><i data-icon="STAR"></i></span><div class="ttl">Highlights</div><div class="dsc">Best moments from your event</div><span class="arr">View Highlights <i data-icon="CHEVRON"></i></span></div>
       </div>
 
@@ -3530,7 +3554,22 @@
     return m ? 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg' : '';
   }
 
+  // Video editing/upload genuinely lags behind the event on the studio's side (sometimes
+  // by weeks, occasionally a month+) — the Home "Videos" card used to always show up
+  // front regardless, which just walked a guest into an empty "No videos added yet"
+  // screen for however long that gap lasts. Now it only appears once eventVideos
+  // actually has something real in it, and the remaining cards reflow to fill the row.
+  function renderHomeVideosCard() {
+    const card = document.getElementById('home-videos-card');
+    const row = document.getElementById('home-card-row');
+    if (!card) return;
+    const hasVideos = eventVideos.length > 0;
+    card.style.display = hasVideos ? 'flex' : 'none';
+    if (row) row.classList.toggle('two-col', !hasVideos);
+  }
+
   function renderVideos() {
+    renderHomeVideosCard();
     const wrap = document.getElementById('videos-list');
     if (!wrap) return;
     if (!eventVideos.length) {
