@@ -479,14 +479,16 @@
 
   /* ---- Posts ---- */
   .posts-body { padding: 0 16px; }
-  .post-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 14px; position: relative; --post-accent: var(--accent); }
-  .post-card::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; background: var(--post-accent); border-radius: 3px; }
-  .post-type-badge { display: inline-flex; align-items: center; gap: 5px; margin: 8px 0 0 12px; padding: 3px 9px; border-radius: 10px; color: #fff; font-size: 10px; font-weight: 700; }
-  .post-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding-left: 12px; }
+  .post-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 10px; position: relative; --post-accent: var(--accent); cursor: pointer; }
+  .post-type-badge { display: inline-flex; align-items: center; gap: 5px; margin: 6px 0 0; padding: 3px 9px; border-radius: 10px; color: #fff; font-size: 10px; font-weight: 700; }
+  .post-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
   .post-title { font-weight: 800; color: var(--ink); font-size: 14.5px; margin: 0; line-height: 1.35; }
   .post-date { font-size: 10.5px; color: var(--muted); white-space: nowrap; text-align: right; }
-  .post-body { padding-left: 12px; font-size: 13px; color: #514D53; line-height: 1.65; margin: 10px 0 0; white-space: pre-line; }
-  .post-checkout { padding-left: 12px; margin-top: 10px; color: var(--accent); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  .post-body { font-size: 13px; color: #514D53; line-height: 1.6; margin: 8px 0 0; white-space: pre-line; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .post-checkout { margin-top: 8px; color: var(--accent); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  .post-detail-meta { font-size: 11.5px; color: var(--muted); margin-bottom: 12px; }
+  .post-detail-body { font-size: 14px; color: #514D53; line-height: 1.7; white-space: pre-line; }
+  .post-detail-body a { color: var(--accent); font-weight: 700; word-break: break-all; }
 
   /* ---- More ---- */
   .more-body { padding: 0 16px; }
@@ -1333,13 +1335,22 @@
       </div>
       <button class="ghost-btn" onclick="openNotifications()" style="position:relative;"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button>
     </div>
-    <div class="album-chip-row" id="posts-filter-row" style="padding:0 16px 14px;">
-      <div class="album-chip active" data-post-filter="all" onclick="setPostsFilter('all')">All Posts</div>
-      <div class="album-chip" data-post-filter="announcement" onclick="setPostsFilter('announcement')">Announcements</div>
-      <div class="album-chip" data-post-filter="update" onclick="setPostsFilter('update')">Updates</div>
-      <div class="album-chip" data-post-filter="event" onclick="setPostsFilter('event')">Events</div>
+    <div class="scroll posts-body" id="posts-list" style="padding-top:14px;"></div>
+  </div>
+
+  <!-- Post detail — opened by tapping a card in the Posts feed. Shows the full
+       title/date/message with any plain-text URLs in the body turned into real
+       tappable links (see linkifyText below), since the feed card itself is just
+       plain text. -->
+  <div id="screen-post-detail" class="sub-screen">
+    <div class="sub-bar">
+      <button class="ghost-btn" onclick="popScreen()"><i data-icon="BACK"></i></button>
+      <h1 id="post-detail-title">Post</h1>
     </div>
-    <div class="scroll posts-body" id="posts-list"></div>
+    <div class="scroll" style="padding:16px;">
+      <div class="post-detail-meta" id="post-detail-meta"></div>
+      <div class="post-detail-body" id="post-detail-body"></div>
+    </div>
   </div>
 
   <!-- ========== MORE ========== -->
@@ -3606,19 +3617,28 @@
     update: { label: 'Update', icon: 'POSTS', color: 'var(--accent)' },
     event: { label: 'Event', icon: 'EVENTS', color: '#7C7A6C' },
   };
-  let postsFilter = 'all';
-  function setPostsFilter(type) {
-    postsFilter = type;
-    document.querySelectorAll('#posts-filter-row .album-chip').forEach(function (chip) {
-      chip.classList.toggle('active', chip.dataset.postFilter === type);
+  // Escapes text for safe innerHTML use, then turns any http(s):// URL it finds into a
+  // real clickable link — used for the full post detail view, since a studio might paste
+  // a booking/checkout link straight into a post's message and guests need to be able to
+  // actually tap it, not just read it as plain text.
+  function linkifyText(text) {
+    const esc = String(text || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc.replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
     });
-    renderPosts();
   }
+
+  // The list currently rendered, kept in the same order the cards are drawn in, so a
+  // tapped card's index can look itself back up here — real Firestore posts always have
+  // an id, but the offline POSTS_SEED demo posts don't, so index is the one thing that's
+  // always reliable for both.
+  let postsRendered = [];
   function renderPosts() {
-    const filtered = postsFilter === 'all' ? POSTS_LIVE : POSTS_LIVE.filter(function (p) { return (p.type || 'update') === postsFilter; });
-    document.getElementById('posts-list').innerHTML = filtered.map(function (p) {
+    postsRendered = POSTS_LIVE;
+    document.getElementById('posts-list').innerHTML = postsRendered.map(function (p, i) {
       const meta = POST_TYPE_META[p.type || 'update'];
-      return '<div class="post-card" style="--post-accent:' + meta.color + ';"><div class="post-top">' +
+      return '<div class="post-card" onclick="openPostDetail(' + i + ')"><div class="post-top">' +
         '<p class="post-title">' + p.title + '</p>' +
         '<span class="post-date">' + p.date + '<br>' + p.time + '</span></div>' +
         '<span class="post-type-badge" style="background:' + meta.color + ';"><i data-icon="' + meta.icon + '" style="width:11px;height:11px;"></i>' + meta.label + '</span>' +
@@ -3627,6 +3647,22 @@
         '</div>';
     }).join('');
     fillIcons();
+  }
+
+  // Opens the full post (untruncated message, with any link inside it made tappable) —
+  // the feed card itself now clamps long bodies to 3 lines for a tighter list, so this is
+  // the only place a guest can read the rest of a longer update.
+  function openPostDetail(index) {
+    const p = postsRendered[index];
+    if (!p) return;
+    const meta = POST_TYPE_META[p.type || 'update'];
+    document.getElementById('post-detail-title').textContent = p.title || 'Post';
+    document.getElementById('post-detail-meta').innerHTML =
+      '<span class="post-type-badge" style="background:' + meta.color + ';display:inline-flex;"><i data-icon="' + meta.icon + '" style="width:11px;height:11px;"></i>' + meta.label + '</span>' +
+      '<span style="margin-left:8px;">' + p.date + ' &middot; ' + p.time + '</span>';
+    document.getElementById('post-detail-body').innerHTML = linkifyText(p.body);
+    fillIcons();
+    pushScreen('post-detail');
   }
 
   // Posts are studio-authored from the dashboard's Posts page, each targeted either
