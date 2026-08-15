@@ -3342,7 +3342,7 @@
       cell.className = 'photo-cell';
       const img = document.createElement('img');
       img.loading = 'lazy';
-      img.src = p.dataUrl;
+      img.src = p.thumbUrl || p.dataUrl;
       const wm = document.createElement('div');
       wm.className = 'wm-badge';
       wm.textContent = 'SF';
@@ -3395,7 +3395,7 @@
       if (highlighted.length) {
         const item = document.createElement('div');
         item.className = 'story';
-        item.innerHTML = '<div class="story-ring"><img src="' + highlighted[0].dataUrl + '"></div><span>Highlights</span>';
+        item.innerHTML = '<div class="story-ring"><img src="' + (highlighted[0].thumbUrl || highlighted[0].dataUrl) + '"></div><span>Highlights</span>';
         item.addEventListener('click', openRealHighlights);
         wrap.appendChild(item);
       }
@@ -3408,7 +3408,7 @@
     eventAlbums.forEach(function (a) {
       const photosInAlbum = eventPhotos.filter(function (p) { return p.album === a.name; });
       if (!photosInAlbum.length && !a.cover) return; // nothing real to show for this album yet
-      const cover = a.cover || photosInAlbum[0].dataUrl;
+      const cover = a.cover || photosInAlbum[0].thumbUrl || photosInAlbum[0].dataUrl;
       const item = document.createElement('div');
       item.className = 'story';
       item.innerHTML = '<div class="story-ring"><img src="' + cover + '"></div><span>' + escWm(a.name) + '</span>';
@@ -4023,7 +4023,7 @@
       const photos = portfolioPhotosByAlbum[c.name] || [];
       const card = document.createElement('div');
       card.className = 'cat-card';
-      card.innerHTML = '<img src="' + (c.cover || (photos[0] && photos[0].dataUrl) || '') + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + photos.length + ' photos</div></div>';
+      card.innerHTML = '<img src="' + (c.cover || (photos[0] && (photos[0].thumbUrl || photos[0].dataUrl)) || '') + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + photos.length + ' photos</div></div>';
       card.addEventListener('click', function () { openHighlights(c.name, photos); });
       wrap.appendChild(card);
     });
@@ -4943,7 +4943,7 @@
     strip.innerHTML = '';
     cats.forEach(function (c) {
       const photos = portfolioPhotosByAlbum[c.name] || [];
-      const cover = c.cover || (photos[0] && photos[0].dataUrl) || '';
+      const cover = c.cover || (photos[0] && (photos[0].thumbUrl || photos[0].dataUrl)) || '';
       if (!cover) return; // nothing real to show for this category yet — skip, don't fake it
       const card = document.createElement('div');
       card.className = 'cat-card';
@@ -5101,7 +5101,7 @@
     // circle further down the page.
     if (eventSettings.highlightEnabled && highlighted.length) {
       html += '<div class="home-album-card" data-home-special="highlights" style="background:linear-gradient(135deg,var(--accent-gold,#B08A4A),#6f5227);">' +
-        '<img src="' + highlighted[0].dataUrl + '" alt="Highlights">' +
+        '<img src="' + (highlighted[0].thumbUrl || highlighted[0].dataUrl) + '" alt="Highlights">' +
         '<div class="overlay"></div>' +
         '<div class="name">Highlights</div>' +
         '<div class="count-badge">' + (ICONS.STAR || ICONS.IMAGE || '') + highlighted.length + '</div>' +
@@ -5178,7 +5178,7 @@
           const existing = eventPhotos.find(function (p) { return p.id === doc.id; });
           let matched = existing ? existing.matched : null;
           if (matched === null && cachedIds.indexOf(doc.id) !== -1) matched = true;
-          return { id: doc.id, dataUrl: doc.data().dataUrl, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded };
+          return { id: doc.id, dataUrl: doc.data().dataUrl, thumbUrl: doc.data().thumbUrl || null, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded };
         });
 
         const currentIds = eventPhotos.map(function (p) { return p.id; });
@@ -5337,10 +5337,25 @@
     return '<div class="wm-overlay' + posClass + (sizeClass ? ' ' + sizeClass : '') + '" style="opacity:' + opacity + ';' + posAttr + '">' + inner + '</div>';
   }
 
+  // Photo grids are rendered in batches instead of dumping every cell into the DOM at
+  // once — with events that can run into the thousands of photos, creating that many
+  // <div>/<img> nodes synchronously was the actual source of guest-side lag (the images
+  // already had loading="lazy" so their bytes weren't the problem; the DOM node count
+  // was). PHOTO_GRID_PAGE_SIZE cells render up front, then a sentinel element at the
+  // bottom of the grid is watched with an IntersectionObserver so the next batch renders
+  // automatically as the guest scrolls near it — same end result as Instagram/Facebook
+  // style infinite scroll. photoGridObservers is keyed by gridId so re-rendering the same
+  // grid (e.g. switching album filters) always tears down its previous observer first.
+  const PHOTO_GRID_PAGE_SIZE = 60;
+  const photoGridObservers = {};
   function renderPhotoGrid(gridId, photos, opts) {
     opts = opts || {};
     const grid = document.getElementById(gridId);
     if (!grid) return;
+    if (photoGridObservers[gridId]) {
+      photoGridObservers[gridId].disconnect();
+      delete photoGridObservers[gridId];
+    }
     grid.innerHTML = '';
     const wmHtml = watermarkOverlayHtml('standard');
     // Photo Selling badges/checkboxes only ever show on the My Photos grid — this
@@ -5350,41 +5365,76 @@
     // selfie matches (see renderMyPhotosResults) — buying is tied to the guest's own
     // account, not whoever they're currently browsing.
     const sellingHere = !opts.suppressSelling && gridId === 'mp-yourphotos-grid' && eventSettings.photoSelling && eventSettings.photoSelling.enabled;
-    photos.forEach(function (p, i) {
-      const cell = document.createElement('div');
-      cell.className = 'photo-cell';
-      let badge = '';
-      // p.matched always reflects the primary/"You" selfie, never another profile's —
-      // when browsing another person's matches every photo shown is already filtered
-      // to their matches, so a "YOU"/"No match" badge sourced from the wrong person's
-      // match state would be actively misleading; opts.suppressMatchBadge skips it.
-      if (opts.suppressMatchBadge) {
-        // no badge
-      } else if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
-      else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
-      const favBadge = favoritedPhotoIds[p.id] ? '<div class="fav-badge"><i data-icon="HEART"></i></div>' : '';
-      let sellBadge = '';
-      if (sellingHere) {
-        if (isPhotoUnlocked(p.id)) {
-          sellBadge = '<div style="position:absolute;bottom:6px;left:6px;background:rgba(31,169,122,.92);color:#fff;font-size:9.5px;font-weight:800;padding:3px 7px;border-radius:6px;letter-spacing:.3px;">PURCHASED</div>';
-        } else if (sellingSelectMode) {
-          const checked = !!sellingCartIds[p.id];
-          sellBadge = '<div style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:8px;background:' + (checked ? 'var(--accent)' : 'rgba(255,255,255,.85)') + ';border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;">' + (checked ? '&#10003;' : '') + '</div>';
-        } else {
-          sellBadge = '<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,20,20,.75);color:#fff;font-size:10px;font-weight:800;padding:3px 7px;border-radius:6px;">&#8377;' + eventSettings.photoSelling.pricePerPhoto + '</div>';
+
+    if (!photos.length) return;
+
+    const sentinel = document.createElement('div');
+    sentinel.style.cssText = 'grid-column:1/-1;height:1px;';
+    grid.appendChild(sentinel);
+
+    let renderedCount = 0;
+    function renderNextBatch() {
+      const end = Math.min(renderedCount + PHOTO_GRID_PAGE_SIZE, photos.length);
+      const frag = document.createDocumentFragment();
+      for (let i = renderedCount; i < end; i++) {
+        const p = photos[i];
+        const cell = document.createElement('div');
+        cell.className = 'photo-cell';
+        let badge = '';
+        // p.matched always reflects the primary/"You" selfie, never another profile's —
+        // when browsing another person's matches every photo shown is already filtered
+        // to their matches, so a "YOU"/"No match" badge sourced from the wrong person's
+        // match state would be actively misleading; opts.suppressMatchBadge skips it.
+        if (opts.suppressMatchBadge) {
+          // no badge
+        } else if (p.matched === true) badge = '<div class="wm-badge" style="background:rgba(31,169,122,.92);">YOU</div>';
+        else if (p.matched === false) badge = '<div class="wm-badge" style="background:rgba(20,20,20,.65);">No match</div>';
+        const favBadge = favoritedPhotoIds[p.id] ? '<div class="fav-badge"><i data-icon="HEART"></i></div>' : '';
+        let sellBadge = '';
+        if (sellingHere) {
+          if (isPhotoUnlocked(p.id)) {
+            sellBadge = '<div style="position:absolute;bottom:6px;left:6px;background:rgba(31,169,122,.92);color:#fff;font-size:9.5px;font-weight:800;padding:3px 7px;border-radius:6px;letter-spacing:.3px;">PURCHASED</div>';
+          } else if (sellingSelectMode) {
+            const checked = !!sellingCartIds[p.id];
+            sellBadge = '<div style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:8px;background:' + (checked ? 'var(--accent)' : 'rgba(255,255,255,.85)') + ';border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;">' + (checked ? '&#10003;' : '') + '</div>';
+          } else {
+            sellBadge = '<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,20,20,.75);color:#fff;font-size:10px;font-weight:800;padding:3px 7px;border-radius:6px;">&#8377;' + eventSettings.photoSelling.pricePerPhoto + '</div>';
+          }
         }
+        // Grid cells use the small thumbUrl generated at upload time (falls back to the
+        // full dataUrl for older photos uploaded before thumbnails existed, and for
+        // guest-uploaded photos which are already small base64). The full-size dataUrl
+        // is only ever loaded when a guest actually opens a photo (openViewer) or
+        // downloads/reels it — see the thumbUrl comment on prepareUploadBlob's sibling
+        // in the dashboard for why this exists.
+        cell.innerHTML = '<img src="' + (p.thumbUrl || p.dataUrl) + '" loading="lazy">' + badge + favBadge + wmHtml + sellBadge;
+        cell.addEventListener('click', function () {
+          if (sellingHere && sellingSelectMode && !isPhotoUnlocked(p.id)) {
+            toggleSellingCartPhoto(p.id);
+            return;
+          }
+          openViewer(photos, i);
+        });
+        frag.appendChild(cell);
       }
-      cell.innerHTML = '<img src="' + p.dataUrl + '" loading="lazy">' + badge + favBadge + wmHtml + sellBadge;
-      cell.addEventListener('click', function () {
-        if (sellingHere && sellingSelectMode && !isPhotoUnlocked(p.id)) {
-          toggleSellingCartPhoto(p.id);
-          return;
-        }
-        openViewer(photos, i);
-      });
-      grid.appendChild(cell);
-    });
-    fillIcons();
+      grid.insertBefore(frag, sentinel);
+      renderedCount = end;
+      fillIcons();
+      if (renderedCount >= photos.length && photoGridObservers[gridId]) {
+        photoGridObservers[gridId].disconnect();
+        delete photoGridObservers[gridId];
+      }
+    }
+
+    renderNextBatch();
+
+    if (photos.length > PHOTO_GRID_PAGE_SIZE) {
+      const observer = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) renderNextBatch();
+      }, { rootMargin: '900px' });
+      observer.observe(sentinel);
+      photoGridObservers[gridId] = observer;
+    }
   }
 
   // Gallery = the full/browsable event photo grid. Shown to everyone by default;
