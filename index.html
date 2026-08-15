@@ -603,6 +603,18 @@
   .viewer-actions { display: flex; gap: 10px; }
   .viewer-img-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; box-sizing: border-box; padding: calc(78px + env(safe-area-inset-top)) 22px 64px; }
   .viewer-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; border-radius: 0; box-shadow: 0 18px 46px -20px rgba(20,16,20,.35); }
+  /* Slide-and-fade transition between photos (see navigateViewer) — mimics a native
+     gallery swipe instead of the old instant src-swap, which could look frozen while a
+     large, not-yet-cached photo was still downloading over the network. .no-anim is
+     toggled on for one frame to snap the incoming image to its off-screen start
+     position without animating that jump. */
+  /* Duration here (.22s) must match the setTimeout in navigateViewer — the JS cuts the
+     outgoing animation short at that mark to swap in the new photo, so the two need to
+     line up or the outgoing slide visibly snaps instead of completing smoothly. */
+  #viewer-img { transition: transform .22s ease, opacity .22s ease; }
+  #viewer-img.no-anim { transition: none; }
+  .viewer-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 34px; height: 34px; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: viewer-spin .8s linear infinite; display: none; z-index: 2; pointer-events: none; }
+  @keyframes viewer-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
   .viewer-count { color: #fff; font-size: 12.5px; font-weight: 700; background: rgba(255,255,255,.18); padding: 5px 12px; border-radius:10px; }
   .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(20,16,20,.5); color: #fff; border: none; width: 38px; height: 38px; border-radius:10px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 4; }
   .viewer-nav-prev { left: 10px; }
@@ -1744,6 +1756,7 @@
     <div class="viewer-img-wrap" id="viewer-img-wrap">
       <button class="viewer-nav viewer-nav-prev" id="viewer-prev-btn" onclick="navigateViewer(-1)"><i data-icon="CHEVRON_LEFT"></i></button>
       <img id="viewer-img" src="">
+      <div class="viewer-spinner" id="viewer-spinner"></div>
       <div id="viewer-watermark"></div>
       <button class="viewer-nav viewer-nav-next" id="viewer-next-btn" onclick="navigateViewer(1)"><i data-icon="CHEVRON"></i></button>
     </div>
@@ -2587,7 +2600,27 @@
     // (renders as a broken image) instead of its .dataUrl every single time a photo
     // was opened in the viewer.
     const currentPhoto = viewerPhotos[viewerIndex];
-    document.getElementById('viewer-img').src = currentPhoto ? currentPhoto.dataUrl : '';
+    const imgEl = document.getElementById('viewer-img');
+    const spinnerEl = document.getElementById('viewer-spinner');
+    // The on-screen viewer shows the ~1800px previewUrl, not the full multi-MB
+    // original — plenty sharp to fill a phone screen (there's no pinch-zoom here),
+    // at a fraction of the bytes. Falls back to dataUrl for older photos uploaded
+    // before previewUrl existed. Download/share/Reels still pull the real dataUrl
+    // (see downloadCurrentPhoto/shareCurrentPhoto/loadImageForReel) — this only
+    // changes what's rendered on screen.
+    const targetSrc = currentPhoto ? (currentPhoto.previewUrl || currentPhoto.dataUrl) : '';
+    if (imgEl) {
+      // Show the spinner only if this photo genuinely isn't ready yet — most of the
+      // time preloadViewerNeighbors() below has already fetched it into the browser
+      // cache before the guest swipes to it, so onload fires almost instantly and the
+      // spinner never really shows. This is what replaces the old "looks frozen" gap
+      // on slower connections with an actual loading indicator instead of nothing.
+      if (spinnerEl) spinnerEl.style.display = (imgEl.src === targetSrc && imgEl.complete) ? 'none' : 'block';
+      imgEl.onload = function () { if (spinnerEl) spinnerEl.style.display = 'none'; };
+      imgEl.onerror = function () { if (spinnerEl) spinnerEl.style.display = 'none'; };
+      imgEl.src = targetSrc;
+    }
+    preloadViewerNeighbors();
     const countEl = document.getElementById('viewer-count');
     if (countEl) countEl.textContent = (viewerIndex + 1) + ' / ' + viewerPhotos.length;
     const prevBtn = document.getElementById('viewer-prev-btn');
@@ -2616,6 +2649,27 @@
     initiatePurchase('photo', [p.id]);
   }
 
+  // Warms the browser cache for the photo(s) either side of the one currently on
+  // screen, so by the time a guest actually swipes/taps to it, <img src> just loads
+  // from cache instead of kicking off a fresh network fetch — this (plus the slide
+  // transition in navigateViewer) is what fixes the viewer "getting stuck" on a large
+  // not-yet-downloaded photo with no visual feedback that anything was happening.
+  const viewerPreloadedUrls = {};
+  function preloadViewerNeighbors() {
+    [viewerIndex - 1, viewerIndex + 1].forEach(function (i) {
+      const p = viewerPhotos[i];
+      if (!p) return;
+      // Preload whatever renderViewerImage() will actually display (previewUrl,
+      // falling back to dataUrl) — preloading the full original here would silently
+      // undo the bandwidth savings previewUrl exists for.
+      const src = p.previewUrl || p.dataUrl;
+      if (!src || viewerPreloadedUrls[src]) return;
+      viewerPreloadedUrls[src] = true;
+      const img = new Image();
+      img.src = src;
+    });
+  }
+
   function openViewer(photos, index) {
     viewerPhotos = photos; viewerIndex = index;
     renderViewerImage();
@@ -2625,8 +2679,25 @@
   function navigateViewer(delta) {
     const next = viewerIndex + delta;
     if (next < 0 || next >= viewerPhotos.length) return;
+    const dir = delta > 0 ? 1 : -1;
+    const img = document.getElementById('viewer-img');
     viewerIndex = next;
-    renderViewerImage();
+    if (!img) { renderViewerImage(); return; }
+    // Slide the outgoing photo away, swap to the new one, then snap it to the opposite
+    // edge (transition disabled for that one frame) and animate it back to center —
+    // the same slide-in feel as a native gallery, instead of the old instant src-swap.
+    img.style.transform = 'translateX(' + (dir * -40) + 'px)';
+    img.style.opacity = '0';
+    setTimeout(function () {
+      renderViewerImage();
+      img.classList.add('no-anim');
+      img.style.transform = 'translateX(' + (dir * 40) + 'px)';
+      img.style.opacity = '0';
+      void img.offsetWidth; // force reflow so this jump isn't batched with the animated state below
+      img.classList.remove('no-anim');
+      img.style.transform = 'translateX(0)';
+      img.style.opacity = '1';
+    }, 220);
   }
 
   function toggleLike() {
@@ -5178,7 +5249,7 @@
           const existing = eventPhotos.find(function (p) { return p.id === doc.id; });
           let matched = existing ? existing.matched : null;
           if (matched === null && cachedIds.indexOf(doc.id) !== -1) matched = true;
-          return { id: doc.id, dataUrl: doc.data().dataUrl, thumbUrl: doc.data().thumbUrl || null, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded };
+          return { id: doc.id, dataUrl: doc.data().dataUrl, thumbUrl: doc.data().thumbUrl || null, previewUrl: doc.data().previewUrl || null, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded };
         });
 
         const currentIds = eventPhotos.map(function (p) { return p.id; });
