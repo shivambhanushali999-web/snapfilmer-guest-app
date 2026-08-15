@@ -1750,7 +1750,7 @@
       <div class="viewer-actions">
         <button class="glass-btn" id="viewer-like" onclick="toggleLike()"><i data-icon="HEART"></i></button>
         <button class="glass-btn" onclick="shareCurrentPhoto()"><i data-icon="SHARE"></i></button>
-        <button class="glass-btn" onclick="downloadCurrentPhoto()"><i data-icon="DOWNLOAD"></i></button>
+        <button class="glass-btn" id="viewer-download-btn" onclick="downloadCurrentPhoto()"><i data-icon="DOWNLOAD"></i></button>
       </div>
     </div>
     <div class="viewer-img-wrap" id="viewer-img-wrap">
@@ -2831,6 +2831,17 @@
     }).catch(function () { return dataUrl; });
   }
 
+  // Toggles a small spinning state on whichever download button triggered this, so a
+  // slow Lambda round-trip (see below) reads as "working on it" instead of looking
+  // like the tap did nothing at all — this is what guests were reporting as "download
+  // button does nothing."
+  function setDownloadBusy(busy) {
+    const btn = document.getElementById('viewer-download-btn');
+    if (!btn) return;
+    btn.style.opacity = busy ? '0.5' : '';
+    btn.style.pointerEvents = busy ? 'none' : '';
+  }
+
   function triggerDownload(src, filename, skipWatermark) {
     // data: URLs (old embedded-in-Firestore photos, or anything already base64) can be
     // watermarked and force-downloaded directly — already same-origin.
@@ -2848,20 +2859,39 @@
     // the watermark in) since it's now a same-page data: URL. Falls back to opening
     // the photo directly if the photo's too big for that round trip or the Lambda
     // call fails for any reason.
+    //
+    // Full-resolution wedding photos (several MB, larger once base64-inflated ~33%)
+    // can push this past the Lambda/API Gateway's own timeout or payload limit — when
+    // that happens the browser's fetch() can sit there for a long time with no error
+    // and no response, which looked to guests like the download button simply did
+    // nothing. An explicit client-side timeout guarantees this always resolves one
+    // way or another within a few seconds, falling back to opening the photo (which
+    // the guest can then long-press/save) instead of hanging forever.
+    setDownloadBusy(true);
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
     fetch(FACE_MATCH_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'download', photoUrl: src }),
+      signal: controller ? controller.signal : undefined,
     }).then(function (res) { return res.json(); }).then(function (data) {
+      if (timeoutId) clearTimeout(timeoutId);
       if (data.dataUrl) {
-        compositeForDownload(data.dataUrl, skipWatermark).then(function (finalDataUrl) { forceDownloadDataUrl(finalDataUrl, filename); });
+        compositeForDownload(data.dataUrl, skipWatermark).then(function (finalDataUrl) {
+          forceDownloadDataUrl(finalDataUrl, filename);
+          setDownloadBusy(false);
+        });
       } else {
         window.open(src, '_blank');
+        setDownloadBusy(false);
       }
     }).catch(function () {
-      // Fallback: at least get the guest to the photo if the Lambda call itself fails
-      // (e.g. offline) — better than a silent no-op.
+      // Fallback: at least get the guest to the photo if the Lambda call itself fails,
+      // times out, or is offline — better than a silent no-op.
+      if (timeoutId) clearTimeout(timeoutId);
       window.open(src, '_blank');
+      setDownloadBusy(false);
     });
   }
 
@@ -3193,7 +3223,11 @@
   // share sheet on mobile, falls back to copying the link on desktop.
   function shareLinkOrCopy(url, title) {
     if (navigator.share) {
-      navigator.share({ title: title, url: url }).catch(function () {});
+      // `text` is included alongside `url` because some share targets (notably
+      // WhatsApp on several platforms) only surface the `text` field in the actual
+      // message they compose, silently dropping `title` — without this, guests
+      // sharing a photo were seeing just a bare link with no context in WhatsApp.
+      navigator.share({ title: title, text: title, url: url }).catch(function () {});
       return;
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -3216,9 +3250,14 @@
 
   function shareCurrentPhoto() {
     const p = viewerPhotos[viewerIndex];
-    const src = p && p.dataUrl;
-    if (!src) return;
-    shareLinkOrCopy(src, 'A photo from ' + EVENT.name);
+    if (!p) return;
+    // Deliberately shares a link back into the event (same ?event=<id> link
+    // shareCurrentEvent() uses), not the photo's own Storage/data URL — a raw image
+    // URL only ever showed that one picture with no way for whoever received it to
+    // see the rest of the event or know whose gallery it came from. This way anyone
+    // the guest shares with lands in the actual event and can browse/follow it.
+    const url = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(EVENT.id);
+    shareLinkOrCopy(url, 'Check out this photo from ' + EVENT.name + ' on SnapFilmer!');
   }
 
   function downloadHighlightsGrid() {
