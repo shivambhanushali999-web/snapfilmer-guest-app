@@ -4552,7 +4552,16 @@
   // ---- Firebase (Firestore) ----
   const firebaseConfig = {
     apiKey: 'AIzaSyCwVBvQuTylTt8_3Ft650y8NHAoUj-Iw8o',
-    authDomain: 'snapfilmer-ai-face-app.firebaseapp.com',
+    // Using our own connected domain (not the default *.firebaseapp.com) here matters:
+    // Google's redirect sign-in needs to read the result back via storage on the
+    // authDomain. When authDomain is a different domain than the one the guest is
+    // actually on, that's third-party storage — which Chrome/Safari on mobile now
+    // block by default, so the redirect "succeeds" but getRedirectResult() silently
+    // comes back empty (no error, just no user — exactly the symptom of the Welcome
+    // screen returning with blank fields). Firebase Hosting auto-proxies the
+    // /__/auth/handler + /__/auth/iframe endpoints on any connected custom domain,
+    // so pointing authDomain at snapfilmer.in makes the whole flow same-origin.
+    authDomain: 'snapfilmer.in',
     projectId: 'snapfilmer-ai-face-app',
     storageBucket: 'snapfilmer-ai-face-app.firebasestorage.app',
     messagingSenderId: '148634541857',
