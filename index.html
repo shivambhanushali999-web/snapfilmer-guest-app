@@ -3458,6 +3458,19 @@
     const isReal = !!(auth && auth.currentUser && !auth.currentUser.isAnonymous);
     if (isReal) {
       alert('Signed in as ' + (auth.currentUser.displayName || auth.currentUser.email));
+      return;
+    }
+    // A guest who already gave their name at the "Welcome!" registration gate
+    // shouldn't be asked to sign in again just for tapping their own profile row —
+    // that's the exact double-ask this was fixed to avoid (see the matching comment in
+    // openCamera() above). Show what's on file instead, with sign-in offered only as
+    // something they can opt into (for real cross-device access), not a wall.
+    let guestName = '';
+    try { guestName = localStorage.getItem('sf_guest_name_' + EVENT.id) || ''; } catch (err) {}
+    if (guestName) {
+      if (confirm('Browsing as ' + guestName + ' (this device only).\n\nWant to sign in with Google or email for access from other devices too?')) {
+        openLoginScreen();
+      }
     } else {
       openLoginScreen();
     }
@@ -4592,6 +4605,54 @@
     functionsClient = null;
   }
 
+  // ================= Google Sign-In (redirect flow) =================
+  // Used to open Google's account picker in a POPUP (signInWithPopup/linkWithPopup) —
+  // that's blocked outright by Safari/Chrome on iOS whenever it isn't fired inside the
+  // exact same synchronous tap handler (any await/network round-trip in between, e.g.
+  // Firestore reads that ran first, and the popup silently never opens or gets killed
+  // by the browser), and doesn't work at all inside an installed PWA's standalone
+  // window on iOS. A full-page redirect has none of those restrictions, at the cost of
+  // reloading the whole app — the tradeoff below is remembering *why* the redirect was
+  // started (in localStorage, since a reload wipes all in-memory state) so the result
+  // can be routed back to the right place once the guest lands back here.
+  let pendingGoogleRedirectUser = null;
+  if (auth) {
+    auth.getRedirectResult().then(function (result) {
+      if (!result || !result.user) return;
+      pendingGoogleRedirectUser = result.user;
+      const intent = (function () {
+        try { const v = localStorage.getItem('sf_google_redirect_intent'); localStorage.removeItem('sf_google_redirect_intent'); return v; } catch (err) { return null; }
+      })();
+      // 'account' (the standalone, optional Sign In screen in More) wants an immediate
+      // sign-in with no further form to fill — 'registration' (the mandatory Welcome
+      // gate) still needs a phone number from the guest, so that one just pre-fills
+      // name/email and waits — see applyPendingGoogleRegistrationPrefill(), called from
+      // showRegistrationGate() once the gate is actually on screen.
+      if (intent === 'account') {
+        pendingGoogleRedirectUser = null;
+        completeLogin();
+      }
+    }).catch(function (err) {
+      // 'auth/no-auth-event' just means the guest arrived here normally (not returning
+      // from a redirect) — every page load checks, so this is the overwhelmingly common,
+      // totally expected outcome and shouldn't surface as an error anywhere.
+      if (err && err.code === 'auth/no-auth-event') return;
+      if (err && err.code === 'auth/credential-already-in-use') {
+        // The Google account already has its own separate real account — that account,
+        // not a link onto this session's anonymous one, is what the guest actually wants.
+        auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+        return;
+      }
+      try {
+        const intent = localStorage.getItem('sf_google_redirect_intent');
+        localStorage.removeItem('sf_google_redirect_intent');
+        const targetId = intent === 'account' ? 'signin-error' : 'reg-msg';
+        const el = document.getElementById(targetId);
+        if (el) { el.textContent = friendlyAuthError(err); el.style.display = 'block'; el.style.color = '#D0342C'; }
+      } catch (e2) {}
+    });
+  }
+
   // Registers sw.js (see that file for why it's deliberately non-caching) purely so
   // Android Chrome recognizes this as an installable PWA — combined with the
   // manifest.json link + icons in <head>, this is what makes "Install app"/"Add to
@@ -4886,6 +4947,24 @@
     if (gate) gate.style.display = 'none';
     const reg = document.getElementById('registration-gate');
     if (reg) reg.style.display = 'block';
+    applyPendingGoogleRegistrationPrefill();
+  }
+
+  // If the guest just came back from a Google redirect started on THIS gate (see the
+  // getRedirectResult() handler near the top of the script), fill in what Google gave
+  // us — name + email — and put the cursor straight in Phone, the one field Google
+  // can't supply, instead of making them retype everything they just picked in Google's
+  // account chooser.
+  function applyPendingGoogleRegistrationPrefill() {
+    if (!pendingGoogleRedirectUser) return;
+    const user = pendingGoogleRedirectUser;
+    pendingGoogleRedirectUser = null;
+    const nameEl = document.getElementById('reg-name');
+    const emailEl = document.getElementById('reg-email');
+    const phoneEl = document.getElementById('reg-phone');
+    if (nameEl && user.displayName) nameEl.value = user.displayName;
+    if (emailEl && user.email) emailEl.value = user.email;
+    if (phoneEl) phoneEl.focus();
   }
 
   // Google-assisted shortcut for the registration gate above — pre-fills name + email
@@ -4902,33 +4981,16 @@
       if (msgEl) { msgEl.textContent = 'Google Sign-In is not available right now (no connection).'; msgEl.style.display = 'block'; }
       return;
     }
+    // Redirect flow (see the getRedirectResult() handler + applyPendingGoogleRegistrationPrefill()
+    // near the top of the script) — a popup here gets silently blocked on iOS Safari and
+    // inside an installed PWA, which is exactly what made this button look "broken".
+    try { localStorage.setItem('sf_google_redirect_intent', 'registration'); } catch (err) {}
     const provider = new firebase.auth.GoogleAuthProvider();
-    const applyProfile = function (user) {
-      if (!user) return;
-      const nameEl = document.getElementById('reg-name');
-      const emailEl = document.getElementById('reg-email');
-      const phoneEl = document.getElementById('reg-phone');
-      if (nameEl && user.displayName) nameEl.value = user.displayName;
-      if (emailEl && user.email) emailEl.value = user.email;
-      if (phoneEl) phoneEl.focus();
-    };
     const doLink = auth.currentUser && auth.currentUser.isAnonymous;
-    const action = doLink ? auth.currentUser.linkWithPopup(provider) : auth.signInWithPopup(provider);
-    action.then(function (result) {
-      applyProfile((result && result.user) || auth.currentUser);
-    }).catch(function (err) {
-      if (err && err.code === 'auth/credential-already-in-use') {
-        // This Google account already has its own real account elsewhere — just sign
-        // straight into that instead of trying to link it to the anonymous session.
-        auth.signInWithPopup(provider).then(function (result) {
-          applyProfile((result && result.user) || auth.currentUser);
-        }).catch(function (err2) {
-          if (msgEl) { msgEl.textContent = friendlyAuthError(err2); msgEl.style.display = 'block'; }
-        });
-        return;
-      }
-      if (msgEl) { msgEl.textContent = friendlyAuthError(err); msgEl.style.display = 'block'; }
-    });
+    (doLink ? auth.currentUser.linkWithRedirect(provider) : auth.signInWithRedirect(provider))
+      .catch(function (err) {
+        if (msgEl) { msgEl.textContent = friendlyAuthError(err); msgEl.style.display = 'block'; }
+      });
   }
 
   function submitGuestRegistration() {
@@ -7125,18 +7187,15 @@
 
   function googleSignIn() {
     if (!auth) { showAuthError('signin-error', 'Login is not available right now (no connection).'); return; }
+    // Redirect flow — see the getRedirectResult() handler near the top of the script
+    // (same popup-blocked-on-iOS reasoning as googleSignInForRegistration() above).
+    // This one's intent is 'account': the handler calls completeLogin() directly the
+    // moment the guest lands back here, no extra tap needed.
+    try { localStorage.setItem('sf_google_redirect_intent', 'account'); } catch (err) {}
     const provider = new firebase.auth.GoogleAuthProvider();
     const doLink = auth.currentUser && auth.currentUser.isAnonymous;
-    const action = doLink ? auth.currentUser.linkWithPopup(provider) : auth.signInWithPopup(provider);
-    action.then(function () { completeLogin(); })
+    (doLink ? auth.currentUser.linkWithRedirect(provider) : auth.signInWithRedirect(provider))
       .catch(function (err) {
-        if (err && err.code === 'auth/credential-already-in-use') {
-          // This Google account already has its own real account elsewhere — just sign
-          // straight into that instead of trying to link it to the anonymous session.
-          auth.signInWithPopup(provider).then(function () { completeLogin(); })
-            .catch(function (err2) { showAuthError('signin-error', friendlyAuthError(err2)); });
-          return;
-        }
         const msg = friendlyAuthError(err);
         showAuthError('signin-error', msg);
         showAuthError('signup-error', msg);
@@ -7210,11 +7269,20 @@
       alert('Face recognition is turned off for this event by the photographer. Ask them to enable it in Event Settings.');
       return;
     }
-    // Unless the photographer has enabled "Anonymous My Photos", a guest needs a real
-    // (non-anonymous) account before they can take a selfie — matches real Kamero's
-    // default behaviour. Redirect to sign-in, then come straight back to the camera.
+    // Used to force a full email/password-or-Google Sign In screen here whenever
+    // "Anonymous My Photos" was off and the guest was still Firebase-anonymous — but
+    // that meant a guest who'd ALREADY given their name/phone at the mandatory
+    // "Welcome!" registration gate on entry (see showRegistrationGate()) got asked to
+    // identify themselves a second time, in a completely different-looking form, just
+    // to take a selfie. A guest who's completed that gate for this event already has a
+    // real identity on file (sf_registered_<eventId> below) even if their Firebase Auth
+    // session itself is still anonymous — that's enough; only a guest with genuinely no
+    // identity on record at all (this event never required registration, and they never
+    // separately signed in) still gets asked here.
     const isAnonymousSession = !!(auth && auth.currentUser && auth.currentUser.isAnonymous);
-    if (!eventSettings.anonymousMyPhotos && isAnonymousSession) {
+    let alreadyIdentified = false;
+    try { alreadyIdentified = localStorage.getItem('sf_registered_' + EVENT.id) === '1'; } catch (err) {}
+    if (!eventSettings.anonymousMyPhotos && isAnonymousSession && !alreadyIdentified) {
       pendingCameraOpen = true;
       openLoginScreen();
       return;
