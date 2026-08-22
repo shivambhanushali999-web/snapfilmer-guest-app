@@ -15,7 +15,27 @@
      on every input/textarea (the usual trigger), since the guest explicitly should never
      see the page jump into a zoomed-in state at all. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>SnapFilmer</title>
+<title>SnapFilmer | Wedding & Pre-Wedding Photography, Dombivli &amp; Mumbai</title>
+<!-- Basic on-page SEO: description/keywords for Google's snippet, canonical pointing
+     at the real custom domain (so photo/guest-code query strings never get indexed as
+     separate duplicate pages), and Open Graph/Twitter tags so a link shared on
+     WhatsApp/Instagram/Facebook shows a proper title+description+image card instead of
+     a bare URL. None of this replaces real SEO work (Google Search Console, Business
+     Profile, backlinks, reviews) — see the checklist shared alongside this file. -->
+<meta name="description" content="SnapFilmer is a wedding, pre-wedding and portfolio photography studio based in Dombivli, Mumbai. Candid, cinematic storytelling for weddings, engagements, maternity and portrait shoots." />
+<meta name="keywords" content="wedding photographer, candid photography, pre-wedding shoot, wedding photographer Dombivli, wedding photographer Mumbai, cinematic wedding films, SnapFilmer" />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://snapfilmer.in/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="SnapFilmer" />
+<meta property="og:title" content="SnapFilmer | Wedding & Pre-Wedding Photography" />
+<meta property="og:description" content="Candid, cinematic wedding and pre-wedding photography in Dombivli & Mumbai. View your event photos and videos here." />
+<meta property="og:url" content="https://snapfilmer.in/" />
+<meta property="og:image" content="https://snapfilmer.in/icon-192.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="SnapFilmer | Wedding & Pre-Wedding Photography" />
+<meta name="twitter:description" content="Candid, cinematic wedding and pre-wedding photography in Dombivli & Mumbai." />
+<meta name="twitter:image" content="https://snapfilmer.in/icon-192.png" />
 <!-- PWA install support — manifest.json/icons/sw.js must sit next to this file at the
      repo root on GitHub/Vercel (uploaded alongside index.html). On Android, Chrome shows
      an "Install app"/"Add to Home Screen" prompt once these are present + served over
@@ -1415,6 +1435,29 @@
         </div>
       </div>
 
+      <!-- Email-on-new-photo subscription — a second, independent channel from the FCM
+           push toggle above (works even if the guest never installs the app or grants
+           notification permission, e.g. iPhone users on plain Safari). Stored server-side
+           in Firestore (events/{id}/emailFollowers) rather than sent client-side, so the
+           actual send happens from notifyOnNewPhoto/notifyOnNewVideo in Cloud Functions —
+           see saveEmailSubscription()/renderEmailSubscriptionUI() below. Deliberately
+           batched server-side (max one email per ~6hr window) instead of one per photo,
+           since a single upload session can add 100+ photos at once. -->
+      <div class="list-card">
+        <div class="list-row">
+          <div>
+            <div class="lt">Email me new photos</div>
+            <div class="ld" id="email-notify-desc">Also get an email with a link whenever new photos are added — no app install needed.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="email-notify-toggle" onchange="toggleEmailNotifySubscription(this.checked)"><span class="slider"></span></label>
+        </div>
+        <div id="email-notify-form" style="display:none;padding:0 16px 16px;">
+          <input id="email-notify-input" type="email" placeholder="Your email address" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:16px;box-sizing:border-box;margin-bottom:10px;">
+          <button class="btn-solid-sm" onclick="saveEmailSubscription()" style="background:var(--accent);color:#fff;border:none;border-radius:0;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;">Save</button>
+          <p id="email-notify-msg" style="font-size:11.5px;margin:8px 0 0;display:none;"></p>
+        </div>
+      </div>
+
       <div class="list-card">
         <div class="list-row" onclick="toggleDownloadAllEmailForm()" style="cursor:pointer;">
           <div><div class="lt">Download All Photos</div><div class="ld">Get an email with a link to download all your matched photos.</div></div>
@@ -1477,7 +1520,7 @@
       </div>
       <div class="sub-bar-actions">
         <button class="ghost-btn" id="myphotos-buy-btn" style="display:none;" onclick="toggleSellingSelectMode()" title="Buy Photos"><i data-icon="BAG"></i></button>
-        <button class="ghost-btn" onclick="openMyReel()" title="Create My Reel"><i data-icon="REEL"></i></button>
+        <button class="ghost-btn" id="myreel-btn" onclick="openMyReel()" title="Create My Reel"><i data-icon="REEL"></i></button>
         <button class="ghost-btn" style="position:relative;" onclick="openFavorites()" title="My Favorites"><i data-icon="HEART"></i><span class="fav-count-badge" style="display:none;">0</span></button>
       </div>
     </div>
@@ -1919,6 +1962,11 @@
   // "Create My Reel" feature below — a guest's personal reel is silent without this,
   // since we can't legally bundle real music with the app ourselves.
   let studioReelMusicUrl = '';
+  // Studio-wide kill switch for "Create My Reel" (Profile → Guest Reels toggle in the
+  // dashboard). Defaults true so existing studios/events aren't silently hidden before
+  // a profile doc with this field has ever been saved — see applyStudioProfile() below
+  // and the button/openMyReel() guards that read it.
+  let studioReelsEnabled = true;
   // Portfolio Event ID (Profile → Portfolio) and the real data loaded from it —
   // replaces the old hardcoded PORTFOLIO_CATS mock entirely once a real event is set.
   let studioPortfolioEventId = '';
@@ -2570,6 +2618,7 @@
     set('ei-studio', studioNameEl ? studioNameEl.textContent : 'SnapFilmer');
     set('ei-access', eventSettings.pin ? 'PIN Protected' : 'Open Access');
     set('ei-id', EVENT.id || '—');
+    renderEmailSubscriptionUI();
   }
 
   function openEventInfo() {
@@ -2990,6 +3039,89 @@
       if (input) input.value = '';
     }).catch(function () {
       if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Could not send that email — please try again.'; statusEl.style.display = 'block'; }
+    });
+  }
+
+  // ================= Email-on-new-photo subscription =================
+  // A guest's saved subscription email, kept locally purely so the Notifications
+  // screen can show "Subscribed as x@y.com" without an extra Firestore round trip —
+  // the actual source of truth (and what the Cloud Function reads to send mail) is the
+  // events/{eventId}/emailFollowers/{docId} doc written by saveEmailSubscription() below.
+  let emailSubscriptionAddress = '';
+
+  function loadEmailSubscriptionState() {
+    try { emailSubscriptionAddress = localStorage.getItem('sf_email_notify_' + EVENT.id) || ''; } catch (err) {}
+  }
+
+  // Called whenever the Notifications screen renders, so the toggle/form reflect
+  // whatever's actually saved for this event on this device.
+  function renderEmailSubscriptionUI() {
+    const toggle = document.getElementById('email-notify-toggle');
+    const form = document.getElementById('email-notify-form');
+    const input = document.getElementById('email-notify-input');
+    const desc = document.getElementById('email-notify-desc');
+    if (!toggle || !form || !input) return;
+    const subscribed = !!emailSubscriptionAddress;
+    toggle.checked = subscribed;
+    form.style.display = subscribed ? 'none' : 'block';
+    if (desc) {
+      desc.textContent = subscribed
+        ? 'Subscribed as ' + emailSubscriptionAddress + ' — toggle off to unsubscribe.'
+        : 'Also get an email with a link whenever new photos are added — no app install needed.';
+    }
+    if (!subscribed) input.value = '';
+  }
+
+  // Flips the toggle: turning it ON reveals the email-entry form (actual subscription
+  // only happens once saveEmailSubscription() below succeeds); turning it OFF removes
+  // the existing subscription doc from Firestore immediately.
+  function toggleEmailNotifySubscription(turningOn) {
+    const form = document.getElementById('email-notify-form');
+    if (turningOn) {
+      if (form) form.style.display = 'block';
+      return;
+    }
+    if (!emailSubscriptionAddress) return;
+    const email = emailSubscriptionAddress;
+    if (db && EVENT.id) {
+      db.collection('events').doc(EVENT.id).collection('emailFollowers').doc(emailToDocId(email))
+        .delete().catch(function () {});
+    }
+    emailSubscriptionAddress = '';
+    try { localStorage.removeItem('sf_email_notify_' + EVENT.id); } catch (err) {}
+    renderEmailSubscriptionUI();
+  }
+
+  // Firestore doc ids can't contain "/" or be empty — emails never contain "/" but this
+  // keeps the id simple/predictable (also doubles as a natural de-dupe key, so
+  // re-subscribing the same address just overwrites rather than creating duplicates).
+  function emailToDocId(email) {
+    return email.trim().toLowerCase().replace(/[^a-z0-9@._-]/g, '_');
+  }
+
+  function saveEmailSubscription() {
+    const input = document.getElementById('email-notify-input');
+    const msg = document.getElementById('email-notify-msg');
+    const email = input ? input.value.trim() : '';
+    if (!email || email.indexOf('@') === -1) {
+      if (msg) { msg.style.color = '#D0342C'; msg.textContent = 'Please enter a valid email address.'; msg.style.display = 'block'; }
+      return;
+    }
+    if (!db || !EVENT.id) {
+      if (msg) { msg.style.color = '#D0342C'; msg.textContent = 'Could not save — no connection. Please try again.'; msg.style.display = 'block'; }
+      return;
+    }
+    db.collection('events').doc(EVENT.id).collection('emailFollowers').doc(emailToDocId(email)).set({
+      email: email,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      lastEmailedAt: null,
+    }, { merge: true }).then(function () {
+      emailSubscriptionAddress = email;
+      try { localStorage.setItem('sf_email_notify_' + EVENT.id, email); } catch (err) {}
+      renderEmailSubscriptionUI();
+      if (msg) { msg.style.color = '#1FA97A'; msg.textContent = "You're subscribed — check " + email + " next time new photos are added."; msg.style.display = 'block'; }
+    }).catch(function () {
+      if (msg) { msg.style.color = '#D0342C'; msg.textContent = 'Could not save — please try again.'; msg.style.display = 'block'; }
     });
   }
 
@@ -4893,6 +5025,7 @@
 
     if (profile.coverUrl !== undefined) { studioCoverUrl = profile.coverUrl || ''; renderGateHero(); }
     if (profile.reelMusicUrl !== undefined) studioReelMusicUrl = profile.reelMusicUrl || '';
+    if (profile.reelsEnabled !== undefined) { studioReelsEnabled = profile.reelsEnabled !== false; updateReelButtonVisibility(); }
 
     // Portfolio used to be 2 hardcoded categories full of picsum.photos filler — this
     // is the real thing: whichever event the studio picks as their "Portfolio Event" in
@@ -6118,7 +6251,20 @@
   // plain uncaptioned slideshow was the specific "simple" complaint being fixed.
   let reelTemplate = 'caption';
 
+  // Shows/hides the "Create My Reel" toolbar button per studioReelsEnabled — called
+  // once the real profile flag arrives (applyStudioProfile) and again on the
+  // myphotos-count-driven UI refreshes so a late-loading profile doc doesn't leave the
+  // button visible for a beat before the studio's "off" choice kicks in.
+  function updateReelButtonVisibility() {
+    const btn = document.getElementById('myreel-btn');
+    if (btn) btn.style.display = studioReelsEnabled ? '' : 'none';
+  }
+
   function openMyReel() {
+    // Belt-and-braces guard in case something still calls this while the studio has
+    // the feature switched off (e.g. a stale button reference) — the toolbar button
+    // is also hidden via updateReelButtonVisibility().
+    if (!studioReelsEnabled) return;
     resetReelScreen();
     pushScreen('reel');
   }
@@ -7209,6 +7355,7 @@
     // moved here so they use the real, resolved event ID.
     try { NOTIFICATIONS = JSON.parse(localStorage.getItem('sf_notifications_' + EVENT.id) || '[]'); } catch (err) { NOTIFICATIONS = []; }
     try { pinUnlocked = localStorage.getItem('sf_pin_unlocked_' + EVENT.id) === '1'; } catch (err) {}
+    loadEmailSubscriptionState();
     loadFavorites();
     updateFavoriteBadges();
 
