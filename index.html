@@ -3069,7 +3069,15 @@
         ? 'Subscribed as ' + emailSubscriptionAddress + ' — toggle off to unsubscribe.'
         : 'Also get an email with a link whenever new photos are added — no app install needed.';
     }
-    if (!subscribed) input.value = '';
+    // Don't make a guest retype an email they already gave us one screen ago (the
+    // registration gate) or that Google already handed over — pre-fill it here so
+    // turning this on is a single tap on Save, not a fresh typing task.
+    if (!subscribed) {
+      let knownEmail = '';
+      try { knownEmail = localStorage.getItem('sf_guest_email_' + EVENT.id) || ''; } catch (err) {}
+      if (!knownEmail && auth && auth.currentUser && !auth.currentUser.isAnonymous) knownEmail = auth.currentUser.email || '';
+      input.value = knownEmail;
+    }
   }
 
   // Flips the toggle: turning it ON reveals the email-entry form (actual subscription
@@ -5013,9 +5021,27 @@
       try {
         localStorage.setItem('sf_registered_' + EVENT.id, '1');
         // Also kept locally (not just in the guestRegistrations doc) so features like
-        // "Share with Photographer" can address the guest by name without asking again.
+        // "Share with Photographer" can address the guest by name without asking again —
+        // and so the "Email me new photos" toggle (renderEmailSubscriptionUI()) can
+        // pre-fill this same address instead of asking the guest to type an email they
+        // already just gave one screen ago.
         localStorage.setItem('sf_guest_name_' + EVENT.id, name);
+        if (email) localStorage.setItem('sf_guest_email_' + EVENT.id, email);
       } catch (err) {}
+      // A guest who gave an email here has already told us they're fine being reached
+      // by email — auto-subscribing them to "Email me new photos" (same doc
+      // saveEmailSubscription() writes) means the feature just works the moment new
+      // photos arrive, with no extra toggle/Save tap needed. Best-effort/silent: this
+      // shouldn't block or interrupt getting into the gallery either way.
+      if (email && db && EVENT.id) {
+        db.collection('events').doc(EVENT.id).collection('emailFollowers').doc(emailToDocId(email)).set({
+          email: email,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastEmailedAt: null,
+        }, { merge: true }).then(function () {
+          try { localStorage.setItem('sf_email_notify_' + EVENT.id, email); } catch (err) {}
+        }).catch(function () {});
+      }
       const reg = document.getElementById('registration-gate');
       if (reg) reg.style.display = 'none';
       bootApp();
