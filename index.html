@@ -4639,6 +4639,12 @@
       if (intent === 'account') {
         pendingGoogleRedirectUser = null;
         completeLogin();
+      } else if (intent === 'registration') {
+        // The registration gate almost always finishes rendering (synchronously, on
+        // boot) BEFORE this promise resolves (it's a network round-trip), so the
+        // showRegistrationGate()-triggered prefill call already ran and found nothing.
+        // Call it again now that the Google account data has actually arrived.
+        applyPendingGoogleRegistrationPrefill();
       }
     }).catch(function (err) {
       // 'auth/no-auth-event' just means the guest arrived here normally (not returning
