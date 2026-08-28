@@ -51,30 +51,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="SnapFilmer" />
-<!-- Firebase (Firestore + Auth) — persists photos and handles real login -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<!-- Firebase Functions (callable) — used by the Photo Selling feature to create/verify
-     Razorpay orders server-side (createRazorpayOrder / verifyRazorpayPayment). -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-<!-- Razorpay Checkout — payment modal for Photo Selling purchases. -->
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<!-- Real push notifications (Firebase Cloud Messaging) — lets a guest get notified about
-     new photos/videos even when this tab/app isn't open, via sw.js's background handler.
-     Permission is only ever requested from a real tap (the notify-banner's Enable button,
-     or the Mute Event toggle) — never automatically on page load — since browsers quietly
-     suppress/auto-block ungestured permission requests. See initNotifyMuteToggle()/
-     showNotifyBanner()/enablePushNotifications() below and the Cloud Functions that
-     actually send these (functions/index.js, deployed separately). -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-<!-- EmailJS: lets this static, backend-less app send a real email (no server needed) —
-     used for the "Download All Photos" > email-me-a-link flow. Needs a free EmailJS
-     account; see EMAILJS_SERVICE_ID / EMAILJS_TEMPLATE_ID / EMAILJS_PUBLIC_KEY below. -->
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<!-- Real QR decoding (pure JS, reads camera frames off a canvas) — powers the QR button
-     next to "Enter Event ID" on the gate screen; see openQrScanner()/scanQrFrame(). -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- Firebase (Firestore + Auth) — persists photos and handles real login.
+     These 8 <script src> tags used to sit here (in <head>), which forced the browser
+     to fully download+execute all eight, one after another, before it could even parse
+     the rest of the document — the guest saw a blank white screen for however long
+     that took (especially slow on wedding-venue wifi/mobile data, since each one is a
+     separate round trip). They're now moved to just before the main app script (see
+     the closing </head>/<body> further down, then search "moved from <head>" right
+     before the big inline <script>) so the browser can parse and paint the actual page
+     markup first — same scripts, same load order, same synchronous execution relative
+     to each other and to the app script right after them, just no longer blocking the
+     first paint. -->
 <!-- Serif display font used only for the premium Event-Gate headlines (studio tagline,
      "Enter Event ID", "Welcome to the future...") — everywhere else stays on the app's
      normal sans-serif system font stack. -->
@@ -1857,6 +1844,18 @@
   </div>
 
 </div>
+
+<!-- moved from <head> (see the comment up there) — same 8 scripts, same order, just
+     placed after all the page's visible markup so the browser paints the real UI
+     first instead of sitting on a blank white screen while these download. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
 <script>
   // ================= ICONS =================
