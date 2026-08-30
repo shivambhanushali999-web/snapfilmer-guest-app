@@ -2803,7 +2803,49 @@
     btn.style.color = (p && p.id && favoritedPhotoIds[p.id]) ? '#E8544A' : '#fff';
   }
 
-  function forceDownloadDataUrl(dataUrl, filename) {
+  function dataUrlToFile(dataUrl, filename) {
+    const parts = dataUrl.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bstr = atob(parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+    return new File([u8arr], filename, { type: mime });
+  }
+
+  function forceDownloadDataUrl(dataUrl, filename, preferShare) {
+    // iOS Safari straight-up ignores the <a download> attribute for data: URLs — instead
+    // of saving the file, it opens a Quick Look-style "data:" preview page with only
+    // "Open in <app>" / "More…" (no direct "Save Image"), which is what guests were
+    // seeing instead of an actual download. The Web Share API's file-sharing mode (iOS
+    // 15+, and Android Chrome) skips that entirely — it hands the real image bytes
+    // straight to the native share sheet, where "Save Image"/"Save to Photos" is a
+    // first-class option right there.
+    //
+    // preferShare is only ever passed true from the single-photo viewer download
+    // button (see downloadCurrentPhoto()) — NOT from "Download All"/bulk flows
+    // (downloadAllPhotos() etc.), which fire several of these back-to-back on a timer
+    // with no guest interaction in between. The share sheet can only ever have one
+    // instance open at a time and needs a fresh tap to appear at all, so using it there
+    // would silently break bulk downloads instead of just saving each file straight
+    // through, which the classic <a download> trick still does fine for that case.
+    if (preferShare) {
+      try {
+        const file = dataUrlToFile(dataUrl, filename);
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file] }).catch(function () {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          });
+          return;
+        }
+      } catch (err) {}
+    }
     const link = document.createElement('a');
     link.href = dataUrl;
     link.download = filename;
@@ -2925,11 +2967,11 @@
     btn.style.pointerEvents = busy ? 'none' : '';
   }
 
-  function triggerDownload(src, filename, skipWatermark) {
+  function triggerDownload(src, filename, skipWatermark, preferShare) {
     // data: URLs (old embedded-in-Firestore photos, or anything already base64) can be
     // watermarked and force-downloaded directly — already same-origin.
     if (src.indexOf('data:') === 0) {
-      compositeForDownload(src, skipWatermark).then(function (finalDataUrl) { forceDownloadDataUrl(finalDataUrl, filename); });
+      compositeForDownload(src, skipWatermark).then(function (finalDataUrl) { forceDownloadDataUrl(finalDataUrl, filename, preferShare); });
       return;
     }
     // Real photo files live in Firebase Storage (a different origin), which doesn't
@@ -2962,7 +3004,7 @@
       if (timeoutId) clearTimeout(timeoutId);
       if (data.dataUrl) {
         compositeForDownload(data.dataUrl, skipWatermark).then(function (finalDataUrl) {
-          forceDownloadDataUrl(finalDataUrl, filename);
+          forceDownloadDataUrl(finalDataUrl, filename, preferShare);
           setDownloadBusy(false);
         });
       } else {
@@ -2991,7 +3033,10 @@
     // "snapfilmer-photo-N.jpg" — guests/studio both need the original numbering intact
     // for their own organization. Only falls back to a generic name for the rare photo
     // that predates filenames being stored at all.
-    triggerDownload(src, p.filename || ('snapfilmer-photo-' + (viewerIndex + 1) + '.jpg'), p && p.id && isPhotoUnlocked(p.id));
+    // preferShare (last arg): a single, guest-initiated tap on the viewer's download
+    // button is exactly the case navigator.share()'s file-sharing mode is meant for —
+    // see forceDownloadDataUrl()'s comment on why bulk downloads below don't use it.
+    triggerDownload(src, p.filename || ('snapfilmer-photo-' + (viewerIndex + 1) + '.jpg'), p && p.id && isPhotoUnlocked(p.id), true);
   }
 
   function downloadAllPhotos() {
