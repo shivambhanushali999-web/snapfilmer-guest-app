@@ -2713,8 +2713,25 @@
   // from cache instead of kicking off a fresh network fetch — this (plus the slide
   // transition in navigateViewer) is what fixes the viewer "getting stuck" on a large
   // not-yet-downloaded photo with no visual feedback that anything was happening.
-  const viewerPreloadedUrls = {};
+  //
+  // This used to remember every URL it had EVER preloaded (viewerPreloadedUrls, never
+  // cleared) purely to avoid re-requesting the same one twice, but never cancelled a
+  // preload once started. On a slow/venue-wifi connection, swiping through many photos
+  // in a row queued up a growing pile of background downloads that were no longer
+  // relevant — after 15-20 swipes there could be a dozen+ stale fetches still
+  // competing with the guest's own limited bandwidth for the ONE photo they're
+  // actually waiting on, which is exactly what made the viewer feel like it "got
+  // stuck"/kept loading the more photos someone swiped through. Now only the current
+  // photo's immediate neighbors are ever kept in flight — anything that falls out of
+  // that window gets its request cancelled (clearing an <img>'s src aborts the
+  // in-flight fetch in every major browser) the moment the guest moves on.
+  let activeViewerPreloads = [];
   function preloadViewerNeighbors() {
+    activeViewerPreloads = activeViewerPreloads.filter(function (entry) {
+      if (entry.index === viewerIndex - 1 || entry.index === viewerIndex + 1) return true;
+      entry.img.src = '';
+      return false;
+    });
     [viewerIndex - 1, viewerIndex + 1].forEach(function (i) {
       const p = viewerPhotos[i];
       if (!p) return;
@@ -2722,16 +2739,21 @@
       // falling back to dataUrl) — preloading the full original here would silently
       // undo the bandwidth savings previewUrl exists for.
       const src = p.previewUrl || p.dataUrl;
-      if (!src || viewerPreloadedUrls[src]) return;
-      viewerPreloadedUrls[src] = true;
+      if (!src) return;
+      if (activeViewerPreloads.some(function (e) { return e.index === i; })) return;
       const img = new Image();
       img.src = src;
+      activeViewerPreloads.push({ index: i, img: img });
     });
   }
 
   function openViewer(photos, index) {
     viewerPhotos = photos; viewerIndex = index;
     viewerNavLocked = false; // fresh open — never start locked from a stale animation
+    // Cancel any preloads left over from a previous time the viewer was open — they'd
+    // just be wasted bandwidth for an album the guest isn't even looking at anymore.
+    activeViewerPreloads.forEach(function (entry) { entry.img.src = ''; });
+    activeViewerPreloads = [];
     renderViewerImage();
     pushScreen('viewer');
   }
