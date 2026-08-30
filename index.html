@@ -150,7 +150,7 @@
   .gate-icon-btn { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); display: none; align-items: center; justify-content: center; text-decoration: none; flex-shrink: 0; }
   .gate-icon-btn svg { width: 15px; height: 15px; }
   .gate-hero-wrap { position: relative; margin: 16px 0 0; display: none; }
-  .gate-hero-wrap img { width: 100%; height: 260px; object-fit: cover; display: block; }
+  .gate-hero-wrap img, .gate-hero-wrap video { width: 100%; height: 260px; object-fit: cover; display: block; }
   .gate-hero-wrap::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(20,16,20,.8) 0%, rgba(20,16,20,.18) 55%, rgba(20,16,20,0) 78%); }
   .gate-hero-content { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 2; }
   .gate-hero-content h1 { color: #fff; margin: 0 0 6px; font-size: 24px; line-height: 1.28; font-weight: 600; }
@@ -798,6 +798,11 @@
            so the headline below just stands on its own cream background until then. -->
       <div class="gate-hero-wrap" id="gate-hero-wrap">
         <img id="gate-hero-img" src="" alt="">
+        <!-- Optional Cover Video (Dashboard > Profile > Photos) — shown instead of the
+             photo above when the studio has uploaded one; see renderGateHero(). Muted
+             is required for autoplay to be allowed at all on iOS/Chrome; playsinline
+             stops iOS from hijacking it into fullscreen the moment it starts. -->
+        <video id="gate-hero-video" muted loop autoplay playsinline style="display:none;"></video>
         <div class="gate-hero-content">
           <h1 class="gate-serif">Every moment,<br><em>beautifully told.</em></h1>
           <p>Your event photos, videos and memories — beautifully delivered in one place.</p>
@@ -1952,6 +1957,10 @@
   // Studio-wide cover photo (Profile → Photos) — used as the Portfolio screen's own
   // banner below, since that's the one screen not tied to any specific event.
   let studioCoverUrl = '';
+  // Optional Cover Video (Dashboard > Profile > Photos) — when set, renderGateHero()
+  // plays this instead of studioCoverUrl on the Event Gate's hero. Empty by default so
+  // every existing studio's gate keeps showing exactly the Cover Photo it always has.
+  let studioCoverVideoUrl = '';
   // Optional studio-uploaded background track (Profile → Guest Reels) for the
   // "Create My Reel" feature below — a guest's personal reel is silent without this,
   // since we can't legally bundle real music with the app ourselves.
@@ -5198,6 +5207,7 @@
     }
 
     if (profile.coverUrl !== undefined) { studioCoverUrl = profile.coverUrl || ''; renderGateHero(); }
+    if (profile.coverVideoUrl !== undefined) { studioCoverVideoUrl = profile.coverVideoUrl || ''; renderGateHero(); }
     if (profile.reelMusicUrl !== undefined) studioReelMusicUrl = profile.reelMusicUrl || '';
     if (profile.reelsEnabled !== undefined) { studioReelsEnabled = profile.reelsEnabled !== false; updateReelButtonVisibility(); }
 
@@ -5369,10 +5379,29 @@
   function renderGateHero() {
     const wrap = document.getElementById('gate-hero-wrap');
     const img = document.getElementById('gate-hero-img');
+    const video = document.getElementById('gate-hero-video');
     const fallback = document.getElementById('gate-hero-fallback-heading');
     if (!wrap || !img) return;
-    if (studioCoverUrl) {
+    // Cover Video takes over the whole hero when the studio has one set — it's meant
+    // to be a much livelier first impression than a static photo. Falls straight back
+    // to the Cover Photo (existing behavior, untouched) the moment there's no video, so
+    // every studio that never touches this new option sees no change at all.
+    if (studioCoverVideoUrl && video) {
+      if (video.src !== studioCoverVideoUrl) {
+        video.src = studioCoverVideoUrl;
+        // iOS Safari can silently refuse an autoplay() promise (e.g. Low Power Mode) —
+        // that's fine, the video just sits on its first frame instead of erroring, and
+        // the guest still sees a real photo-like frame rather than a blank box.
+        video.play().catch(function () {});
+      }
+      video.style.display = 'block';
+      img.style.display = 'none';
+      wrap.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+    } else if (studioCoverUrl) {
+      if (video) { video.style.display = 'none'; video.removeAttribute('src'); }
       img.src = studioCoverUrl;
+      img.style.display = 'block';
       wrap.style.display = 'block';
       if (fallback) fallback.style.display = 'none';
     } else {
