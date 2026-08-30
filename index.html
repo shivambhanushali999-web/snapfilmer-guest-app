@@ -2674,10 +2674,32 @@
       // cache before the guest swipes to it, so onload fires almost instantly and the
       // spinner never really shows. This is what replaces the old "looks frozen" gap
       // on slower connections with an actual loading indicator instead of nothing.
-      if (spinnerEl) spinnerEl.style.display = (imgEl.src === targetSrc && imgEl.complete) ? 'none' : 'block';
-      imgEl.onload = function () { if (spinnerEl) spinnerEl.style.display = 'none'; };
-      imgEl.onerror = function () { if (spinnerEl) spinnerEl.style.display = 'none'; };
+      const alreadyLoaded = imgEl.src === targetSrc && imgEl.complete;
+      if (spinnerEl) spinnerEl.style.display = alreadyLoaded ? 'none' : 'block';
+      // navigateViewer() below used to reveal the slide-in (opacity 1 / translateX 0)
+      // on a fixed 220ms timer completely disconnected from whether this photo had
+      // actually finished downloading — on a slow connection, swiping again before
+      // that 220ms photo had loaded aborted its still-in-flight request (the browser
+      // does this automatically the instant .src is reassigned) and forcibly revealed
+      // whatever was on screen anyway. Every subsequent fast swipe kept cancelling the
+      // one before it finished, so the visible photo could get stuck many photos
+      // behind the counter — which kept advancing correctly since that's just JS
+      // state, not tied to the network at all. Now the reveal only happens from
+      // onload/onerror below, so the guest always sees either the spinner or the
+      // photo that's actually, fully on screen — never an aborted in-between state —
+      // no matter how fast they swipe.
+      imgEl.onload = function () {
+        if (spinnerEl) spinnerEl.style.display = 'none';
+        imgEl.style.transform = 'translateX(0)';
+        imgEl.style.opacity = '1';
+      };
+      imgEl.onerror = function () {
+        if (spinnerEl) spinnerEl.style.display = 'none';
+        imgEl.style.transform = 'translateX(0)';
+        imgEl.style.opacity = '1';
+      };
       imgEl.src = targetSrc;
+      if (alreadyLoaded) { imgEl.style.transform = 'translateX(0)'; imgEl.style.opacity = '1'; }
     }
     preloadViewerNeighbors();
     const countEl = document.getElementById('viewer-count');
@@ -2784,14 +2806,15 @@
     img.style.transform = 'translateX(' + (dir * -40) + 'px)';
     img.style.opacity = '0';
     setTimeout(function () {
-      renderViewerImage();
       img.classList.add('no-anim');
       img.style.transform = 'translateX(' + (dir * 40) + 'px)';
       img.style.opacity = '0';
       void img.offsetWidth; // force reflow so this jump isn't batched with the animated state below
       img.classList.remove('no-anim');
-      img.style.transform = 'translateX(0)';
-      img.style.opacity = '1';
+      // Sets the new src and wires up onload/onerror to actually reveal it (translateX
+      // 0 / opacity 1) — see renderViewerImage()'s comment on why the reveal moved
+      // there instead of happening unconditionally right here.
+      renderViewerImage();
       viewerNavLocked = false;
     }, 220);
   }
