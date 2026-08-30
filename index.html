@@ -802,7 +802,7 @@
              photo above when the studio has uploaded one; see renderGateHero(). Muted
              is required for autoplay to be allowed at all on iOS/Chrome; playsinline
              stops iOS from hijacking it into fullscreen the moment it starts. -->
-        <video id="gate-hero-video" muted loop autoplay playsinline style="display:none;"></video>
+        <video id="gate-hero-video" muted loop autoplay playsinline preload="auto" style="display:none;"></video>
         <div class="gate-hero-content">
           <h1 class="gate-serif">Every moment,<br><em>beautifully told.</em></h1>
           <p>Your event photos, videos and memories — beautifully delivered in one place.</p>
@@ -1852,13 +1852,33 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- Razorpay checkout.js, EmailJS, and jsQR used to load here on every single visit even
+     though most guests never pay, never trigger an email, and never scan a QR code on any
+     given visit — that's 3 extra render-blocking network+parse round trips for nothing on
+     slow mobile connections. They're now lazy-loaded via loadScriptOnce() (below) right at
+     the moment each feature is actually used: initiatePurchase() for Razorpay,
+     sendDownloadAllEmail()/shareFavoritesWithPhotographer() for EmailJS, openQrScanner()
+     for jsQR. Each of those already had a graceful "not available" fallback, so this is a
+     pure load-time win with no behavior change for guests who never touch those features. -->
 
 <script>
   // ================= ICONS =================
+  // Loads a third-party <script src> on demand instead of upfront on every page load —
+  // reused by Razorpay/EmailJS/jsQR below. Caches by URL so a second call for the same
+  // script (e.g. re-opening the QR scanner) resolves instantly instead of re-fetching.
+  const _loadedScripts = {};
+  function loadScriptOnce(src) {
+    if (_loadedScripts[src]) return _loadedScripts[src];
+    _loadedScripts[src] = new Promise(function (resolve, reject) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { delete _loadedScripts[src]; reject(new Error('Failed to load ' + src)); };
+      document.body.appendChild(s);
+    });
+    return _loadedScripts[src];
+  }
   function icon(paths) {
     return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
   }
@@ -3081,11 +3101,20 @@
   // background. Left as-is, it falls back to opening the guest's own mail app instead
   // (see openFavoritesMailtoFallback) — that path needs zero setup and always works.
   const EMAILJS_FAVORITES_TEMPLATE_ID = 'REPLACE_WITH_YOUR_TEMPLATE_ID';
-  try {
-    if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY.indexOf('REPLACE') !== 0) {
-      emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-    }
-  } catch (err) {}
+  const EMAILJS_SRC = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+  let emailjsInited = false;
+  // Loads + initializes the EmailJS SDK on first actual use instead of on every page
+  // load — most guests never trigger an email send in a given visit, and until the
+  // REPLACE_WITH_... placeholders above are filled in with real EmailJS credentials
+  // this SDK is never used at all, so there's no reason to make every guest download it.
+  function ensureEmailJs() {
+    return loadScriptOnce(EMAILJS_SRC).then(function () {
+      if (!emailjsInited) {
+        emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+        emailjsInited = true;
+      }
+    });
+  }
 
   // A static app with no backend can't generate/host a ZIP file to attach to the
   // email, so the "download link" opens the guest's own personalized gallery in the
@@ -3098,7 +3127,7 @@
       if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Please enter a valid email address.'; statusEl.style.display = 'block'; }
       return;
     }
-    if (typeof emailjs === 'undefined' || EMAILJS_SERVICE_ID.indexOf('REPLACE') === 0) {
+    if (EMAILJS_SERVICE_ID.indexOf('REPLACE') === 0) {
       if (statusEl) { statusEl.style.color = '#D0342C'; statusEl.textContent = 'Email delivery isn\'t set up yet — downloading to this device instead.'; statusEl.style.display = 'block'; }
       downloadAllPhotos();
       return;
@@ -3107,10 +3136,12 @@
     // than a hardcoded placeholder domain, so the link in the email actually opens
     // something instead of a dead address.
     const galleryLink = window.location.origin + window.location.pathname;
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email: email,
-      event_name: EVENT.name,
-      gallery_link: galleryLink,
+    ensureEmailJs().then(function () {
+      return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+        to_email: email,
+        event_name: EVENT.name,
+        gallery_link: galleryLink,
+      });
     }).then(function () {
       if (statusEl) { statusEl.style.color = '#1FA97A'; statusEl.textContent = 'Sent! Check ' + email + ' for your download link.'; statusEl.style.display = 'block'; }
       if (input) input.value = '';
@@ -3248,7 +3279,7 @@
     let guestName = '';
     try { guestName = localStorage.getItem('sf_guest_name_' + EVENT.id) || ''; } catch (err) {}
 
-    const useEmailJs = typeof emailjs !== 'undefined' && EMAILJS_SERVICE_ID.indexOf('REPLACE') !== 0 && EMAILJS_FAVORITES_TEMPLATE_ID.indexOf('REPLACE') !== 0;
+    const useEmailJs = EMAILJS_SERVICE_ID.indexOf('REPLACE') !== 0 && EMAILJS_FAVORITES_TEMPLATE_ID.indexOf('REPLACE') !== 0;
     if (!useEmailJs) {
       // No silent-send template configured — the guaranteed, zero-setup path is
       // opening the guest's own mail app with everything pre-filled; they just hit send.
@@ -3257,12 +3288,14 @@
       return;
     }
     if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_FAVORITES_TEMPLATE_ID, {
-      to_email: studioContactEmail,
-      event_name: EVENT.name,
-      guest_name: guestName || 'A guest',
-      photo_count: favs.length,
-      photo_list: photoList,
+    ensureEmailJs().then(function () {
+      return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_FAVORITES_TEMPLATE_ID, {
+        to_email: studioContactEmail,
+        event_name: EVENT.name,
+        guest_name: guestName || 'A guest',
+        photo_count: favs.length,
+        photo_list: photoList,
+      });
     }).then(function () {
       if (btn) { btn.disabled = false; btn.textContent = 'Share with Photographer'; }
       if (msgEl) { msgEl.style.color = '#1FA97A'; msgEl.textContent = 'Sent! ' + studioContactEmail + ' now has your ' + favs.length + (favs.length === 1 ? ' selected photo.' : ' selected photos.'); msgEl.style.display = 'block'; }
@@ -3363,8 +3396,14 @@
     overlay.style.display = 'flex';
     fallback.style.display = 'none';
     video.style.display = 'block';
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof jsQR === 'undefined') {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showQrScanFallback('Couldn\'t access the camera on this device. You can still type the Event ID in above.');
+      return;
+    }
+    if (typeof jsQR === 'undefined') {
+      loadScriptOnce('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js')
+        .then(function () { openQrScanner(onResult); })
+        .catch(function () { showQrScanFallback('Couldn\'t load the scanner. You can still type the Event ID in above.'); });
       return;
     }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
@@ -5387,15 +5426,19 @@
     // to the Cover Photo (existing behavior, untouched) the moment there's no video, so
     // every studio that never touches this new option sees no change at all.
     if (studioCoverVideoUrl && video) {
+      // Show the Cover Photo (if any) as a poster underneath the video immediately —
+      // this way the guest sees a real image the instant the page loads instead of a
+      // blank box while the video is still buffering over the network.
+      if (studioCoverUrl && video.poster !== studioCoverUrl) video.poster = studioCoverUrl;
       if (video.src !== studioCoverVideoUrl) {
         video.src = studioCoverVideoUrl;
         // iOS Safari can silently refuse an autoplay() promise (e.g. Low Power Mode) —
-        // that's fine, the video just sits on its first frame instead of erroring, and
-        // the guest still sees a real photo-like frame rather than a blank box.
+        // that's fine, the video just sits on its poster/first frame instead of erroring,
+        // and the guest still sees a real photo-like frame rather than a blank box.
         video.play().catch(function () {});
       }
-      video.style.display = 'block';
       img.style.display = 'none';
+      video.style.display = 'block';
       wrap.style.display = 'block';
       if (fallback) fallback.style.display = 'none';
     } else if (studioCoverUrl) {
@@ -6343,7 +6386,9 @@
       return;
     }
     if (typeof Razorpay === 'undefined') {
-      alert('Payment could not load — please check your internet connection and try again.');
+      loadScriptOnce('https://checkout.razorpay.com/v1/checkout.js')
+        .then(function () { initiatePurchase(type, photoIds); })
+        .catch(function () { alert('Payment could not load — please check your internet connection and try again.'); });
       return;
     }
     if (!EVENT || !EVENT.id) return;
