@@ -2731,11 +2731,24 @@
 
   function openViewer(photos, index) {
     viewerPhotos = photos; viewerIndex = index;
+    viewerNavLocked = false; // fresh open — never start locked from a stale animation
     renderViewerImage();
     pushScreen('viewer');
   }
 
+  // Guards against overlapping slide animations: navigateViewer() advances viewerIndex
+  // immediately but only actually swaps the <img> src 220ms later (after the slide-out
+  // finishes). Without this lock, swiping quickly (completely normal — guests flick
+  // through a gallery fast) fired a second/third navigateViewer() before that timeout
+  // ran, each one restarting the animation and scheduling its own timeout — all of
+  // which read the *current* viewerIndex when they finally fired, so several fast
+  // swipes collapsed into a single, repeatedly-interrupted animation that looked stuck
+  // on one photo (or "kept re-loading") instead of actually stepping through several
+  // photos. Ignoring a new swipe while one is still animating fixes that; 220ms is
+  // short enough that this is never perceptible as unresponsiveness.
+  let viewerNavLocked = false;
   function navigateViewer(delta) {
+    if (viewerNavLocked) return;
     const next = viewerIndex + delta;
     if (next < 0 || next >= viewerPhotos.length) return;
     const dir = delta > 0 ? 1 : -1;
@@ -2745,6 +2758,7 @@
     // Slide the outgoing photo away, swap to the new one, then snap it to the opposite
     // edge (transition disabled for that one frame) and animate it back to center —
     // the same slide-in feel as a native gallery, instead of the old instant src-swap.
+    viewerNavLocked = true;
     img.style.transform = 'translateX(' + (dir * -40) + 'px)';
     img.style.opacity = '0';
     setTimeout(function () {
@@ -2756,6 +2770,7 @@
       img.classList.remove('no-anim');
       img.style.transform = 'translateX(0)';
       img.style.opacity = '1';
+      viewerNavLocked = false;
     }, 220);
   }
 
