@@ -612,16 +612,11 @@
   .viewer-actions { display: flex; gap: 10px; }
   .viewer-img-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; box-sizing: border-box; padding: calc(78px + env(safe-area-inset-top)) 22px 64px; }
   .viewer-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; border-radius: 0; box-shadow: 0 18px 46px -20px rgba(20,16,20,.35); }
-  /* Slide-and-fade transition between photos (see navigateViewer) — mimics a native
-     gallery swipe instead of the old instant src-swap, which could look frozen while a
-     large, not-yet-cached photo was still downloading over the network. .no-anim is
-     toggled on for one frame to snap the incoming image to its off-screen start
-     position without animating that jump. */
-  /* Duration here (.22s) must match the setTimeout in navigateViewer — the JS cuts the
-     outgoing animation short at that mark to swap in the new photo, so the two need to
-     line up or the outgoing slide visibly snaps instead of completing smoothly. */
-  #viewer-img { transition: transform .22s ease, opacity .22s ease; }
-  #viewer-img.no-anim { transition: none; }
+  /* Photo switches are instant (see navigateViewer) — this is just a quick, subtle
+     opacity dip while a not-yet-cached photo is still downloading (renderViewerImage
+     sets opacity to .35 immediately, then back to 1 once it's actually loaded), short
+     enough that it never feels like a scripted animation getting in the way. */
+  #viewer-img { transition: opacity .12s ease; }
   .viewer-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 34px; height: 34px; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: viewer-spin .8s linear infinite; display: none; z-index: 2; pointer-events: none; }
   @keyframes viewer-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
   .viewer-count { color: #fff; font-size: 12.5px; font-weight: 700; background: rgba(255,255,255,.18); padding: 5px 12px; border-radius:10px; }
@@ -2676,30 +2671,26 @@
       // on slower connections with an actual loading indicator instead of nothing.
       const alreadyLoaded = imgEl.src === targetSrc && imgEl.complete;
       if (spinnerEl) spinnerEl.style.display = alreadyLoaded ? 'none' : 'block';
-      // navigateViewer() below used to reveal the slide-in (opacity 1 / translateX 0)
-      // on a fixed 220ms timer completely disconnected from whether this photo had
-      // actually finished downloading — on a slow connection, swiping again before
-      // that 220ms photo had loaded aborted its still-in-flight request (the browser
-      // does this automatically the instant .src is reassigned) and forcibly revealed
-      // whatever was on screen anyway. Every subsequent fast swipe kept cancelling the
-      // one before it finished, so the visible photo could get stuck many photos
-      // behind the counter — which kept advancing correctly since that's just JS
-      // state, not tied to the network at all. Now the reveal only happens from
-      // onload/onerror below, so the guest always sees either the spinner or the
-      // photo that's actually, fully on screen — never an aborted in-between state —
-      // no matter how fast they swipe.
+      // This used to be a scripted 220ms slide-out/slide-in on every single navigation
+      // (plus a lock that dropped any swipe/click that came in during that window) —
+      // meant to feel like a native gallery, but it actually made the viewer feel
+      // slower and less responsive than a plain instant swap, and on a slow connection
+      // it could abort a still-loading photo's request and force-reveal an unfinished
+      // state, leaving the visible photo stuck behind the (purely local, instant)
+      // photo counter. Real fast galleries (Kamero included) just swap the image
+      // immediately — that's what this does now: no delay, no lock, every tap/swipe
+      // is honored the instant it happens. A quick opacity dip is all that shows while
+      // a not-yet-cached photo is still downloading, so it never looks broken.
+      imgEl.style.opacity = alreadyLoaded ? '1' : '0.35';
       imgEl.onload = function () {
         if (spinnerEl) spinnerEl.style.display = 'none';
-        imgEl.style.transform = 'translateX(0)';
         imgEl.style.opacity = '1';
       };
       imgEl.onerror = function () {
         if (spinnerEl) spinnerEl.style.display = 'none';
-        imgEl.style.transform = 'translateX(0)';
         imgEl.style.opacity = '1';
       };
       imgEl.src = targetSrc;
-      if (alreadyLoaded) { imgEl.style.transform = 'translateX(0)'; imgEl.style.opacity = '1'; }
     }
     preloadViewerNeighbors();
     const countEl = document.getElementById('viewer-count');
@@ -2771,7 +2762,6 @@
 
   function openViewer(photos, index) {
     viewerPhotos = photos; viewerIndex = index;
-    viewerNavLocked = false; // fresh open — never start locked from a stale animation
     // Cancel any preloads left over from a previous time the viewer was open — they'd
     // just be wasted bandwidth for an album the guest isn't even looking at anymore.
     activeViewerPreloads.forEach(function (entry) { entry.img.src = ''; });
@@ -2780,43 +2770,17 @@
     pushScreen('viewer');
   }
 
-  // Guards against overlapping slide animations: navigateViewer() advances viewerIndex
-  // immediately but only actually swaps the <img> src 220ms later (after the slide-out
-  // finishes). Without this lock, swiping quickly (completely normal — guests flick
-  // through a gallery fast) fired a second/third navigateViewer() before that timeout
-  // ran, each one restarting the animation and scheduling its own timeout — all of
-  // which read the *current* viewerIndex when they finally fired, so several fast
-  // swipes collapsed into a single, repeatedly-interrupted animation that looked stuck
-  // on one photo (or "kept re-loading") instead of actually stepping through several
-  // photos. Ignoring a new swipe while one is still animating fixes that; 220ms is
-  // short enough that this is never perceptible as unresponsiveness.
-  let viewerNavLocked = false;
+  // Instant, no-lock navigation — every tap/swipe moves immediately, exactly like a
+  // native gallery (Kamero included). This used to run a scripted 220ms slide
+  // animation on every navigation and ignore any swipe/click that came in during that
+  // window; on top of making the viewer feel sluggish even on a fast connection, that
+  // lock is what caused the "photo counter moves but the picture doesn't" bug — see
+  // renderViewerImage()'s comment.
   function navigateViewer(delta) {
-    if (viewerNavLocked) return;
     const next = viewerIndex + delta;
     if (next < 0 || next >= viewerPhotos.length) return;
-    const dir = delta > 0 ? 1 : -1;
-    const img = document.getElementById('viewer-img');
     viewerIndex = next;
-    if (!img) { renderViewerImage(); return; }
-    // Slide the outgoing photo away, swap to the new one, then snap it to the opposite
-    // edge (transition disabled for that one frame) and animate it back to center —
-    // the same slide-in feel as a native gallery, instead of the old instant src-swap.
-    viewerNavLocked = true;
-    img.style.transform = 'translateX(' + (dir * -40) + 'px)';
-    img.style.opacity = '0';
-    setTimeout(function () {
-      img.classList.add('no-anim');
-      img.style.transform = 'translateX(' + (dir * 40) + 'px)';
-      img.style.opacity = '0';
-      void img.offsetWidth; // force reflow so this jump isn't batched with the animated state below
-      img.classList.remove('no-anim');
-      // Sets the new src and wires up onload/onerror to actually reveal it (translateX
-      // 0 / opacity 1) — see renderViewerImage()'s comment on why the reveal moved
-      // there instead of happening unconditionally right here.
-      renderViewerImage();
-      viewerNavLocked = false;
-    }, 220);
+    renderViewerImage();
   }
 
   function toggleLike() {
