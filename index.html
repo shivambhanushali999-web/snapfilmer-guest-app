@@ -5703,7 +5703,13 @@
           const existing = eventPhotos.find(function (p) { return p.id === doc.id; });
           let matched = existing ? existing.matched : null;
           if (matched === null && cachedIds.indexOf(doc.id) !== -1) matched = true;
-          return { id: doc.id, dataUrl: doc.data().dataUrl, thumbUrl: doc.data().thumbUrl || null, previewUrl: doc.data().previewUrl || null, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded };
+          // filename was missing here — the dashboard upload (and the guest upload,
+          // fixed separately) both save it straight to Firestore just fine, but this
+          // mapping never copied it onto the local eventPhotos objects, so every photo
+          // looked filename-less to the rest of the guest app (e.g. "Share with
+          // Photographer" falling back to a made-up "Photo #N" label) no matter what
+          // was actually stored.
+          return { id: doc.id, dataUrl: doc.data().dataUrl, thumbUrl: doc.data().thumbUrl || null, previewUrl: doc.data().previewUrl || null, album: doc.data().album || '', matched: matched, isHighlight: !!doc.data().isHighlight, guestUploaded: !!doc.data().guestUploaded, filename: doc.data().filename || null };
         });
 
         const currentIds = eventPhotos.map(function (p) { return p.id; });
@@ -6129,6 +6135,10 @@
           dataUrl: resized,
           album: '',
           guestUploaded: true,
+          // Missing here before — "Share with Photographer" (and anywhere else that
+          // shows a real filename) fell back to a made-up "Photo #N (ID: ...)" label
+          // for every guest-uploaded photo, since there was no actual filename to show.
+          filename: file.name || null,
           uid: (auth && auth.currentUser) ? auth.currentUser.uid : null,
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
