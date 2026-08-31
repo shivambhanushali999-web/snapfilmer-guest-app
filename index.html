@@ -303,7 +303,7 @@
      Solid bands guarantee the text is always legible AND the photo is always shown
      completely uncovered, regardless of what's in it. */
   .hero { position: relative; margin: 0 0 18px; border-radius: 0 0 28px 28px; overflow: hidden; background: var(--ink); }
-  .hero img { width: 100%; height: 200px; object-fit: cover; display: block; }
+  .hero img { width: 100%; height: 190px; object-fit: cover; display: block; }
   /* calc(...+ env(safe-area-inset-top)) — when this runs as an installed home-screen PWA
      (viewport-fit=cover in the meta tag), the real device status bar/clock/notch overlays
      transparently on top of the page instead of pushing content down, so a flat "top: 20px"
@@ -326,15 +326,15 @@
   /* Studio wordmark — now a normal-flow header band that sits ABOVE the photo on the
      hero's own solid background, instead of absolutely overlaid on top of it (see the
      .hero comment above for why). Comes first in the DOM so it renders above <img>. */
-  .hero-brand { position: relative; z-index: 2; text-align: center; cursor: pointer; padding: calc(14px + env(safe-area-inset-top)) 50px 12px; }
+  .hero-brand { position: relative; z-index: 2; text-align: center; cursor: pointer; padding: calc(8px + env(safe-area-inset-top)) 50px 6px; }
   .hero-brand .crown { color: var(--accent-gold); margin-bottom: 1px; }
-  .hero-brand .crown svg { width: 15px; height: 15px; }
-  .hero-brand .wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: #fff; }
+  .hero-brand .crown svg { width: 14px; height: 14px; }
+  .hero-brand .wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 18px; font-weight: 700; color: #fff; line-height: 1.15; }
   .hero-brand .wordmark em { font-style: normal; color: var(--accent-gold); }
-  .hero-brand .kicker { color: var(--accent-gold); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; margin-top: 2px; }
+  .hero-brand .kicker { color: var(--accent-gold); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; margin-top: 1px; }
   /* Event name/stats — same idea, now a normal-flow footer band below the photo instead
      of overlaid on it. Comes after <img> in the DOM so it renders below it. */
-  .hero-info { position: relative; z-index: 2; text-align: center; padding: 14px 20px calc(16px + env(safe-area-inset-bottom)); }
+  .hero-info { position: relative; z-index: 2; text-align: center; padding: 10px 20px calc(10px + env(safe-area-inset-bottom)); }
   .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 18px; font-weight: 600; margin: 0; }
   .hero-info .cat { display: block; font-size: 13px; }
   .hero-divider { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 3px 0 6px; }
