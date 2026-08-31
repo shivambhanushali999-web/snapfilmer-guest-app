@@ -306,12 +306,14 @@
   .hero img { width: 100%; height: 190px; object-fit: cover; display: block; }
   /* calc(...+ env(safe-area-inset-top)) — when this runs as an installed home-screen PWA
      (viewport-fit=cover in the meta tag), the real device status bar/clock/notch overlays
-     transparently on top of the page instead of pushing content down, so a flat "top: 20px"
+     transparently on top of the page instead of pushing content down, so a flat top padding
      here would sit directly under the clock/status icons (this is exactly what happened:
-     the date pill rendered underneath the phone's own clock). The bell button is the one
-     piece that still needs to clear the real status bar, since it sits in the solid header
-     band right at the very top of the screen. */
-  .hero-top { position: absolute; top: calc(16px + env(safe-area-inset-top)); right: 18px; z-index: 2; }
+     the date pill rendered underneath the phone's own clock). Now a real header row (event
+     name left, bell right) on the hero's solid background, in normal flow above the photo —
+     not absolutely positioned over it — so it only ever takes exactly the space its own
+     content needs. */
+  .hero-top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(14px + env(safe-area-inset-top)) 18px 12px; }
+  .hero-event-title { color: #fff; font-size: 21px; font-weight: 800; margin: 0; line-height: 1.25; cursor: pointer; }
   /* Restored — this base rule got accidentally dropped during an earlier edit pass on this
      block, leaving only the ".viewer-top .glass-btn" override behind. Every glass-btn
      across the whole app (Viewer/Camera/Video-player back buttons, share/download/like,
@@ -1125,35 +1127,25 @@
   <div id="screen-home" class="tab-screen active">
     <div class="scroll">
       <div class="hero">
+        <!-- Simplified per feedback: just the event name in a plain solid header bar,
+             nothing else — no studio branding, no stats — so the header takes minimal
+             space and the cover photo gets the rest of the card. Tapping the name still
+             opens Event Info, same as before. -->
         <div class="hero-top">
+          <h1 class="hero-event-title" id="home-event-name" onclick="openEventInfo()">Vaibhav &amp; Komal</h1>
           <button class="hero-bell-btn" onclick="openNotifications()"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button>
         </div>
-        <!-- Studio wordmark + crown — now a solid-background header band ABOVE the photo
-             (was absolutely centered on top of it) so it's never sitting across a face or
-             any other part of whatever cover photo a studio uploads. Still tappable
-             straight through to the real Portfolio (same destination as the studio name
-             everywhere else). Name/initials come from applyStudioProfile like every other
-             copy of the studio name in this file. -->
-        <div class="hero-brand" onclick="openPortfolio()" title="View Our Portfolio">
+        <!-- Kept in the DOM (just not shown) purely because other code reads these exact
+             elements directly by id: #studio-name for share text and the Reel intro/outro
+             cards, #home-event-cat/#home-stats for renderHomeStats()'s live Photos/Videos/
+             Albums counts. Removing the elements would break that code; hiding them is
+             enough to reclaim the space the user asked for. Can resurface these (e.g. on
+             the Event Info screen) later if wanted — see openEventInfo(). -->
+        <div style="display:none;">
           <div class="crown"><i data-icon="CROWN"></i></div>
-          <!-- Keeps id="studio-name" (moved here from the removed studio-block card) since
-               several other places — Event Info's Studio row, share text, and the Reel
-               intro/outro cards — read this element's real textContent directly. Once
-               applyStudioProfile fills in the real name it becomes plain text (loses the
-               hardcoded two-tone "Snap"/"Filmer" split below), which is expected: that
-               split was only ever a default-brand visual, never meant to survive a
-               different real studio name. -->
           <div class="wordmark" id="studio-name">Snap<em>Filmer</em></div>
           <div class="kicker">Wedding Photography &amp; Films</div>
-        </div>
-        <img id="home-cover" src="" alt="cover">
-        <div class="hero-info" title="Event Info">
-          <h2 id="home-event-name" onclick="openEventInfo()" style="cursor:pointer;">Vaibhav &amp; Komal</h2>
-          <!-- Cursive event-type line — only ever the event's real category (Wedding,
-               Pre-Wedding, etc. as picked in the dashboard's Create Event wizard); the
-               whole line + divider stays hidden if the event has no category set, rather
-               than showing a fake "Wedding" label. See renderHomeStats() below. -->
-          <span class="gate-script cat" id="home-event-cat" style="display:none;color:var(--accent-gold);"></span>
+          <span class="gate-script cat" id="home-event-cat" style="color:var(--accent-gold);"></span>
           <div class="hero-divider"><span></span><i data-icon="HEART" style="width:12px;height:12px;color:var(--accent-gold);"></i><span></span></div>
           <div class="hero-stats" id="home-stats">
             <div class="stat"><i data-icon="IMAGE"></i><b id="home-stat-photos">0</b><span>Photos</span></div>
@@ -1163,6 +1155,7 @@
             <div class="stat"><i data-icon="FOLDER"></i><b id="home-stat-albums">0</b><span>Albums</span></div>
           </div>
         </div>
+        <img id="home-cover" src="" alt="cover">
       </div>
 
       <!-- Real Call/Email/Website + Instagram/Vimeo/WhatsApp/YouTube — moved up here,
