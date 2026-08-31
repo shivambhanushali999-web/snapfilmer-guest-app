@@ -368,6 +368,22 @@
   .home-social-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
   .home-social-row .ghost-btn, .home-social-row .social-ghost { width: 32px; height: 32px; border-radius: 9px; }
   .home-social-row .social-strip { display: flex; gap: 8px; }
+  /* Each contact/social/portfolio icon gets its own solid brand-ish fill + white icon
+     instead of the flat neutral .ghost-btn/.social-ghost look everywhere else — this row
+     specifically is meant to read as a colorful, at-a-glance action bar for guests, not
+     a subtle utility row. Scoped to .home-social-row only so back/share/other ghost
+     buttons elsewhere in the app are unaffected. */
+  .home-social-row .ghost-btn, .home-social-row .social-ghost { border: none; color: #fff; }
+  .home-social-row .ghost-btn i, .home-social-row .social-ghost i { display: flex; }
+  .home-social-row .ghost-btn svg, .home-social-row .social-ghost svg { stroke: #fff; }
+  .home-social-row .portfolio-ghost { background: var(--ink); }
+  .home-social-row .brand-call { background: #34C759; }
+  .home-social-row .brand-mail { background: #4C8DFF; }
+  .home-social-row .brand-web { background: var(--accent); }
+  .home-social-row .brand-insta { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF, #515BD4); }
+  .home-social-row .brand-vimeo { background: #1AB7EA; }
+  .home-social-row .brand-whatsapp { background: #25D366; }
+  .home-social-row .brand-youtube { background: #FF3B30; }
 
   /* ---- Quick action chips ---- */
   .chip-row { display: flex; gap: 10px; padding: 0 16px 18px; overflow-x: auto; }
@@ -1148,14 +1164,15 @@
            below Folders. Same ids/wiring as before, so applyStudioProfile()/
            wireGateQuickLinks() populate/hide these automatically with no code changes. -->
       <div class="home-sec home-social-row" style="margin-top:16px;">
-        <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
-        <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
-        <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+        <div class="social-ghost portfolio-ghost" id="home-portfolio-btn" title="Portfolio" onclick="openPortfolio()"><i data-icon="CAMERA"></i></div>
+        <a class="ghost-btn brand-call" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+        <a class="ghost-btn brand-mail" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+        <a class="ghost-btn brand-web" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
         <div class="social-strip" id="social-strip">
-          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
-          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
-          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
-          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
+          <div class="social-ghost brand-insta"><i data-icon="INSTA_O"></i></div>
+          <div class="social-ghost brand-vimeo"><i data-icon="VIMEO_O"></i></div>
+          <div class="social-ghost brand-whatsapp"><i data-icon="WHATSAPP_O"></i></div>
+          <div class="social-ghost brand-youtube"><i data-icon="YOUTUBE_O"></i></div>
         </div>
       </div>
 
@@ -4067,6 +4084,15 @@
     renderHomeCardVisibility();
     const wrap = document.getElementById('videos-list');
     if (!wrap) return;
+    // The Portfolio-sourced list depends on loadPortfolioEventData() having actually
+    // finished — a guest who taps "Watch Videos" before that fetch resolves used to see
+    // a permanent (never-retried) "No videos added yet", even though the video was
+    // really there. Show a loading state and re-render once the fetch lands instead.
+    if (videosSource === 'portfolio' && !portfolioLoaded) {
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">Loading videos...</div>';
+      loadPortfolioEventData().then(function () { if (videosSource === 'portfolio') renderVideos(); });
+      return;
+    }
     const list = videosSource === 'portfolio' ? ((portfolioEvent && portfolioEvent.videos) || []) : eventVideos;
     currentVideosList = list;
     if (!list.length) {
