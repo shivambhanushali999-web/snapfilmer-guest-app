@@ -1235,7 +1235,7 @@
              exists just leads a guest into an empty "No videos added yet" screen. Hidden
              by default, only shown once eventVideos genuinely has something in it — see
              renderVideos()/renderHomeCardVisibility() below. -->
-        <div class="home-card" id="home-videos-card" onclick="pushScreen('videos')" style="display:none;"><span class="dot"><i data-icon="PLAY_SQ"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div><span class="arr">Watch Videos <i data-icon="CHEVRON"></i></span></div>
+        <div class="home-card" id="home-videos-card" onclick="videosSource='event'; renderVideos(); pushScreen('videos')" style="display:none;"><span class="dot"><i data-icon="PLAY_SQ"></i></span><div class="ttl">Videos</div><div class="dsc">Watch all your videos here</div><span class="arr">Watch Videos <i data-icon="CHEVRON"></i></span></div>
         <!-- Same reasoning as the Videos card above — tapping this used to just pop an
              alert() explaining Highlights aren't on yet / nothing's starred yet, which
              reads as a broken button. Hidden until eventSettings.highlightEnabled AND at
@@ -1702,7 +1702,7 @@
       <div id="portfolio-banner" style="display:none;position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;background:var(--border);"></div>
       <div style="padding:16px;">
         <div class="chip-row" style="padding:0 0 16px;">
-          <div class="chip" onclick="pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Watch Videos</div>
+          <div class="chip" onclick="videosSource='portfolio'; renderVideos(); pushScreen('videos')"><span class="dot"><i data-icon="PLAY_SM"></i></span>Watch Videos</div>
         </div>
         <div class="portfolio-grid" id="portfolio-categories"></div>
       </div>
@@ -4067,11 +4067,13 @@
     renderHomeCardVisibility();
     const wrap = document.getElementById('videos-list');
     if (!wrap) return;
-    if (!eventVideos.length) {
+    const list = videosSource === 'portfolio' ? ((portfolioEvent && portfolioEvent.videos) || []) : eventVideos;
+    currentVideosList = list;
+    if (!list.length) {
       wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;">No videos added yet — your studio hasn\'t added any videos to this event.</div>';
       return;
     }
-    wrap.innerHTML = eventVideos.map(function (v, i) {
+    wrap.innerHTML = list.map(function (v, i) {
       const thumb = youtubeThumbnailUrl(v.link);
       return '<div class="video-tile" onclick="playEventVideo(' + i + ')">' +
         (thumb
@@ -4331,7 +4333,7 @@
   }
 
   function playEventVideo(index) {
-    const v = eventVideos[index];
+    const v = currentVideosList[index];
     if (!v || !v.link) return;
     const stage = document.getElementById('video-player-stage');
     const titleEl = document.getElementById('video-player-title');
@@ -4391,7 +4393,7 @@
     return db.collection('events').doc(evId).get().then(function (doc) {
       if (!doc.exists) { portfolioEvent = null; portfolioLoaded = true; return null; }
       const d = doc.data();
-      portfolioEvent = { id: evId, name: d.name || '', cover: d.cover || '', albums: Array.isArray(d.albums) ? d.albums : [] };
+      portfolioEvent = { id: evId, name: d.name || '', cover: d.cover || '', albums: Array.isArray(d.albums) ? d.albums : [], videos: Array.isArray(d.videos) ? d.videos : [] };
       return db.collection('photos').where('eventId', '==', evId).get();
     }).then(function (snap) {
       portfolioPhotosByAlbum = {};
@@ -4726,6 +4728,14 @@
   // sync live below (startEventSettingsSync), not a one-time fetch, so a video added
   // mid-visit shows up without the guest needing to reload.
   let eventVideos = [];
+  // Which video list the Videos screen should currently render: the followed event's own
+  // videos, or the studio's Portfolio-event videos (reachable pre-follow from the public
+  // Portfolio screen's "Watch Videos" chip). currentVideosList is what actually gets
+  // rendered/played, kept separate from eventVideos so a live Firestore update to the
+  // followed event's videos (see startEventSettingsSync) can't clobber the portfolio
+  // list while a guest who hasn't followed anything is mid-browse of it.
+  let videosSource = 'event';
+  let currentVideosList = [];
   let galleryAlbumFilter = null;
   // Sentinel value for galleryAlbumFilter meaning "photos with no album tag at all" —
   // distinct from null (which means no filter / show everything), so the Home
