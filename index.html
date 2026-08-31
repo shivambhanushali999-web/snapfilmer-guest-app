@@ -4369,28 +4369,28 @@
     if (titleEl) titleEl.textContent = v.name || 'Video';
     const info = parseVideoEmbed(v.link);
     if (info.type === 'youtube') {
-      stage.innerHTML = vpPlayerHtml();
-      wireVpControls();
+      // Reverted to YouTube's own controls (was a custom no-branding overlay bar) — on
+      // iOS Safari, fullscreen for an embedded cross-origin iframe video is ONLY reachable
+      // via that platform's own native controls calling their internal <video> element;
+      // there's no web API that lets our page trigger it from outside. Hiding YouTube's
+      // controls (controls:0/fs:0) to remove branding silently killed fullscreen as a
+      // side effect. Guests asked for working fullscreen back, so branding returns too —
+      // this is a real platform trade-off, not a bug (see the note above this function).
+      stage.innerHTML = '<div class="vp-mount" id="vp-mount"></div>';
       loadYouTubeApi().then(function () {
         activeVideoPlayer = { type: 'youtube', api: new YT.Player('vp-mount', {
           videoId: info.id,
-          playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, playsinline: 1, fs: 0, disablekb: 1, iv_load_policy: 3 },
-          events: {
-            onReady: function (e) { e.target.playVideo(); vpStartPolling(); vpShowControls(); },
-            onStateChange: function (e) { vpSetPlayIcon(e.data === 1); },
-          },
+          playerVars: { autoplay: 1, controls: 1, fs: 1, playsinline: 1, rel: 0, iv_load_policy: 3 },
+          events: { onReady: function (e) { e.target.playVideo(); } },
         }) };
       });
     } else if (info.type === 'vimeo') {
-      stage.innerHTML = vpPlayerHtml();
-      wireVpControls();
+      // Same trade-off as the YouTube branch above — native Vimeo controls back in
+      // exchange for working iOS fullscreen.
+      stage.innerHTML = '<div class="vp-mount" id="vp-mount"></div>';
       loadVimeoApi().then(function () {
-        const player = new Vimeo.Player('vp-mount', { id: info.id, autoplay: true, controls: false, playsinline: true });
+        const player = new Vimeo.Player('vp-mount', { id: info.id, autoplay: true, controls: true, playsinline: true });
         activeVideoPlayer = { type: 'vimeo', api: player };
-        player.on('play', function () { vpSetPlayIcon(true); });
-        player.on('pause', function () { vpSetPlayIcon(false); });
-        vpStartPolling();
-        vpShowControls();
       });
     } else {
       // Direct video file, or an unrecognized host — a native <video controls> tag
