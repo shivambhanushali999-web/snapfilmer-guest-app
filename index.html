@@ -588,7 +588,17 @@
 
   /* ---- Photo grid ---- */
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .photo-cell { position: relative; border-radius:0; overflow: hidden; aspect-ratio: 3/4; background: var(--border); cursor: pointer; }
+  /* content-visibility: auto skips layout/paint/rendering work entirely for grid cells
+     that are far off-screen — a stronger optimization than loading="lazy" alone, since
+     lazy only defers the image *download*, not the browser's per-frame cost of having
+     that DOM node exist while scrolling past it. contain-intrinsic-size gives the browser
+     a placeholder size to reserve (matching the 3:4 aspect-ratio) so scroll position
+     doesn't jump once a cell's real content finally renders in. This is the single
+     biggest lever available for smoother scroll on a big Firestore-backed grid in a
+     browser tab — a native app (Flutter, etc.) gets this kind of cell-recycling for
+     free from its own rendering engine, a web page has to opt into the closest
+     equivalent explicitly. */
+  .photo-cell { position: relative; border-radius:0; overflow: hidden; aspect-ratio: 3/4; background: var(--border); cursor: pointer; content-visibility: auto; contain-intrinsic-size: 200px 267px; }
   .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .wm-badge { position: absolute; left: 8px; bottom: 8px; background: rgba(75,93,58,.9); color: #fff; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius:6px; letter-spacing: .3px; }
   /* Small heart badge on any grid thumbnail already added to Favorites — top-right so
@@ -6006,7 +6016,12 @@
         // is only ever loaded when a guest actually opens a photo (openViewer) or
         // downloads/reels it — see the thumbUrl comment on prepareUploadBlob's sibling
         // in the dashboard for why this exists.
-        cell.innerHTML = '<img src="' + cdnize(p.thumbUrl || p.dataUrl) + '" loading="lazy">' + badge + favBadge + wmHtml + sellBadge;
+        // decoding="async" lets the browser decode each JPEG off the main thread instead
+        // of blocking it right as a cell scrolls into view — without it, decode work
+        // competes with the same thread that's handling the scroll gesture itself, which
+        // is exactly the kind of stutter a native app's own image pipeline never has to
+        // deal with (its decoding is never on the UI thread to begin with).
+        cell.innerHTML = '<img src="' + cdnize(p.thumbUrl || p.dataUrl) + '" loading="lazy" decoding="async">' + badge + favBadge + wmHtml + sellBadge;
         cell.addEventListener('click', function () {
           if (sellingHere && sellingSelectMode && !isPhotoUnlocked(p.id)) {
             toggleSellingCartPhoto(p.id);
