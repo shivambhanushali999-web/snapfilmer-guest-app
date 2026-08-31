@@ -295,21 +295,23 @@
   /* Full-bleed like the reference exactly — no side margins, square top corners flush
      with the screen, only the bottom two corners rounded into the page background below.
      overflow: hidden on .hero clips both the img and the ::after gradient to match. */
-  .hero { position: relative; margin: 0 0 18px; border-radius: 0 0 28px 28px; overflow: hidden; }
-  .hero img { width: 100%; height: 260px; object-fit: cover; display: block; }
-  /* Two gradients: the original bottom-up one (for the date/title text), plus a new
-     top-down one so the bell button in .hero-top always has a dark backdrop to sit on.
-     Without the top gradient, a bright/light-colored cover photo (e.g. a light-colored
-     outfit near the top of frame) could wash out the icon to the point of being invisible
-     against it — happened with this event's actual cover photo. */
-  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.9) 0%, rgba(10,8,6,.55) 30%, rgba(10,8,6,.25) 55%, rgba(10,8,6,0) 75%), linear-gradient(to bottom, rgba(10,8,6,.5), rgba(10,8,6,0) 22%); }
+  /* Redesigned so the studio wordmark/kicker and the event name/stats sit on solid
+     dark bands above and below the cover photo instead of overlaid directly on top of
+     it. Overlaid white text used to land wherever it happened to land on whatever photo
+     a studio picked — often straight across a face, since studios can upload literally
+     any image and there's no way to know in advance where the important part of it is.
+     Solid bands guarantee the text is always legible AND the photo is always shown
+     completely uncovered, regardless of what's in it. */
+  .hero { position: relative; margin: 0 0 18px; border-radius: 0 0 28px 28px; overflow: hidden; background: var(--ink); }
+  .hero img { width: 100%; height: 200px; object-fit: cover; display: block; }
   /* calc(...+ env(safe-area-inset-top)) — when this runs as an installed home-screen PWA
      (viewport-fit=cover in the meta tag), the real device status bar/clock/notch overlays
      transparently on top of the page instead of pushing content down, so a flat "top: 20px"
      here would sit directly under the clock/status icons (this is exactly what happened:
-     the date pill rendered underneath the phone's own clock). Every absolutely positioned
-     element inside .hero now clears the real status bar first. */
-  .hero-top { position: absolute; top: calc(16px + env(safe-area-inset-top)); left: 18px; right: 18px; display: flex; justify-content: flex-end; align-items: flex-start; z-index: 2; }
+     the date pill rendered underneath the phone's own clock). The bell button is the one
+     piece that still needs to clear the real status bar, since it sits in the solid header
+     band right at the very top of the screen. */
+  .hero-top { position: absolute; top: calc(16px + env(safe-area-inset-top)); right: 18px; z-index: 2; }
   /* Restored — this base rule got accidentally dropped during an earlier edit pass on this
      block, leaving only the ".viewer-top .glass-btn" override behind. Every glass-btn
      across the whole app (Viewer/Camera/Video-player back buttons, share/download/like,
@@ -321,15 +323,18 @@
      just toggling a blank dot. */
   .hero-bell-btn { position: relative; background: none; border: none; color: #fff; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
   .notif-badge { position: absolute; top: -8px; right: -10px; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px; background: var(--accent-gold); color: #2A2116; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
-  /* Studio wordmark centered near the top of the hero — real name/kicker (applyStudioProfile),
-     tap-through to Portfolio same as everywhere else this wordmark appears. */
-  .hero-brand { position: absolute; top: calc(28px + env(safe-area-inset-top)); left: 20px; right: 20px; z-index: 2; text-align: center; cursor: pointer; }
+  /* Studio wordmark — now a normal-flow header band that sits ABOVE the photo on the
+     hero's own solid background, instead of absolutely overlaid on top of it (see the
+     .hero comment above for why). Comes first in the DOM so it renders above <img>. */
+  .hero-brand { position: relative; z-index: 2; text-align: center; cursor: pointer; padding: calc(14px + env(safe-area-inset-top)) 50px 12px; }
   .hero-brand .crown { color: var(--accent-gold); margin-bottom: 1px; }
   .hero-brand .crown svg { width: 15px; height: 15px; }
   .hero-brand .wordmark { font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: #fff; }
   .hero-brand .wordmark em { font-style: normal; color: var(--accent-gold); }
   .hero-brand .kicker { color: var(--accent-gold); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.6px; margin-top: 2px; }
-  .hero-info { position: absolute; left: 20px; right: 20px; bottom: 10px; z-index: 2; text-align: center; }
+  /* Event name/stats — same idea, now a normal-flow footer band below the photo instead
+     of overlaid on it. Comes after <img> in the DOM so it renders below it. */
+  .hero-info { position: relative; z-index: 2; text-align: center; padding: 14px 20px calc(16px + env(safe-area-inset-bottom)); }
   .hero-info h2 { color: #fff; font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 18px; font-weight: 600; margin: 0; }
   .hero-info .cat { display: block; font-size: 13px; }
   .hero-divider { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 3px 0 6px; }
@@ -368,22 +373,22 @@
   .home-social-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
   .home-social-row .ghost-btn, .home-social-row .social-ghost { width: 32px; height: 32px; border-radius: 9px; }
   .home-social-row .social-strip { display: flex; gap: 8px; }
-  /* Each contact/social/portfolio icon gets its own solid brand-ish fill + white icon
-     instead of the flat neutral .ghost-btn/.social-ghost look everywhere else — this row
-     specifically is meant to read as a colorful, at-a-glance action bar for guests, not
-     a subtle utility row. Scoped to .home-social-row only so back/share/other ghost
-     buttons elsewhere in the app are unaffected. */
-  .home-social-row .ghost-btn, .home-social-row .social-ghost { border: none; color: #fff; }
+  /* One consistent solid fill + white icon across every contact/social button in this
+     row (previously each platform got its own brand color — call green, Instagram
+     gradient, etc. — but that read as busy/cluttered rather than premium; a single
+     uniform tone reads calmer and more on-brand). Scoped to .home-social-row only so
+     back/share/other ghost buttons elsewhere in the app are unaffected. */
+  .home-social-row .ghost-btn, .home-social-row .social-ghost { border: none; color: #fff; background: var(--ink); }
   .home-social-row .ghost-btn i, .home-social-row .social-ghost i { display: flex; }
   .home-social-row .ghost-btn svg, .home-social-row .social-ghost svg { stroke: #fff; }
-  .home-social-row .portfolio-ghost { background: var(--ink); }
-  .home-social-row .brand-call { background: #34C759; }
-  .home-social-row .brand-mail { background: #4C8DFF; }
-  .home-social-row .brand-web { background: var(--accent); }
-  .home-social-row .brand-insta { background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF, #515BD4); }
-  .home-social-row .brand-vimeo { background: #1AB7EA; }
-  .home-social-row .brand-whatsapp { background: #25D366; }
-  .home-social-row .brand-youtube { background: #FF3B30; }
+  /* Portfolio is the one button in this row that isn't a plain icon square — it's a
+     wider labeled pill, pinned to the right end of the row (margin-left:auto) so it
+     reads as a distinct, prominent call-to-action rather than blending in with the
+     plain contact/social icons. */
+  .home-social-row .portfolio-ghost {
+    width: auto; margin-left: auto; padding: 0 14px; border-radius: 999px;
+    display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800;
+  }
 
   /* ---- Quick action chips ---- */
   .chip-row { display: flex; gap: 10px; padding: 0 16px 18px; overflow-x: auto; }
@@ -1120,14 +1125,14 @@
   <div id="screen-home" class="tab-screen active">
     <div class="scroll">
       <div class="hero">
-        <img id="home-cover" src="" alt="cover">
         <div class="hero-top">
           <button class="hero-bell-btn" onclick="openNotifications()"><i data-icon="BELL"></i><span class="notif-badge" style="display:none;"></span></button>
         </div>
-        <!-- Studio wordmark + crown, centered over the top of the hero photo — tappable
+        <!-- Studio wordmark + crown — now a solid-background header band ABOVE the photo
+             (was absolutely centered on top of it) so it's never sitting across a face or
+             any other part of whatever cover photo a studio uploads. Still tappable
              straight through to the real Portfolio (same destination as the studio name
-             everywhere else), so removing the old studio-block card below doesn't lose
-             that entry point. Name/initials come from applyStudioProfile like every other
+             everywhere else). Name/initials come from applyStudioProfile like every other
              copy of the studio name in this file. -->
         <div class="hero-brand" onclick="openPortfolio()" title="View Our Portfolio">
           <div class="crown"><i data-icon="CROWN"></i></div>
@@ -1141,6 +1146,7 @@
           <div class="wordmark" id="studio-name">Snap<em>Filmer</em></div>
           <div class="kicker">Wedding Photography &amp; Films</div>
         </div>
+        <img id="home-cover" src="" alt="cover">
         <div class="hero-info" title="Event Info">
           <h2 id="home-event-name" onclick="openEventInfo()" style="cursor:pointer;">Vaibhav &amp; Komal</h2>
           <!-- Cursive event-type line — only ever the event's real category (Wedding,
@@ -1164,16 +1170,16 @@
            below Folders. Same ids/wiring as before, so applyStudioProfile()/
            wireGateQuickLinks() populate/hide these automatically with no code changes. -->
       <div class="home-sec home-social-row" style="margin-top:16px;">
-        <div class="social-ghost portfolio-ghost" id="home-portfolio-btn" title="Portfolio" onclick="openPortfolio()"><i data-icon="CAMERA"></i></div>
-        <a class="ghost-btn brand-call" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
-        <a class="ghost-btn brand-mail" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
-        <a class="ghost-btn brand-web" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
+        <a class="ghost-btn" id="studio-call-btn" href="#" title="Call" style="display:none;text-decoration:none;"><i data-icon="PHONE"></i></a>
+        <a class="ghost-btn" id="studio-mail-btn" href="#" title="Email" style="display:none;text-decoration:none;"><i data-icon="MAIL"></i></a>
+        <a class="ghost-btn" id="studio-web-btn" href="#" target="_blank" rel="noopener" title="Website" style="display:none;text-decoration:none;"><i data-icon="GLOBE"></i></a>
         <div class="social-strip" id="social-strip">
-          <div class="social-ghost brand-insta"><i data-icon="INSTA_O"></i></div>
-          <div class="social-ghost brand-vimeo"><i data-icon="VIMEO_O"></i></div>
-          <div class="social-ghost brand-whatsapp"><i data-icon="WHATSAPP_O"></i></div>
-          <div class="social-ghost brand-youtube"><i data-icon="YOUTUBE_O"></i></div>
+          <div class="social-ghost"><i data-icon="INSTA_O"></i></div>
+          <div class="social-ghost"><i data-icon="VIMEO_O"></i></div>
+          <div class="social-ghost"><i data-icon="WHATSAPP_O"></i></div>
+          <div class="social-ghost"><i data-icon="YOUTUBE_O"></i></div>
         </div>
+        <div class="social-ghost portfolio-ghost" id="home-portfolio-btn" title="Portfolio" onclick="openPortfolio()"><i data-icon="CAMERA"></i><span>Portfolio</span></div>
       </div>
 
       <!-- "Install App" nudge — shown once per guest (dismissible, remembered in
@@ -1856,6 +1862,12 @@
     <div class="video-player-top">
       <button class="glass-btn" onclick="closeVideoPlayer()"><i data-icon="BACK"></i></button>
       <h1 class="video-player-title" id="video-player-title">Video</h1>
+      <!-- Native YouTube/Vimeo controls (restored for working iOS fullscreen — see
+           playEventVideo()) don't share OUR app's branded ?video= deep link, only the
+           raw youtube.com/vimeo.com URL if a guest finds their own share option inside
+           those controls. This button, same as before, always shares/copies the real
+           SnapFilmer link via vpShare(). -->
+      <button class="glass-btn" onclick="vpShare()"><i data-icon="SHARE"></i></button>
     </div>
     <div class="video-player-stage" id="video-player-stage"></div>
   </div>
