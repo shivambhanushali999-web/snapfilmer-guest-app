@@ -2691,7 +2691,7 @@
     // before previewUrl existed. Download/share/Reels still pull the real dataUrl
     // (see downloadCurrentPhoto/shareCurrentPhoto/loadImageForReel) — this only
     // changes what's rendered on screen.
-    const targetSrc = currentPhoto ? (currentPhoto.previewUrl || currentPhoto.dataUrl) : '';
+    const targetSrc = currentPhoto ? cdnize(currentPhoto.previewUrl || currentPhoto.dataUrl) : '';
     if (imgEl) {
       // Show the spinner only if this photo genuinely isn't ready yet — most of the
       // time preloadViewerNeighbors() below has already fetched it into the browser
@@ -2780,7 +2780,7 @@
       // Preload whatever renderViewerImage() will actually display (previewUrl,
       // falling back to dataUrl) — preloading the full original here would silently
       // undo the bandwidth savings previewUrl exists for.
-      const src = p.previewUrl || p.dataUrl;
+      const src = cdnize(p.previewUrl || p.dataUrl);
       if (!src) return;
       if (activeViewerPreloads.some(function (e) { return e.index === i; })) return;
       const img = new Image();
@@ -2937,7 +2937,7 @@
         if (!hasLogo) return Promise.resolve();
         const logoSize = Math.round(canvas.width * 0.1 * ((w.logoScale || 100) / 100));
         logoBoxHeight = logoSize;
-        return loadImageEl(studioLogoUrl).then(function (logoImg) {
+        return loadImageEl(cdnize(studioLogoUrl)).then(function (logoImg) {
           const wantsSponsor = eventWatermark.dualLogo && eventWatermark.sponsorLogoUrl;
           function paint(sponsorImg) {
             ctx.save();
@@ -2954,7 +2954,7 @@
             ctx.restore();
           }
           return wantsSponsor
-            ? loadImageEl(eventWatermark.sponsorLogoUrl).then(paint).catch(function () { paint(null); })
+            ? loadImageEl(cdnize(eventWatermark.sponsorLogoUrl)).then(paint).catch(function () { paint(null); })
             : Promise.resolve(paint(null));
         }).catch(function () { logoBoxHeight = 0; }); // missing/broken logo — text (if any) still applies
       }
@@ -3056,7 +3056,7 @@
   // URLs with no real bytes to save — not a real photo, so nothing to actually download.
   function downloadCurrentPhoto() {
     const p = viewerPhotos[viewerIndex];
-    const src = p && p.dataUrl;
+    const src = p && cdnize(p.dataUrl);
     if (!src) return;
     // Keep the camera's own filename (e.g. "MITU7165.jpg") instead of renaming it to
     // "snapfilmer-photo-N.jpg" — guests/studio both need the original numbering intact
@@ -3077,7 +3077,7 @@
     }
     toDownload.forEach(function (p, i) {
       // Stagger slightly so the browser doesn't treat rapid-fire downloads as popups.
-      setTimeout(function () { triggerDownload(p.dataUrl, p.filename || ('snapfilmer-photo-' + (i + 1) + '.jpg'), p.id && isPhotoUnlocked(p.id)); }, i * 300);
+      setTimeout(function () { triggerDownload(cdnize(p.dataUrl), p.filename || ('snapfilmer-photo-' + (i + 1) + '.jpg'), p.id && isPhotoUnlocked(p.id)); }, i * 300);
     });
   }
 
@@ -3538,7 +3538,7 @@
     photos.forEach(function (p, i) {
       // Keep the camera's own filename instead of renaming to "snapfilmer-<album>-N.jpg"
       // — matches the same fix applied to the single-photo and My Photos downloads.
-      setTimeout(function () { triggerDownload(p.dataUrl, p.filename || ('snapfilmer-' + title.replace(/\s+/g, '-').toLowerCase() + '-' + (i + 1) + '.jpg')); }, i * 300);
+      setTimeout(function () { triggerDownload(cdnize(p.dataUrl), p.filename || ('snapfilmer-' + title.replace(/\s+/g, '-').toLowerCase() + '-' + (i + 1) + '.jpg')); }, i * 300);
     });
   }
 
@@ -3735,7 +3735,7 @@
       cell.className = 'photo-cell';
       const img = document.createElement('img');
       img.loading = 'lazy';
-      img.src = p.thumbUrl || p.dataUrl;
+      img.src = cdnize(p.thumbUrl || p.dataUrl);
       const wm = document.createElement('div');
       wm.className = 'wm-badge';
       wm.textContent = 'SF';
@@ -3788,7 +3788,7 @@
       if (highlighted.length) {
         const item = document.createElement('div');
         item.className = 'story';
-        item.innerHTML = '<div class="story-ring"><img src="' + (highlighted[0].thumbUrl || highlighted[0].dataUrl) + '"></div><span>Highlights</span>';
+        item.innerHTML = '<div class="story-ring"><img src="' + cdnize(highlighted[0].thumbUrl || highlighted[0].dataUrl) + '"></div><span>Highlights</span>';
         item.addEventListener('click', openRealHighlights);
         wrap.appendChild(item);
       }
@@ -3801,7 +3801,7 @@
     eventAlbums.forEach(function (a) {
       const photosInAlbum = eventPhotos.filter(function (p) { return p.album === a.name; });
       if (!photosInAlbum.length && !a.cover) return; // nothing real to show for this album yet
-      const cover = a.cover || photosInAlbum[0].thumbUrl || photosInAlbum[0].dataUrl;
+      const cover = cdnize(a.cover || photosInAlbum[0].thumbUrl || photosInAlbum[0].dataUrl);
       const item = document.createElement('div');
       item.className = 'story';
       item.innerHTML = '<div class="story-ring"><img src="' + cover + '"></div><span>' + escWm(a.name) + '</span>';
@@ -3839,7 +3839,7 @@
       card.innerHTML =
         '<div class="event-card-top">' +
           '<div class="event-card-thumb-wrap">' +
-            '<img src="' + e.cover + '">' +
+            '<img src="' + cdnize(e.cover) + '">' +
             (isCurrent ? '<span class="event-card-current">Current</span>' : '') +
           '</div>' +
           '<div class="event-card-info">' +
@@ -4368,7 +4368,7 @@
       // Direct video file, or an unrecognized host — a native <video controls> tag
       // has its own working seek/fast-forward/fullscreen and no outside-linking
       // branding problem, so no custom control bar is needed for this case.
-      stage.innerHTML = '<video src="' + info.url + '" controls autoplay playsinline></video>';
+      stage.innerHTML = '<video src="' + cdnize(info.url) + '" controls autoplay playsinline></video>';
       activeVideoPlayer = { type: 'file', api: stage.querySelector('video') };
     }
     pushScreen('video-player');
@@ -4422,7 +4422,7 @@
       return;
     }
     if (banner) {
-      const coverSrc = studioCoverUrl || (portfolioEvent && portfolioEvent.cover) || '';
+      const coverSrc = cdnize(studioCoverUrl || (portfolioEvent && portfolioEvent.cover) || '');
       if (coverSrc) {
         banner.style.display = 'block';
         banner.innerHTML = '<img src="' + coverSrc + '" style="width:100%;height:100%;object-fit:cover;display:block;">' +
@@ -4441,7 +4441,7 @@
       const photos = portfolioPhotosByAlbum[c.name] || [];
       const card = document.createElement('div');
       card.className = 'cat-card';
-      card.innerHTML = '<img src="' + (c.cover || (photos[0] && (photos[0].thumbUrl || photos[0].dataUrl)) || '') + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + photos.length + ' photos</div></div>';
+      card.innerHTML = '<img src="' + cdnize(c.cover || (photos[0] && (photos[0].thumbUrl || photos[0].dataUrl)) || '') + '"><div class="lbl"><div class="nm">' + c.name + '</div><div class="ct">' + photos.length + ' photos</div></div>';
       card.addEventListener('click', function () { openHighlights(c.name, photos); });
       wrap.appendChild(card);
     });
@@ -4696,6 +4696,14 @@
   // Firebase Functions (callable) client — used only by the Photo Selling purchase flow
   // (initiatePurchase below) to reach createRazorpayOrder/verifyRazorpayPayment.
   let functionsClient = null;
+  // Storage — added for handleGuestPhotoUpload() below, which used to write a guest's
+  // full-size resized image as base64 text directly onto the Firestore photo doc. That
+  // made every guest-uploaded photo's Firestore doc huge (megabytes of base64 instead
+  // of a short URL), which meant every device viewing that event had to download that
+  // whole doc through the Firestore SDK — no browser image caching, no CDN, nothing —
+  // instead of loading a normal <img src="https://..."> that the browser/CDN can cache
+  // properly. Uploading through Storage like the dashboard already does fixes that.
+  let storage = null;
   let eventPhotos = [];
   let eventPhotosUnsub = null;
   // faceRecognition: whether the selfie/AI matching feature exists at all for this event.
@@ -4734,11 +4742,28 @@
       db = firebase.firestore();
       auth = firebase.auth();
       functionsClient = firebase.functions();
+      // Storage SDK itself is lazy-loaded (see ensureGuestStorage() near
+      // handleGuestPhotoUpload) — most guests never upload their own photos in a given
+      // visit, so there's no reason to make every guest download this on every load.
     }
   } catch (err) {
     db = null;
     auth = null;
     functionsClient = null;
+  }
+
+  // Rewrites a Firebase Storage download URL to go through our Cloudflare Worker CDN
+  // (cdn.snapfilmer.in), which transparently proxies+caches the exact same
+  // firebasestorage.googleapis.com content at Cloudflare's edge. Display-time only —
+  // never applied before storing a URL in Firestore/localStorage and never applied to
+  // upload calls, so anything that later parses/compares the stored URL (orphaned-file
+  // cleanup, etc.) still sees the canonical Firebase host. Apply this as the LAST step,
+  // right before a URL is written into src/href.
+  function cdnize(url) {
+    if (!url || typeof url !== 'string') return url;
+    return url.indexOf('firebasestorage.googleapis.com') !== -1
+      ? url.replace('firebasestorage.googleapis.com', 'cdn.snapfilmer.in')
+      : url;
   }
 
   // ================= Google Sign-In (redirect flow) =================
@@ -5426,12 +5451,14 @@
     // to the Cover Photo (existing behavior, untouched) the moment there's no video, so
     // every studio that never touches this new option sees no change at all.
     if (studioCoverVideoUrl && video) {
+      const cdnCoverUrl = cdnize(studioCoverUrl);
+      const cdnCoverVideoUrl = cdnize(studioCoverVideoUrl);
       // Show the Cover Photo (if any) as a poster underneath the video immediately —
       // this way the guest sees a real image the instant the page loads instead of a
       // blank box while the video is still buffering over the network.
-      if (studioCoverUrl && video.poster !== studioCoverUrl) video.poster = studioCoverUrl;
-      if (video.src !== studioCoverVideoUrl) {
-        video.src = studioCoverVideoUrl;
+      if (cdnCoverUrl && video.poster !== cdnCoverUrl) video.poster = cdnCoverUrl;
+      if (video.src !== cdnCoverVideoUrl) {
+        video.src = cdnCoverVideoUrl;
         // iOS Safari can silently refuse an autoplay() promise (e.g. Low Power Mode) —
         // that's fine, the video just sits on its poster/first frame instead of erroring,
         // and the guest still sees a real photo-like frame rather than a blank box.
@@ -5443,7 +5470,7 @@
       if (fallback) fallback.style.display = 'none';
     } else if (studioCoverUrl) {
       if (video) { video.style.display = 'none'; video.removeAttribute('src'); }
-      img.src = studioCoverUrl;
+      img.src = cdnize(studioCoverUrl);
       img.style.display = 'block';
       wrap.style.display = 'block';
       if (fallback) fallback.style.display = 'none';
@@ -5468,7 +5495,7 @@
     strip.innerHTML = '';
     cats.forEach(function (c) {
       const photos = portfolioPhotosByAlbum[c.name] || [];
-      const cover = c.cover || (photos[0] && (photos[0].thumbUrl || photos[0].dataUrl)) || '';
+      const cover = cdnize(c.cover || (photos[0] && (photos[0].thumbUrl || photos[0].dataUrl)) || '');
       if (!cover) return; // nothing real to show for this category yet — skip, don't fake it
       const card = document.createElement('div');
       card.className = 'cat-card';
@@ -5626,14 +5653,14 @@
     // circle further down the page.
     if (eventSettings.highlightEnabled && highlighted.length) {
       html += '<div class="home-album-card" data-home-special="highlights" style="background:linear-gradient(135deg,var(--accent-gold,#B08A4A),#6f5227);">' +
-        '<img src="' + (highlighted[0].thumbUrl || highlighted[0].dataUrl) + '" alt="Highlights">' +
+        '<img src="' + cdnize(highlighted[0].thumbUrl || highlighted[0].dataUrl) + '" alt="Highlights">' +
         '<div class="overlay"></div>' +
         '<div class="name">Highlights</div>' +
         '<div class="count-badge">' + (ICONS.STAR || ICONS.IMAGE || '') + highlighted.length + '</div>' +
       '</div>';
     }
     html += eventAlbums.map(function (a, i) {
-      const cover = a.cover ? '<img src="' + a.cover + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
+      const cover = a.cover ? '<img src="' + cdnize(a.cover) + '" alt="' + a.name + '">' : '<div class="folder-fallback">' + (ICONS.IMAGE || '') + '</div>';
       return '<div class="home-album-card" data-home-album="' + i + '">' + cover +
         '<div class="overlay"></div>' +
         '<div class="name">' + a.name + '</div>' +
@@ -5850,9 +5877,9 @@
       // fight the base .wm-logo rule and stays crisp at any scale.
       const logoScalePct = (w.logoScale || 100) / 100;
       const logoStyle = logoScalePct !== 1 ? ' style="transform:scale(' + logoScalePct + ');"' : '';
-      inner += '<img class="wm-logo" src="' + studioLogoUrl + '"' + logoStyle + '>';
+      inner += '<img class="wm-logo" src="' + cdnize(studioLogoUrl) + '"' + logoStyle + '>';
       if (eventWatermark.dualLogo && eventWatermark.sponsorLogoUrl) {
-        inner += '<img class="wm-logo" src="' + eventWatermark.sponsorLogoUrl + '"' + logoStyle + '>';
+        inner += '<img class="wm-logo" src="' + cdnize(eventWatermark.sponsorLogoUrl) + '"' + logoStyle + '>';
       }
     }
     if (hasText) inner += '<span class="wm-text">' + escWm(w.text) + '</span>';
@@ -5938,7 +5965,7 @@
         // is only ever loaded when a guest actually opens a photo (openViewer) or
         // downloads/reels it — see the thumbUrl comment on prepareUploadBlob's sibling
         // in the dashboard for why this exists.
-        cell.innerHTML = '<img src="' + (p.thumbUrl || p.dataUrl) + '" loading="lazy">' + badge + favBadge + wmHtml + sellBadge;
+        cell.innerHTML = '<img src="' + cdnize(p.thumbUrl || p.dataUrl) + '" loading="lazy">' + badge + favBadge + wmHtml + sellBadge;
         cell.addEventListener('click', function () {
           if (sellingHere && sellingSelectMode && !isPhotoUnlocked(p.id)) {
             toggleSellingCartPhoto(p.id);
@@ -6091,6 +6118,17 @@
     note.style.display = 'block';
   }
 
+  // Loads firebase-storage-compat.js on first actual use and initializes `storage` —
+  // see the comment on `let storage = null;` above for why this replaced writing raw
+  // base64 straight into the Firestore doc.
+  function ensureGuestStorage() {
+    if (storage) return Promise.resolve(storage);
+    return loadScriptOnce('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js').then(function () {
+      storage = firebase.storage();
+      return storage;
+    });
+  }
+
   function handleGuestPhotoUpload(evt) {
     const files = Array.prototype.slice.call(evt.target.files || []).filter(function (f) { return f.type && f.type.indexOf('image/') === 0; });
     evt.target.value = '';
@@ -6121,32 +6159,44 @@
     const statusEl = document.getElementById('gallery-upload-status');
     if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Uploading 0/' + toUpload.length + '...'; }
     let done = 0;
-    Promise.all(toUpload.map(function (file) {
-      return new Promise(function (resolve, reject) {
-        const reader = new FileReader();
-        reader.onload = function () { resolve(reader.result); };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      }).then(function (raw) {
-        return resizeDataUrl(raw, 1600);
-      }).then(function (resized) {
-        return db.collection('photos').add({
-          eventId: EVENT.id,
-          dataUrl: resized,
-          album: '',
-          guestUploaded: true,
-          // Missing here before — "Share with Photographer" (and anywhere else that
-          // shows a real filename) fell back to a made-up "Photo #N (ID: ...)" label
-          // for every guest-uploaded photo, since there was no actual filename to show.
-          filename: file.name || null,
-          uid: (auth && auth.currentUser) ? auth.currentUser.uid : null,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    ensureGuestStorage().then(function () {
+      return Promise.all(toUpload.map(function (file) {
+        return new Promise(function (resolve, reject) {
+          const reader = new FileReader();
+          reader.onload = function () { resolve(reader.result); };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        }).then(function (raw) {
+          return resizeDataUrl(raw, 1600);
+        }).then(function (resized) {
+          // Uploaded to Storage now instead of writing the resized base64 straight into
+          // Firestore — same "photos/<eventId>/<random>_<name>" convention the dashboard's
+          // own uploads use, so this photo behaves identically everywhere (real cacheable
+          // URL, works with thumbUrl/previewUrl fallbacks, counted the same way, etc.).
+          const safeName = Date.now() + '_' + Math.random().toString(36).slice(2) + '_' +
+            (file.name || 'photo.jpg').replace(/[^a-zA-Z0-9_.-]/g, '_');
+          const blob = dataUrlToFile(resized, safeName);
+          return storage.ref().child('photos/' + EVENT.id + '/' + safeName).put(blob)
+            .then(function (snap) { return snap.ref.getDownloadURL(); });
+        }).then(function (url) {
+          return db.collection('photos').add({
+            eventId: EVENT.id,
+            dataUrl: url,
+            album: '',
+            guestUploaded: true,
+            // Missing here before — "Share with Photographer" (and anywhere else that
+            // shows a real filename) fell back to a made-up "Photo #N (ID: ...)" label
+            // for every guest-uploaded photo, since there was no actual filename to show.
+            filename: file.name || null,
+            uid: (auth && auth.currentUser) ? auth.currentUser.uid : null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+        }).then(function () {
+          done++;
+          if (statusEl) statusEl.textContent = 'Uploading ' + done + '/' + toUpload.length + '...';
         });
-      }).then(function () {
-        done++;
-        if (statusEl) statusEl.textContent = 'Uploading ' + done + '/' + toUpload.length + '...';
-      });
-    })).then(function () {
+      }));
+    }).then(function () {
       if (statusEl) {
         statusEl.textContent = 'Uploaded ' + done + (done === 1 ? ' photo!' : ' photos!');
         setTimeout(function () { statusEl.style.display = 'none'; }, 2500);
@@ -6916,7 +6966,7 @@
     let loadedCount = 0;
     const totalPhotos = photos.length;
     Promise.all(photos.map(function (p) {
-      return loadImageForReel(p.dataUrl).then(function (img) {
+      return loadImageForReel(cdnize(p.dataUrl)).then(function (img) {
         loadedCount++;
         setReelProgress(3 + (loadedCount / totalPhotos) * 10, 'Loading your photos... (' + loadedCount + '/' + totalPhotos + ')');
         return img;
@@ -7187,7 +7237,7 @@
       if (!d || d.eventId !== EVENT.id || !d.dataUrl) return;
       const thumb = document.getElementById('selfie-thumb');
       const addBtn = document.getElementById('selfie-add');
-      if (thumb) { thumb.src = d.dataUrl; thumb.style.display = 'block'; }
+      if (thumb) { thumb.src = cdnize(d.dataUrl); thumb.style.display = 'block'; }
       if (addBtn) addBtn.style.display = 'none';
       try { localStorage.setItem('sf_selfie_' + EVENT.id, d.dataUrl); } catch (err) {}
       openMyPhotos();
@@ -7623,7 +7673,7 @@
     loadFavorites();
     updateFavoriteBadges();
 
-    document.getElementById('home-cover').src = EVENT.cover;
+    document.getElementById('home-cover').src = cdnize(EVENT.cover);
     document.getElementById('home-event-name').textContent = EVENT.name;
     renderStories();
     renderEvents();
@@ -7643,7 +7693,7 @@
       selfieRawDataUrl = saved;
       const thumb = document.getElementById('selfie-thumb');
       const addBtn = document.getElementById('selfie-add');
-      if (thumb) { thumb.src = saved; thumb.style.display = 'block'; }
+      if (thumb) { thumb.src = cdnize(saved); thumb.style.display = 'block'; }
       if (addBtn) addBtn.style.display = 'none';
     })();
 
